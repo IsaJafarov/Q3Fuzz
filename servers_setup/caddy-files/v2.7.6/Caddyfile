@@ -1,0 +1,11 @@
+{
+	servers {
+		protocols h3
+	}
+}
+
+:443 {
+	tls ../certs/prett3.com.crt ../certs/prett3.com.key
+	root * /usr/local/nginx/html
+	file_server
+}
