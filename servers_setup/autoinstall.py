@@ -1,4 +1,4 @@
-import os, sys
+import os, argparse
 
 current_folder = os.path.dirname(os.path.abspath(__file__))
 os.chdir(current_folder)
@@ -43,6 +43,7 @@ def install_openlitespeed(version):
 
         os.system("sudo cp ../../ols-files/v1.8.1/httpd_config.conf /usr/local/lsws/conf/httpd_config.conf")
         
+        # Configuration with relative path to the SSL certs didn't work. Put absolute path.
         os.system("sudo sed -i -e s+ssl_cert_path+{}/certs/prett3.com.crt+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
         os.system("sudo sed -i -e s+ssl_key_path+{}/certs/prett3.com.key+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
         
@@ -68,9 +69,15 @@ def install_h2o(version):
 
 if __name__ == '__main__':
     
-    server = sys.argv[1]
-    version = sys.argv[2]
+    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='HTTP/3 web servers installation')
+    parser.add_argument("server", help="Server name (nginx, caddy, h2o, ols)")
+    parser.add_argument("version", help="Version (1.25.5 for nginx, 2.7.6 for caddy, 222b36d for h2o, 1.8.1 for openlitespeed)")
+    args = parser.parse_args()
+    server = args.server
+    version = args.version
     
+    # kill the running webserver processes
     os.system("sudo pkill -9 nginx")
     os.system("sudo pkill -9 litespeed")
     
