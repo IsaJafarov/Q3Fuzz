@@ -69,7 +69,6 @@ def install_h2o(version):
 
 if __name__ == '__main__':
     
-    parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation')
     parser.add_argument("server", help="Server name (nginx, caddy, h2o, ols)")
     parser.add_argument("version", help="Version (1.25.5 for nginx, 2.7.6 for caddy, 222b36d for h2o, 1.8.1 for openlitespeed)")
