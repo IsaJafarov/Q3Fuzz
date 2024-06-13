@@ -1,0 +1,14 @@
+{
+	auto_https off
+	servers {
+		protocol {
+			experimental_http3
+		}
+	}
+}
+
+:443 {
+	tls /home/ubuntu/prett3/localhost.crt /home/ubuntu/prett3/localhost.key
+	root * /usr/local/nginx/html
+	file_server
+}
