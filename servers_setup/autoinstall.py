@@ -4,6 +4,13 @@ current_folder = os.path.dirname(os.path.abspath(__file__))
 os.chdir(current_folder)
 
 def install_caddy(version):
+    if version=='2.4.6':
+        os.system("rm -r ./caddy-2.4.6; mkdir caddy-2.4.6")
+        os.chdir("caddy-2.4.6")
+        os.system("pwd")
+        os.system("cp ../caddy-files/v2.4.6/caddy ./")
+        os.system("cp ../caddy-files/v2.4.6/Caddyfile ./")
+        os.system("sudo ./caddy run")
     if version=='2.7.6':
         os.system("rm -r ./caddy-2.7.6; mkdir caddy-2.7.6")
         os.chdir("caddy-2.7.6")
@@ -71,7 +78,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation')
     parser.add_argument("server", help="Server name (nginx, caddy, h2o, ols)")
-    parser.add_argument("version", help="Version (1.25.5 for nginx, 2.7.6 for caddy, 222b36d for h2o, 1.8.1 for openlitespeed)")
+    parser.add_argument("version", help="Version (1.25.5 for nginx, 2.4.6, 2.7.6 for caddy, 222b36d for h2o, 1.8.1 for openlitespeed)")
     args = parser.parse_args()
     server = args.server
     version = args.version
