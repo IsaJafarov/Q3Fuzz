@@ -39,6 +39,23 @@ def install_nginx(version):
         os.system("sudo ../installation-root/sbin/nginx")
 
 def install_openlitespeed(version):
+    if version=='1.7.15':
+        os.system("sudo rm -r ./ols-1.7.15 /usr/local/lsws/; mkdir ./ols-1.7.15")
+        os.chdir("ols-1.7.15")
+        os.system("cp ../ols-files/v1.7.15/openlitespeed-1.7.15.tgz ./")
+        os.system("tar -zxf openlitespeed-1.7.15.tgz")
+        os.chdir("openlitespeed")
+        os.system("sudo bash install.sh")
+
+        os.system("sudo cp ../../ols-files/v1.7.15/httpd_config.conf /usr/local/lsws/conf/httpd_config.conf")
+        
+        # Configuration with relative path to the SSL certs didn't work. Put absolute path.
+        os.system("sudo sed -i -e s+ssl_cert_path+{}/certs/prett3.com.crt+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        os.system("sudo sed -i -e s+ssl_key_path+{}/certs/prett3.com.key+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        
+        os.system("sudo sed -i -e s+'$VH_ROOT/html/'+/usr/local/nginx/html/+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf")
+
+        os.system("sudo /usr/local/lsws/bin/lswsctrl start")
 
     if version=='1.8.1':
         os.system("sudo rm -r ./ols-1.8.1 /usr/local/lsws/; mkdir ./ols-1.8.1")
@@ -78,7 +95,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation')
     parser.add_argument("server", help="Server name (nginx, caddy, h2o, ols)")
-    parser.add_argument("version", help="Version (1.25.5 for nginx, 2.4.6, 2.7.6 for caddy, 222b36d for h2o, 1.8.1 for openlitespeed)")
+    parser.add_argument("version", help="Version (1.25.5 for nginx, 2.4.6/2.7.6 for caddy, 222b36d for h2o, 1.7.15/1.8.1 for openlitespeed)")
     args = parser.parse_args()
     server = args.server
     version = args.version
