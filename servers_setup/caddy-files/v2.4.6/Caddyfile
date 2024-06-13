@@ -8,7 +8,7 @@
 }
 
 :443 {
-	tls /home/ubuntu/prett3/localhost.crt /home/ubuntu/prett3/localhost.key
+	tls /home/ubuntu/prett3/prett3.com.crt /home/ubuntu/prett3/prett3.com.key
 	root * /usr/local/nginx/html
 	file_server
 }
