@@ -21,6 +21,7 @@ def install_caddy(version):
 
 def install_nginx(version):
     if version=='1.23.4':
+        os.system("sudo apt update && sudo apt install build-essential")
         os.system("sudo rm -r ./nginx-1.23.4; mkdir nginx-1.23.4")
         os.chdir("nginx-1.23.4")
         os.system("cp ../nginx-files/v1.23.4/nginx-quic.tar.gz ./")
