@@ -5,11 +5,12 @@ os.chdir(current_folder)
 
 def install_caddy(version):
     if version=='2.7.6':
-        os.system("rm -r ./caddy-2.7.6; mkdir caddy-2.7.6")
+        os.system("rm -rf ./caddy-2.7.6; mkdir caddy-2.7.6")
         os.chdir("caddy-2.7.6")
         os.system("pwd")
         os.system("cp ../caddy-files/v2.7.6/caddy ./")
         os.system("cp ../caddy-files/v2.7.6/Caddyfile ./")
+        os.system("chmod +x ./*")
         os.system("sudo ./caddy run")
 
 def install_nginx(version):
