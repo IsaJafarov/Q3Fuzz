@@ -4,6 +4,13 @@ current_folder = os.path.dirname(os.path.abspath(__file__))
 os.chdir(current_folder)
 
 def install_caddy(version):
+    if version=='2.4.6':
+        os.system("rm -r ./caddy-2.4.6; mkdir caddy-2.4.6")
+        os.chdir("caddy-2.4.6")
+        os.system("pwd")
+        os.system("cp ../caddy-files/v2.4.6/caddy ./")
+        os.system("cp ../caddy-files/v2.4.6/Caddyfile ./")
+        os.system("sudo ./caddy run")
     if version=='2.7.6':
         os.system("rm -rf ./caddy-2.7.6; mkdir caddy-2.7.6")
         os.chdir("caddy-2.7.6")
@@ -14,7 +21,29 @@ def install_caddy(version):
         os.system("sudo ./caddy run")
 
 def install_nginx(version):
-    if version=='1.25.5':
+    if version=='1.23.4':
+        os.system("sudo apt update && sudo apt install build-essential")
+        os.system("sudo rm -r ./nginx-1.23.4; mkdir nginx-1.23.4")
+        os.chdir("nginx-1.23.4")
+        os.system("cp ../nginx-files/v1.23.4/nginx-quic.tar.gz ./")
+        os.system("tar -zxf nginx-quic.tar.gz")
+        os.chdir("nginx-quic")
+        
+        os.system("mkdir ../installation-root")
+        
+        os.system("./auto/configure --with-debug --with-http_v3_module         \
+					   --prefix=../installation-root \
+                       --with-cc-opt=\"-I../boringssl/include\"     \
+                       --with-ld-opt=\"-L../boringssl/build/ssl    \
+                                      -L../boringssl/build/crypto\"")        
+        os.system("sudo make")
+        os.system("sudo make install")
+        os.system("sudo cp ../../nginx-files/v1.23.4/nginx.conf ../installation-root/conf/nginx.conf")
+
+        os.system("sudo ../installation-root/sbin/nginx")
+        
+
+    elif version=='1.25.5':
         os.system("sudo apt update && sudo apt install gcc libpcre3-dev libssl-dev zlib1g-dev")
         os.system("sudo rm -r ./nginx-1.25.5; mkdir nginx-1.25.5")
         os.chdir("nginx-1.25.5")
@@ -33,6 +62,23 @@ def install_nginx(version):
         os.system("sudo ../installation-root/sbin/nginx")
 
 def install_openlitespeed(version):
+    if version=='1.7.15':
+        os.system("sudo rm -r ./ols-1.7.15 /usr/local/lsws/; mkdir ./ols-1.7.15")
+        os.chdir("ols-1.7.15")
+        os.system("cp ../ols-files/v1.7.15/openlitespeed-1.7.15.tgz ./")
+        os.system("tar -zxf openlitespeed-1.7.15.tgz")
+        os.chdir("openlitespeed")
+        os.system("sudo bash install.sh")
+
+        os.system("sudo cp ../../ols-files/v1.7.15/httpd_config.conf /usr/local/lsws/conf/httpd_config.conf")
+        
+        # Configuration with relative path to the SSL certs didn't work. Put absolute path.
+        os.system("sudo sed -i -e s+ssl_cert_path+{}/certs/prett3.com.crt+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        os.system("sudo sed -i -e s+ssl_key_path+{}/certs/prett3.com.key+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        
+        os.system("sudo sed -i -e s+'$VH_ROOT/html/'+/usr/local/nginx/html/+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf")
+
+        os.system("sudo /usr/local/lsws/bin/lswsctrl start")
 
     if version=='1.8.1':
         os.system("sudo rm -r ./ols-1.8.1 /usr/local/lsws/; mkdir ./ols-1.8.1")
@@ -72,7 +118,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation')
     parser.add_argument("server", help="Server name (nginx, caddy, h2o, ols)")
-    parser.add_argument("version", help="Version (1.25.5 for nginx, 2.7.6 for caddy, 222b36d for h2o, 1.8.1 for openlitespeed)")
+    parser.add_argument("version", help="Version (1.23.4/1.25.5 for nginx, 2.4.6/2.7.6 for caddy, 222b36d for h2o, 1.7.15/1.8.1 for openlitespeed)")
     args = parser.parse_args()
     server = args.server
     version = args.version
@@ -80,6 +126,7 @@ if __name__ == '__main__':
     # kill the running webserver processes
     os.system("sudo pkill -9 nginx")
     os.system("sudo pkill -9 litespeed")
+    os.system("sudo pkill -9 caddy")
     
 
     if server == 'caddy':
