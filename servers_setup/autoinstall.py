@@ -100,6 +100,7 @@ def install_openlitespeed(version):
 
 def install_h2o(version):
     if version=='222b36d':
+        os.system("sudo apt install unzip cmake build-essential")
         os.system("sudo rm -r ./h2o-222b36d; mkdir ./h2o-222b36d")
         os.chdir("h2o-222b36d")
         os.system("cp ../h2o-files/222b36d/222b36d7bd3a98616eae82993552098747268d5e.zip ./")
