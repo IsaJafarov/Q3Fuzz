@@ -127,6 +127,7 @@ if __name__ == '__main__':
     # kill the running webserver processes
     os.system("sudo pkill -9 nginx")
     os.system("sudo pkill -9 caddy")
+    os.system("sudo pkill -9 h2o")
     os.system("sudo /usr/local/lsws/bin/lswsctrl stop")
     
 
