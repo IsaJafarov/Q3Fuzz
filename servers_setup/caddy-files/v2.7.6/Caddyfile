@@ -1,6 +1,6 @@
 {
 	servers {
-		protocols h3
+		protocols h1 h3
 	}
 }
 
@@ -8,4 +8,5 @@
 	tls ../certs/prett3.com.crt ../certs/prett3.com.key
 	root * /usr/local/nginx/html
 	file_server
+	header "alt-svc" "h3=\":443\""
 }
