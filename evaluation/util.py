@@ -1,15 +1,19 @@
 # -*- coding: UTF-8 -*-
-# import re
+# Modules for HTTP3
+import pyshark 
 
-# import scapy.contrib.http2 as h2
-# from scapy.layers.inet import IP
-# # import scapy.layers.inet4 as inet4
-# from scapy.utils import rdpcap
+# IETF specification
+QUIC_LONGPACKETTYPE = ['Initial', '0-RTT', 'Handshake', 'Retry']
+QUIC_SHORTPACKETTYPE = "1-RTT" # short packet does not have a type. It corresponds to 1-RTT only.
+QUIC_FRAMETYPE = ['PADDING', 'PING', 'ACK', 'ACK', 'RESET_STREAM', 'STOP_SENDING', 'CRYPTO', 'NEW_TOKEN', \
+             'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', \
+             'MAX_DATA', 'MAX_STREAM_DATA', 'MAX_STREAMS', 'MAX_STREAMS', 'DATA_BLOCKED', 'STREAM_DATA_BLOCKED', 'STREAMS_BLOCKED', 'STREAMS_BLOCKED',\
+             'NEW_CONNECTION_ID', 'RETIRE_CONNECTION_ID', 'PATH_CHALLENGE', 'PATH_RESPONSE', 'CONNECTION_CLOSE', 'CONNECTION_CLOSE', 'HANDSHAKE_DONE', 'IMMEDIATE_ACK',\
+             'DATAGRAM', 'DATAGRAM'] # ~0x21 frames so far
 
-# frameInfoArr = ['DATA', 'HEADERS', 'PRIORITY', 'RST_STREAM', 'SETTINGS', 'PUSHPROMISE', 'PING', 'GO_AWAY',
-#                 'WINDOW_UPDATE', 'CONTINUATION', 'RAW']
-# frameShortInfoArr = ['DA', 'HE', 'PR', 'RS', 'SE', 'PU', 'PI', 'GO', 'WI', 'CO', 'RA']
-# TIMEOUT = 5
+H3_STREAMTYPE = ['Control Stream', 'Push Stream', 'QPACK Encoder Stream', 'QPACK Decoder Stream']
+H3_FRAMETYPE = ['DATA', 'HEADERS', 'Reserved', 'CANCEL_PUSH', 'SETTINGS', 'PUSH_PROMISE', 'Reserved', 'GOAWAY',\
+                'Reserved', 'Reserved', 'Unassigned', 'Unassigned', 'ORIGIN', 'MAX_PUSH_ID'] # ~0x0d frames so far
 
 
 ############# GENERAL #############
@@ -54,53 +58,78 @@ def ip_checker(string):
         return True  # ip adress
 
 
-############# HTTP2 #############
-# def prn_http2(packet):
-# 	global sniff_frame
-# 	sniff_frame = h2.H2Frame(str(packet))
+def h3msg_from_pcap(f): # for HTTP3
+    # Extract all QUIC messages from pcapfile and return an array of http3 messages
+    # Now we only consider EXPORTED_PDU layer instead of UDP
+    print("\n[STEP 2] Parsing QUIC messages from pcapfile %s ..." % f)
+    client_ip = None   # Get ip to gather client message 
+    raw_cap = pyshark.FileCapture(f)
+    quic_cap = pyshark.FileCapture(f, display_filter='quic')
+    quic_packet_list = []
+    quic_cap_cnt = 0
 
-def h3msg_from_pcap(f):
-    # Extract all http2 messages from pcapfile and return an array of http2 messages in scapy form
-    print("\n[STEP 2] Parsing http3 messages from pcapfile %s ..." % f)
-    # Get ip to gather client message 
-    client_ip = None
-    with open(f, 'rb') as f_pre:
-        pcapng = rdpcap(f_pre)
-        for buf in pcapng:
-            http2raw = buf.load[64:]
-            # Got client's message
-            if http2raw[:24] == b'\x50\x52\x49\x20\x2a\x20\x48\x54\x54\x50\x2f\x32\x2e\x30\x0d\x0a\x0d\x0a\x53\x4d\x0d\x0a\x0d\x0a':
-                client_ip = buf.load[16:20]
-                break
+    print("============= List of QUIC packets in pcap =============")
+    for packet in quic_cap:
+        client_flag = " "
+        quic_cap_cnt += 1
+        if client_ip == None and packet.quic.header_form == "1" and packet.quic.long_packet_type == "0": # The first INITIAL packet type of QUIC
+            if 'exported_pdu' in packet: 
+                client_ip = packet.exported_pdu.ip_src
+        # if 'exported_pdu' in packet and packet.exported_pdu.ip_src == client_ip:
+        if 'exported_pdu' in packet:
+            quic_packet_list.append(packet)
+            client_flag = "*"
+        print("  [%d%s] %s" % (quic_cap_cnt, client_flag, packet.layers))
 
-    h2msg_arr = []
-    with open(f, 'rb') as f:
-        pcapng = rdpcap(f)
-        frameid = 1
-        for buf in pcapng:  # for each http2 message
-            if buf.load[16:20] != client_ip:
-                continue
+    print("  [+] Parsing done! (Extracted %d client messages out of all %d QUIC messages.)" % (len(quic_packet_list), quic_cap_cnt))
 
-            http2raw = buf.load[64:]
-            # handle magic
-            if http2raw[:24] == b'\x50\x52\x49\x20\x2a\x20\x48\x54\x54\x50\x2f\x32\x2e\x30\x0d\x0a\x0d\x0a\x53\x4d\x0d\x0a\x0d\x0a':
-                http2raw = http2raw[24:] 
-            tmpseq = h2.H2Seq(http2raw)
-            h2msg_arr.append(tmpseq)
-            frameid += 1
-    print("  [+] Parsing done! (Total %s messages.)" % len(h2msg_arr))
+    quic_packet_cnt = 0
+    print("\n  [DBG] Extracted messages")
+    for quic_packet in quic_packet_list:
+        quic_packet_cnt += 1
+        # A pacekt may have multile layers
+        print("  <PKT %d>---------------" % quic_packet_cnt)
+        quic_layer_cnt = 0
+        for layer in quic_packet.layers:
 
-    msgid = 1
-    # Debugging http2 messages frame by frame
-    # print("  [DBG] messages (shortened)")
-    for h2msg in h2msg_arr:
-        h2msg_str = h2msg_to_str(h2msg)
-        print("    - h2msg %d: %s" % (msgid, h2msg_str))
-        msgid += 1
+            if layer.layer_name == 'quic':
+                quic_layer_cnt += 1
+                if 'header_form' in dir(layer) and layer.header_form == "1": #long header type (Initial | 0-RTT | Handshake | Retry)
+                    print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]))
+                    print("     \t\t- frame (first-only): %s" % QUIC_FRAMETYPE[int(layer.frame_type)])
+                elif 'coalesced_padding_data' in dir(layer):
+                    print("     (Layer %d) [%s] PKT_TYPE: Random_padding" % (quic_layer_cnt, 'QUIC'))
+                else: # short header type (1-RTT)
+                    print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_SHORTPACKETTYPE))
+                    print("     \t\t- frame (first-only): %s" % QUIC_FRAMETYPE[int(layer.frame_type)])
+                    # IMPORTANT ISSUE:
+                    # It is unable to access multiple frames/streams of a pyshark layer,
+                    # even if print(layer) shows multiple frames or streams in a QUIC layer.
+                    # Thus we only consider the topmost frames and use pyshark's own printing method
+                    # for debugging transmitted packets.  
+                    # print(layer)
+            elif layer.layer_name == "http3":
+                quic_layer_cnt += 1
+                # 1. Check stream type
+                if 'stream_type' in dir(layer):
+                    print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', H3_STREAMTYPE[int(layer.stream_type)]))
+                else:
+                    print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', "NONE"))
+                # 2. Check the frame type
+                if 'frame_type' in dir(layer):
+                    print("     \t\t- frame (first-only): %s" % H3_FRAMETYPE[int(layer.frame_type)])
+                
+                # IMPORTANT ISSUE:
+                # Same as QUIC, it is unable to access multiple frames/streams of a pyshark layer (i.e. HEADER),
+                # even if print(layer) shows multiple frames in a HTTP3 layer (i.e., HEADER DATA).
+                # Thus we only consider the topmost frames and use pyshark's own printing method
+                # for debugging transmitted packets.  
+                # Below is the packet number that shows the example.
+                # if quic_packet_cnt == 16:
+                #     print(dir(layer))
+                #     print(layer)
 
-    # [NOTE] An HTTP2 message is a sequence of frames.
-    return h2msg_arr
-
+    return quic_packet_list
 
 
 def h2msg_from_pcap(f):
