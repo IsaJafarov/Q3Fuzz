@@ -11,4 +11,5 @@
 	tls ../certs/prett3.com.crt ../certs/prett3.com.key
 	root * /usr/local/nginx/html
 	file_server
+	header "alt-svc" "h3=\":443\""
 }

@@ -100,6 +100,7 @@ def install_openlitespeed(version):
 
 def install_h2o(version):
     if version=='222b36d':
+        os.system("sudo apt install unzip cmake build-essential")
         os.system("sudo rm -r ./h2o-222b36d; mkdir ./h2o-222b36d")
         os.chdir("h2o-222b36d")
         os.system("cp ../h2o-files/222b36d/222b36d7bd3a98616eae82993552098747268d5e.zip ./")
@@ -118,15 +119,16 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("server", help="supported servers \n\t- nginx\n\t- caddy\n\t- h2o\n\t- ols (openlitespeed)")
-    parser.add_argument("version", help="corresponding version(s) \n\t- 1.23.4 or 1.25.5\t(for nginx) \n\t- 2.4.6 or 2.7.6\t(for caddy)\n\t- 222b36d\t\t(for h20)\n\t- 1.7.15 or 1.8.1\t(for ols)")
+    parser.add_argument("version", help="corresponding version(s) \n\t- 1.23.4 or 1.25.5\t(for nginx) \n\t- 2.4.6 or 2.7.6\t(for caddy)\n\t- 222b36d\t\t(for h2o)\n\t- 1.7.15 or 1.8.1\t(for ols)")
     args = parser.parse_args()
     server = args.server
     version = args.version
     
     # kill the running webserver processes
     os.system("sudo pkill -9 nginx")
-    os.system("sudo pkill -9 litespeed")
     os.system("sudo pkill -9 caddy")
+    os.system("sudo pkill -9 h2o")
+    os.system("sudo /usr/local/lsws/bin/lswsctrl stop")
     
 
     if server == 'caddy':
