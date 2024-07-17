@@ -99,8 +99,21 @@ def install_openlitespeed(version):
         os.system("sudo /usr/local/lsws/bin/lswsctrl start")
 
 def install_h2o(version):
+    os.system("sudo apt install unzip cmake build-essential")
+    if version=='a429117':
+        os.system("sudo rm -r ./h2o-a429117; mkdir ./h2o-a429117")
+        os.chdir("h2o-a429117")
+        os.system("cp ../h2o-files/a429117/a429117babff09542d3517c4fa36c1ef769889c1.zip ./")
+        os.system("unzip a429117babff09542d3517c4fa36c1ef769889c1.zip")
+        os.chdir("h2o-a429117babff09542d3517c4fa36c1ef769889c1")
+        os.system("mkdir -p build")
+        os.chdir("build")
+        os.system("cmake ..")
+        os.system("make")
+        os.system("sudo make install")
+        os.system("cp ../../../h2o-files/a429117/h2o.conf ../examples/h2o/h2o.conf")
+        os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
     if version=='222b36d':
-        os.system("sudo apt install unzip cmake build-essential")
         os.system("sudo rm -r ./h2o-222b36d; mkdir ./h2o-222b36d")
         os.chdir("h2o-222b36d")
         os.system("cp ../h2o-files/222b36d/222b36d7bd3a98616eae82993552098747268d5e.zip ./")
@@ -128,8 +141,7 @@ if __name__ == '__main__':
     os.system("sudo pkill -9 nginx")
     os.system("sudo pkill -9 caddy")
     os.system("sudo pkill -9 h2o")
-    #os.system("sudo /usr/local/lsws/bin/lswsctrl stop")
-    os.system("sudo service lsws stop")
+    os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
     
 
     if server == 'caddy':
