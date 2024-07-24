@@ -19,6 +19,14 @@ def install_caddy(version):
         os.system("cp ../caddy-files/v2.7.6/Caddyfile ./")
         os.system("chmod +x ./*")
         os.system("sudo ./caddy run")
+    if version=='2.8.4':
+        os.system("rm -rf ./caddy-2.8.4; mkdir caddy-2.8.4")
+        os.chdir("caddy-2.8.4")
+        os.system("pwd")
+        os.system("cp ../caddy-files/v2.8.4/caddy ./")
+        os.system("cp ../caddy-files/v2.8.4/Caddyfile ./")
+        os.system("chmod +x ./*")
+        os.system("sudo ./caddy run")
 
 def install_nginx(version):
     if version=='1.23.4':
@@ -163,7 +171,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("server", help="supported servers \n\t- nginx\n\t- caddy\n\t- h2o\n\t- ols (openlitespeed)")
-    parser.add_argument("version", help="corresponding version(s) \n\t- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n\t- 2.4.6 or 2.7.6\t(for caddy)\n\t- a429117, 222b36d or 16b13ee\t(for h2o)\n\t- 1.7.15 or 1.8.1\t(for ols)")
+    parser.add_argument("version", help="corresponding version(s) \n\t- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n\t- 2.4.6, 2.7.6, 2.8.4\t(for caddy)\n\t- a429117, 222b36d or 16b13ee\t(for h2o)\n\t- 1.7.15 or 1.8.1\t(for ols)")
     args = parser.parse_args()
     server = args.server
     version = args.version
