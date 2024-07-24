@@ -61,6 +61,24 @@ def install_nginx(version):
         os.system("sudo cp ../../nginx-files/v1.25.5/nginx.conf ../installation-root/conf/nginx.conf")
         os.system("sudo ../installation-root/sbin/nginx")
 
+    elif version=='1.27.0':
+        os.system("sudo apt update && sudo apt install gcc libpcre3-dev libssl-dev zlib1g-dev")
+        os.system("sudo rm -r ./nginx-1.25.5; mkdir nginx-1.27.0")
+        os.chdir("nginx-1.27.0")
+        os.system("cp ../nginx-files/v1.27.0/nginx-1.27.0.tar.gz ./")
+        os.system("tar -zxf nginx-1.27.0.tar.gz")
+        os.chdir("nginx-1.27.0")
+        os.system('./configure \
+	--prefix=../installation-root \
+	--with-debug \
+	--with-http_v3_module \
+	--with-cc-opt="-I../boringssl/include" \
+	--with-ld-opt="-L../boringssl/build/ssl -L../boringssl/build/crypto"')
+        os.system("sudo make")
+        os.system("sudo make install")
+        os.system("sudo cp ../../nginx-files/v1.27.0/nginx.conf ../installation-root/conf/nginx.conf")
+        os.system("sudo ../installation-root/sbin/nginx")
+
 def install_openlitespeed(version):
     if version=='1.7.15':
         os.system("sudo rm -r ./ols-1.7.15 /usr/local/lsws/; mkdir ./ols-1.7.15")
