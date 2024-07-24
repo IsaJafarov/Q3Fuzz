@@ -63,7 +63,7 @@ def install_nginx(version):
 
     elif version=='1.27.0':
         os.system("sudo apt update && sudo apt install gcc libpcre3-dev libssl-dev zlib1g-dev")
-        os.system("sudo rm -r ./nginx-1.25.5; mkdir nginx-1.27.0")
+        os.system("sudo rm -r ./nginx-1.27.0; mkdir nginx-1.27.0")
         os.chdir("nginx-1.27.0")
         os.system("cp ../nginx-files/v1.27.0/nginx-1.27.0.tar.gz ./")
         os.system("tar -zxf nginx-1.27.0.tar.gz")
@@ -144,13 +144,26 @@ def install_h2o(version):
         os.system("sudo make install")
         os.system("cp ../../../h2o-files/222b36d/h2o.conf ../examples/h2o/h2o.conf")
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
+    if version=='16b13ee':
+        os.system("sudo rm -r ./h2o-16b13ee; mkdir ./h2o-16b13ee")
+        os.chdir("h2o-16b13ee")
+        os.system("cp ../h2o-files/16b13ee/16b13eee8ad7895b4fe3fcbcabee53bd52782562.zip ./")
+        os.system("unzip 16b13eee8ad7895b4fe3fcbcabee53bd52782562.zip")
+        os.chdir("h2o-16b13eee8ad7895b4fe3fcbcabee53bd52782562")
+        os.system("mkdir -p build")
+        os.chdir("build")
+        os.system("cmake ..")
+        os.system("make")
+        os.system("sudo make install")
+        os.system("cp ../../../h2o-files/16b13ee/h2o.conf ../examples/h2o/h2o.conf")
+        os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
         
 
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("server", help="supported servers \n\t- nginx\n\t- caddy\n\t- h2o\n\t- ols (openlitespeed)")
-    parser.add_argument("version", help="corresponding version(s) \n\t- 1.23.4 or 1.25.5\t(for nginx) \n\t- 2.4.6 or 2.7.6\t(for caddy)\n\t- a429117 or 222b36d\t(for h2o)\n\t- 1.7.15 or 1.8.1\t(for ols)")
+    parser.add_argument("version", help="corresponding version(s) \n\t- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n\t- 2.4.6 or 2.7.6\t(for caddy)\n\t- a429117 or 222b36d\t(for h2o)\n\t- 1.7.15 or 1.8.1\t(for ols)")
     args = parser.parse_args()
     server = args.server
     version = args.version
