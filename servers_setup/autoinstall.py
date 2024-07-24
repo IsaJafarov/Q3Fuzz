@@ -7,14 +7,12 @@ def install_caddy(version):
     if version=='2.4.6':
         os.system("rm -r ./caddy-2.4.6; mkdir caddy-2.4.6")
         os.chdir("caddy-2.4.6")
-        os.system("pwd")
         os.system("cp ../caddy-files/v2.4.6/caddy ./")
         os.system("cp ../caddy-files/v2.4.6/Caddyfile ./")
         os.system("sudo ./caddy run")
     if version=='2.7.6':
         os.system("rm -rf ./caddy-2.7.6; mkdir caddy-2.7.6")
         os.chdir("caddy-2.7.6")
-        os.system("pwd")
         os.system("cp ../caddy-files/v2.7.6/caddy ./")
         os.system("cp ../caddy-files/v2.7.6/Caddyfile ./")
         os.system("chmod +x ./*")
@@ -22,7 +20,6 @@ def install_caddy(version):
     if version=='2.8.4':
         os.system("rm -rf ./caddy-2.8.4; mkdir caddy-2.8.4")
         os.chdir("caddy-2.8.4")
-        os.system("pwd")
         os.system("cp ../caddy-files/v2.8.4/caddy ./")
         os.system("cp ../caddy-files/v2.8.4/Caddyfile ./")
         os.system("chmod +x ./*")
