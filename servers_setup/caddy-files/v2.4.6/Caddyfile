@@ -12,4 +12,5 @@
 	root * /usr/local/nginx/html
 	file_server
 	header "alt-svc" "h3=\":443\""
+	header "server" "Caddy 2.4.6"
 }

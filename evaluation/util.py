@@ -57,6 +57,16 @@ def ip_checker(string):
     else:
         return True  # ip adress
 
+def get_frames_of_layer(layer):
+   
+    frame_names = []
+    for field_line in layer._get_all_field_lines():
+        if ':' in field_line:
+            field_name, field_value = field_line.split(':', 1)
+            if (layer.layer_name == 'quic' and field_name.strip() == 'Frame Type') \
+                or (layer.layer_name == 'http3' and field_name.strip() == 'Type') :
+                frame_names.append( field_value.split()[0] )
+    return frame_names
 
 def h3msg_from_pcap(f): # for HTTP3
     # Extract all QUIC messages from pcapfile and return an array of http3 messages
@@ -70,15 +80,16 @@ def h3msg_from_pcap(f): # for HTTP3
 
     print("============= List of QUIC packets in pcap =============")
     for packet in quic_cap:
+        #print(packet)
         client_flag = " "
         quic_cap_cnt += 1
         if client_ip == None and packet.quic.header_form == "1" and packet.quic.long_packet_type == "0": # The first INITIAL packet type of QUIC
             if 'exported_pdu' in packet: 
+                #print(packet)
                 client_ip = packet.exported_pdu.ip_src
         # if 'exported_pdu' in packet and packet.exported_pdu.ip_src == client_ip:
-        if 'exported_pdu' in packet:
-            quic_packet_list.append(packet)
-            client_flag = "*"
+        quic_packet_list.append(packet)
+        client_flag = "*"
         print("  [%d%s] %s" % (quic_cap_cnt, client_flag, packet.layers))
 
     print("  [+] Parsing done! (Extracted %d client messages out of all %d QUIC messages.)" % (len(quic_packet_list), quic_cap_cnt))
@@ -91,18 +102,24 @@ def h3msg_from_pcap(f): # for HTTP3
         print("  <PKT %d>---------------" % quic_packet_cnt)
         quic_layer_cnt = 0
         for layer in quic_packet.layers:
-
+            
+            #layer.pretty_print()
+            #print(layer.field_names)
+           
             if layer.layer_name == 'quic':
                 quic_layer_cnt += 1
+                
                 if 'header_form' in dir(layer) and layer.header_form == "1": #long header type (Initial | 0-RTT | Handshake | Retry)
                     print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]))
-                    print("     \t\t- frame (first-only): %s" % QUIC_FRAMETYPE[int(layer.frame_type)])
                 elif 'coalesced_padding_data' in dir(layer):
                     print("     (Layer %d) [%s] PKT_TYPE: Random_padding" % (quic_layer_cnt, 'QUIC'))
                 else: # short header type (1-RTT)
                     print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_SHORTPACKETTYPE))
-                    print("     \t\t- frame (first-only): %s" % QUIC_FRAMETYPE[int(layer.frame_type)])
-                    # IMPORTANT ISSUE:
+
+                for frame_name in get_frames_of_layer(layer):
+                    print("     \t\t- frame: %s" % frame_name )
+
+                    # IMPORTANT ISSUE:w
                     # It is unable to access multiple frames/streams of a pyshark layer,
                     # even if print(layer) shows multiple frames or streams in a QUIC layer.
                     # Thus we only consider the topmost frames and use pyshark's own printing method
@@ -111,16 +128,14 @@ def h3msg_from_pcap(f): # for HTTP3
             elif layer.layer_name == "http3":
                 quic_layer_cnt += 1
                 # 1. Check stream type
-                if 'stream_type' in dir(layer):
+                if 'stream_type' in dir(layer): # always false????
                     print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', H3_STREAMTYPE[int(layer.stream_type)]))
                 else:
                     print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', "NONE"))
                 # 2. Check the frame type
-                if 'frame_type' in dir(layer):
-                    print("     \t\t- frame (first-only): %s" % H3_FRAMETYPE[int(layer.frame_type)])
+                for frame_name in get_frames_of_layer(layer):
+                    print("     \t\t- frame: %s" % frame_name )
 
-
-                
                 # IMPORTANT ISSUE:
                 # Same as QUIC, it is unable to access multiple frames/streams of a pyshark layer (i.e. HEADER),
                 # even if print(layer) shows multiple frames in a HTTP3 layer (i.e., HEADER DATA).
