@@ -68,9 +68,17 @@ def get_frames_of_layer(layer):
                 frame_names.append( field_value.split()[0] )
     return frame_names
 
-def h3msg_from_pcap(f): # for HTTP3
-    # Extract all QUIC messages from pcapfile and return an array of http3 messages
-    # Now we only consider EXPORTED_PDU layer instead of UDP
+def h3msg_from_pcap(f, client_only=False): # for HTTP3
+    """
+    Extract all QUIC messages from pcapfile and return an array of http3 messages
+    Now we only consider EXPORTED_PDU layer exported by wireshark instead of preserving data of UDP layer.
+
+    Args:
+        f (str): pcap file with QUIC or HTTP/3 messages
+        client_only (bool, default=False): flag for extracting messages set by client side. 
+    Returns:
+        quic_packet_list (FileCapture): QUIC or HTTP/3 messages that are seen in the pcap file.
+    """
     print("\n[STEP 2] Parsing QUIC messages from pcapfile %s ..." % f)
     client_ip = None   # Get ip to gather client message 
     raw_cap = pyshark.FileCapture(f)
@@ -81,16 +89,18 @@ def h3msg_from_pcap(f): # for HTTP3
     print("============= List of QUIC packets in pcap =============")
     for packet in quic_cap:
         #print(packet)
-        client_flag = " "
+        mark_client = " "
         quic_cap_cnt += 1
         if client_ip == None and packet.quic.header_form == "1" and packet.quic.long_packet_type == "0": # The first INITIAL packet type of QUIC
             if 'exported_pdu' in packet: 
-                #print(packet)
                 client_ip = packet.exported_pdu.ip_src
-        # if 'exported_pdu' in packet and packet.exported_pdu.ip_src == client_ip:
-        quic_packet_list.append(packet)
-        client_flag = "*"
-        print("  [%d%s] %s" % (quic_cap_cnt, client_flag, packet.layers))
+        if client_only:
+            if 'exported_pdu' in packet and packet.exported_pdu.ip_src == client_ip:
+                quic_packet_list.append(packet)
+                mark_client = "*"
+        else:
+            quic_packet_list.append(packet)
+        print("  [%d%s] %s" % (quic_cap_cnt, mark_client, packet.layers))
 
     print("  [+] Parsing done! (Extracted %d client messages out of all %d QUIC messages.)" % (len(quic_packet_list), quic_cap_cnt))
 
@@ -102,10 +112,6 @@ def h3msg_from_pcap(f): # for HTTP3
         print("  <PKT %d>---------------" % quic_packet_cnt)
         quic_layer_cnt = 0
         for layer in quic_packet.layers:
-            
-            #layer.pretty_print()
-            #print(layer.field_names)
-           
             if layer.layer_name == 'quic':
                 quic_layer_cnt += 1
                 
@@ -119,12 +125,6 @@ def h3msg_from_pcap(f): # for HTTP3
                 for frame_name in get_frames_of_layer(layer):
                     print("     \t\t- frame: %s" % frame_name )
 
-                    # IMPORTANT ISSUE:w
-                    # It is unable to access multiple frames/streams of a pyshark layer,
-                    # even if print(layer) shows multiple frames or streams in a QUIC layer.
-                    # Thus we only consider the topmost frames and use pyshark's own printing method
-                    # for debugging transmitted packets.  
-                    # print(layer)
             elif layer.layer_name == "http3":
                 quic_layer_cnt += 1
                 # 1. Check stream type
@@ -135,16 +135,6 @@ def h3msg_from_pcap(f): # for HTTP3
                 # 2. Check the frame type
                 for frame_name in get_frames_of_layer(layer):
                     print("     \t\t- frame: %s" % frame_name )
-
-                # IMPORTANT ISSUE:
-                # Same as QUIC, it is unable to access multiple frames/streams of a pyshark layer (i.e. HEADER),
-                # even if print(layer) shows multiple frames in a HTTP3 layer (i.e., HEADER DATA).
-                # Thus we only consider the topmost frames and use pyshark's own printing method
-                # for debugging transmitted packets.  
-                # Below is the packet number that shows the example.
-                # if quic_packet_cnt == 16:
-                #     print(dir(layer))
-                #     print(layer)
 
     return quic_packet_list
 
