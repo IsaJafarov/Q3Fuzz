@@ -73,6 +73,9 @@ class HttpClient(QuicConnectionProtocol):
         self._http = H3Connection(self._quic)
 
     def http_event_received(self, event: H3Event) -> None:
+        print("H3 event happened:")
+        print( type(event) )
+        print("")
         if isinstance(event, (HeadersReceived, DataReceived)):
             stream_id = event.stream_id
             if stream_id in self._request_events:
@@ -92,8 +95,11 @@ class HttpClient(QuicConnectionProtocol):
 
     def quic_event_received(self, event: QuicEvent) -> None:
         #  pass event to the HTTP layer
+        #print("QQQQQQQQQQQQQ")
+        #print( type(event) )
         if self._http is not None:
             for http_event in self._http.handle_event(event):
+                
                 self.http_event_received(http_event)
 
     async def _request(self, request: HttpRequest) -> Deque[H3Event]:
@@ -122,22 +128,120 @@ class HttpClient(QuicConnectionProtocol):
 
         return await asyncio.shield(waiter)
 
-    async def send_headers_frame(self):
 
-        # get stream id
+    async def send_sample_headers_frame(self):
+        '''
+        finishes normal. doesn't hang
+        prints html and response headers
+        print "Connection close sent (code 0x100, reason )"
+        '''
         stream_id = self._quic.get_next_available_stream_id()
 
-        # send headers
-        self._http.send_headers(
-            stream_id=stream_id,
-            headers=[
+        headers = [
                 (b":method", "GET".encode()),
                 (b":scheme", "HTTPS".encode()),
                 (b":authority", "prett3.com".encode()),
                 (b":path", "/".encode()),
                 (b"user-agent", USER_AGENT.encode()),
-            ],
-            end_stream=True
+            ]
+
+        frame_date = self._http._encode_headers(stream_id, headers)
+
+        self._http._quic.send_stream_data(
+            stream_id, aioquic.h3.connection.encode_frame(FrameType.HEADERS, frame_date), False)
+
+        waiter = self._loop.create_future()
+        self._request_events[stream_id] = deque()
+        self._request_waiter[stream_id] = waiter
+        self.transmit()
+
+        # without it, you don't receive h3 packets
+        return await asyncio.shield(waiter)
+    
+    async def send_sample_data_frame(self):
+        '''
+        sends the data frame and hangs
+        doesn't receive any h3 packet
+        prints "Connection close received (code 0x105, reason unexpected HTTP/3 frame sequence on stream 0)"
+        '''
+        stream_id = self._quic.get_next_available_stream_id()
+
+        frame_date = "ASASASASASASASASASASASASASASASASASASASASASASASASASASASASASASASASAS".encode()
+
+        self._http._quic.send_stream_data(
+            stream_id, aioquic.h3.connection.encode_frame(FrameType.DATA, frame_date), True)
+
+        waiter = self._loop.create_future()
+        self._request_events[stream_id] = deque()
+        self._request_waiter[stream_id] = waiter
+        self.transmit()
+
+        return await asyncio.shield(waiter)
+    
+    async def send_sample_settings_frame(self):
+        '''
+        sends settings frame and hangs
+        doesn't receive any h3 packet
+        logs "Connection close received (code 0x105, reason unexpected HTTP/3 frame sequence on stream 0)"
+        '''
+        stream_id = self._quic.get_next_available_stream_id()
+
+        asyncio.sleep(2)
+
+        setting_params={
+            1:1, # QPACK_MAX_TABLE_CAPACITY
+            6:6, # MAX_FIELD_SECTION_SIZE
+            7:7, # QPACK_BLOCKED_STREAMS
+            8:8, # ENABLE_CONNECT_PROTOCOL
+            33:33, # H3_DATAGRAM
+            727725890:727725890, # ENABLE_WEBTRANSPORT
+            21:21 # DUMMY
+        }
+
+        self._http._quic.send_stream_data(
+            stream_id,
+            aioquic.h3.connection.encode_frame(FrameType.SETTINGS, 
+                                               aioquic.h3.connection.encode_settings(setting_params) 
+                                               ), False
+        )
+
+
+        waiter = self._loop.create_future()
+        self._request_events[stream_id] = deque()
+        self._request_waiter[stream_id] = waiter
+        self.transmit()
+
+        return await asyncio.shield(waiter)
+
+    async def send_sample_goaway_frame(self):
+        '''
+        
+        '''
+        stream_id = self._quic.get_next_available_stream_id()
+
+        asyncio.sleep(2)
+
+        self._http._quic.send_stream_data(
+            stream_id,
+            aioquic.h3.connection.encode_frame(FrameType.GOAWAY, 
+                                               "".encode()
+                                               ), False
+        )
+
+
+        waiter = self._loop.create_future()
+        self._request_events[stream_id] = deque()
+        self._request_waiter[stream_id] = waiter
+        self.transmit()
+
+        return await asyncio.shield(waiter)
+
+    async def send_packet_bytes(self, packet: bytes):
+  
+        stream_id = self._quic.get_next_available_stream_id()
+
+        self._http._quic.send_stream_data(
+            stream_id, packet, False
         )
 
         waiter = self._loop.create_future()
@@ -147,82 +251,35 @@ class HttpClient(QuicConnectionProtocol):
 
         return await asyncio.shield(waiter)
 
-    async def send_data_frame(self):
-
-        # get stream id
-        stream_id = self._quic.get_next_available_stream_id()
-
-        # send data
-        self._http.send_data(
-                stream_id=stream_id, data="ASASASASASASASASASASASAS".encode(), end_stream=True
-            )
-
-        waiter = self._loop.create_future()
-        self._request_events[stream_id] = deque()
-        self._request_waiter[stream_id] = waiter
-        self.transmit()
-
-        return await asyncio.shield(waiter)
-
-    async def send_any_frame(self, frame_type: FrameType, data: bytes ):
-
-        # get stream id
-        stream_id = self._quic.get_next_available_stream_id()
-        # self._local_control_stream_id
-        
-        self._http._quic.send_stream_data(
-            stream_id, aioquic.h3.connection.encode_frame(frame_type, data), False)
-
-        #waiter = self._loop.create_future()
-        #self._request_events[stream_id] = deque()
-        #self._request_waiter[stream_id] = waiter
-        self.transmit()
-
-        #return await asyncio.shield(waiter)
-
-
-
-       
 
 async def perform_packet_transmission(
     client: HttpClient,
 ) -> None:
-    # perform request
-    start = time.time()
-
-    # Send HEADERS frame
-    #http_events = await client.send_headers_frame()
 
     # Send DATA frame
     #http_events = await client.send_data_frame()
+    #http_events = await client.send_sample_data_frame()
 
     # Send SETTINGS frame
-    await client.send_any_frame(FrameType.SETTINGS, "ASASAS".encode())
+    #await client.send_any_frame(FrameType.SETTINGS, "ASASAS".encode())
+    #http_events = await client.send_sample_settings_frame()
     
-
     # Send HEADERS frame
-    await client.send_any_frame(FrameType.HEADERS,   "ASASAS".encode() )
+    #await client.send_any_frame(FrameType.HEADERS,   "ASASAS".encode() )
+    #http_events = await client.send_sample_headers_frame()
 
-    # Send DATA frame
-    await client.send_any_frame(FrameType.DATA, "ASASAS".encode())
+    # Send GOAWAY frame
+    #http_events = await client.send_sample_goaway_frame()
 
 
-    elapsed = time.time() - start
+    # Send packet bytes
+    packet = aioquic.h3.connection.encode_frame(FrameType.GOAWAY, "".encode()) # sample packet bytes
+    http_events = await client.send_packet_bytes( packet )
 
-    '''
-    # print speed
-    octets = 0
-    for http_event in http_events:
-        if isinstance(http_event, DataReceived):
-            octets += len(http_event.data)
-    logger.info(
-        "Response received: %d bytes in %.1f s (%.3f Mbps)"
-        % ( octets, elapsed, octets * 8 / elapsed / 1000000)
-    )
 
     # output response
     print_response(http_events=http_events)
-    '''
+    
 
 def print_response( http_events: Deque[H3Event] ) -> None:
     for http_event in http_events:
@@ -265,6 +322,7 @@ async def main(
     ) as client:
         client = cast(HttpClient, client)
 
+        
         
         await perform_packet_transmission(
                     client=client
@@ -408,7 +466,6 @@ if __name__ == "__main__":
     ### Extract initial state machine ###
     http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
 
-    #print( http3_basic_messages[0] )
 
     asyncio.run(
         main(
@@ -419,3 +476,4 @@ if __name__ == "__main__":
             zero_rtt=args.zero_rtt,
         )
     )
+    
