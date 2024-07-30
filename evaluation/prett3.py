@@ -70,7 +70,6 @@ class HttpClient(QuicConnectionProtocol):
         self._http: H3Connection = None
         self._request_events: Dict[int, Deque[H3Event]] = {}
         self._request_waiter: Dict[int, asyncio.Future[Deque[H3Event]]] = {}
-        self._websockets: Dict[int, WebSocket] = {}
         self._http = H3Connection(self._quic)
 
     def http_event_received(self, event: H3Event) -> None:
@@ -82,11 +81,6 @@ class HttpClient(QuicConnectionProtocol):
                 if event.stream_ended:
                     request_waiter = self._request_waiter.pop(stream_id)
                     request_waiter.set_result(self._request_events.pop(stream_id))
-
-            elif stream_id in self._websockets:
-                # websocket
-                websocket = self._websockets[stream_id]
-                websocket.http_event_received(event)
 
             elif event.push_id in self.pushes:
                 # push
