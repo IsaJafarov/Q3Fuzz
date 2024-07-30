@@ -178,7 +178,7 @@ class HttpClient(QuicConnectionProtocol):
         #self._request_waiter[stream_id] = waiter
         self.transmit()
 
-        return await asyncio.shield(waiter)
+        #return await asyncio.shield(waiter)
 
 
 
