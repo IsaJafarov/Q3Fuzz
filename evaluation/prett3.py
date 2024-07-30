@@ -436,8 +436,6 @@ def init(args):
 
     SERVER_ADDR = args.url[0]
     pcapfile = args.pcap[0]
-    # outdir = setup_logger(pcapfile, 0)
-    # _enable_capture()
 
     print("  [+] Initializing done!\n    => pcap : %s, SERVER_ADDR : %s" % (pcapfile, SERVER_ADDR))
     return
