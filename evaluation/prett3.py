@@ -184,7 +184,7 @@ class HttpClient(QuicConnectionProtocol):
         #self._request_waiter[stream_id] = waiter
         self.transmit()
 
-        #return await asyncio.shield(waiter)
+        return await asyncio.shield(waiter)
 
 
 
@@ -204,6 +204,7 @@ async def perform_packet_transmission(
 
     # Send SETTINGS frame
     await client.send_any_frame(FrameType.SETTINGS, "ASASAS".encode())
+    
 
     # Send HEADERS frame
     await client.send_any_frame(FrameType.HEADERS,   "ASASAS".encode() )
@@ -212,12 +213,9 @@ async def perform_packet_transmission(
     await client.send_any_frame(FrameType.DATA, "ASASAS".encode())
 
 
-
-
+    elapsed = time.time() - start
 
     '''
-    elapsed = time.time() - start
-    
     # print speed
     octets = 0
     for http_event in http_events:
