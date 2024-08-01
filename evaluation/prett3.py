@@ -62,7 +62,7 @@ class HttpClient(QuicConnectionProtocol):
         Craft a sample HEADERS frame
         """
         
-        print("Crafting a sample HEADERS frame")
+        print("\nCrafting a sample HEADERS frame")
         stream_id = self._quic.get_next_available_stream_id()
 
         headers = [
@@ -83,7 +83,7 @@ class HttpClient(QuicConnectionProtocol):
         Craft a sample DATA frame
         """
         
-        print("Crafting a sample DATA frame")
+        print("\nCrafting a sample DATA frame")
         stream_id = self._quic.get_next_available_stream_id()
 
         frame_date = "ASASASASASASASASASASASASASASASASASASASASASASASASASASASASASASASASAS".encode()
@@ -96,7 +96,7 @@ class HttpClient(QuicConnectionProtocol):
         Craft a sample SETTINGS frame
         """
         
-        print("Crafting a sample SETTINGS frame")
+        print("\nCrafting a sample SETTINGS frame")
 
         stream_id = self._quic.get_next_available_stream_id()
 
@@ -122,7 +122,7 @@ class HttpClient(QuicConnectionProtocol):
         Craft a sample GOAWAY frame
         """
             
-        print("Crafting a sample GOAWAY frame")
+        print("\nCrafting a sample GOAWAY frame")
 
         stream_id = self._quic.get_next_available_stream_id()
 
@@ -140,7 +140,7 @@ class HttpClient(QuicConnectionProtocol):
         :param packet_bytes: The bytes of the packet.
         """
         
-        print("Crafting a packet by bytes")
+        print("\nCrafting a packet by bytes")
         stream_id = self._quic.get_next_available_stream_id()
 
         self._http._quic.send_stream_data(
@@ -151,21 +151,21 @@ class HttpClient(QuicConnectionProtocol):
         """
         Send the crafted packet and wait for some time to receive the server's response. 
         """
-        
+
         # remove the previously received packets from the list. We care about the ones that will be received from now on
         self.received_packets = []
             
         # send the packet
         self.transmit()
 
-        # wait for 3 seconds to receive packets sent from the server
-        print("\nWaiting for the server's response...")
-        await asyncio.sleep(3) # waiting should be asynchronous. time.sleep() won't work.
+        # wait for 2 seconds to receive packets sent from the server
+        print("\nWaiting 1 sec. to receive the server's response to our packet")
+        await asyncio.sleep(1) # waiting should be asynchronous. time.sleep() won't work.
         
         # the received packets
         quic_events = self.received_packets
 
-        print("\n\n [+] Received Packets: \n")
+        print("\n\n\tReceived Packets: \n")
 
         for i, quic_event in enumerate(quic_events):
             print("%d. QUIC EVENT: " % (i+1), end="")
@@ -179,21 +179,25 @@ class HttpClient(QuicConnectionProtocol):
             print()
 
 
+
 async def perform_packet_transmission(
     client: HttpClient,
 ) -> None:
 
     print("\n\n [+] Packet Transmission: \n")
 
-    client.craft_sample_headers_frame()
+    print("\nWaiting 1 sec. to receive the server's response to previously sent packets")
+    await asyncio.sleep(1)
+    
 
-    #client.craft_sample_data_frame()
+    #client.craft_sample_headers_frame()
+
+    client.craft_sample_data_frame()
 
     #client.craft_sample_settings_frame()
 
     #client.craft_sample_goaway_frame()
     
-
     # Send packet bytes
     #packet = aioquic.h3.connection.encode_frame(FrameType.GOAWAY, "".encode()) # sample packet bytes
     #client.craft_packet_by_bytes( packet )
@@ -209,6 +213,8 @@ async def main(
     zero_rtt: bool,
 ) -> None:
     
+    print("\nConnection initialization...")
+
     async with connect(
         urlparse(url).netloc,
         443,
