@@ -6,11 +6,12 @@ os.chdir(current_folder)
 def run_caddy(version):
     print("[+] Running caddy %s..." % version)
     if version=='2.4.6':
-        os.system("sudo ./caddy-2.4.6/caddy run")
+        os.chdir("caddy-2.4.6")
     elif version=='2.7.6':
-        os.system("sudo ./caddy-2.7.6/caddy run")
+        os.chdir("caddy-2.7.6")
     elif version=='2.8.4':
-        os.system("sudo ./caddy-2.8.4/caddy run")
+        os.chdir("caddy-2.8.4")
+    os.system("sudo ./caddy run")
 
 def run_nginx(version):
     print("[+] Running nginx %s..." % version)
