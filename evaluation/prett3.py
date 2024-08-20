@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 import util
+import smbuilder
 import os
 import sys
 import logging
@@ -180,10 +181,6 @@ class HttpClient(QuicConnectionProtocol):
 
         #return await asyncio.shield(waiter)
 
-
-
-       
-
 async def perform_packet_transmission(
     client: HttpClient,
 ) -> None:
@@ -252,6 +249,7 @@ async def main(
     data: Optional[str],
     local_port: int,
     zero_rtt: bool,
+    message: Optional[List],
 ) -> None:
     
     async with connect(
@@ -265,10 +263,10 @@ async def main(
     ) as client:
         client = cast(HttpClient, client)
 
-        
-        await perform_packet_transmission(
-                    client=client
-            )
+        sm = smbuilder.modeller_h3(message, url)
+        # await perform_packet_transmission(
+        #             client=client
+        #     )
         
 
         client._quic.close(error_code=ErrorCode.H3_NO_ERROR)
@@ -403,6 +401,7 @@ if __name__ == "__main__":
     
     ### Extract initial state machine ###
     http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
+    # sm = smbuilder.modeller_h3(http3_basic_messages, args)
 
     #print( http3_basic_messages[0] )
 
@@ -413,5 +412,6 @@ if __name__ == "__main__":
             data=args.data,
             local_port=args.local_port,
             zero_rtt=args.zero_rtt,
+            message=http3_basic_messages
         )
     )
