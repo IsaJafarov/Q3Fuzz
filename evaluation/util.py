@@ -108,78 +108,92 @@ def h3msg_from_pcap(f, client_only=False): # for HTTP3
     print("\n  [DBG] Extracted messages")
     for quic_packet in quic_packet_list:
         quic_packet_cnt += 1
-        # A pacekt may have multile layers
+        # A packet may have multile layers
         print("  <PKT %d>---------------" % quic_packet_cnt)
-        quic_layer_cnt = 0
-        for layer in quic_packet.layers:
-            if layer.layer_name == 'quic':
-                quic_layer_cnt += 1
-                
-                if 'header_form' in dir(layer) and layer.header_form == "1": #long header type (Initial | 0-RTT | Handshake | Retry)
-                    print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]))
-                elif 'coalesced_padding_data' in dir(layer):
-                    print("     (Layer %d) [%s] PKT_TYPE: Random_padding" % (quic_layer_cnt, 'QUIC'))
-                else: # short header type (1-RTT)
-                    print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_SHORTPACKETTYPE))
-
-                for frame_name in get_frames_of_layer(layer):
-                    print("     \t\t- frame: %s" % frame_name )
-
-            elif layer.layer_name == "http3":
-                quic_layer_cnt += 1
-                # 1. Check stream type
-                if 'stream_type' in dir(layer): # always false????
-                    print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', H3_STREAMTYPE[int(layer.stream_type)]))
-                else:
-                    print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', "NONE"))
-                # 2. Check the frame type
-                for frame_name in get_frames_of_layer(layer):
-                    print("     \t\t- frame: %s" % frame_name )
+        msginfo = h3msg_to_str(quic_packet)
+        print(msginfo)
 
     return quic_packet_list
 
+def h3msg_to_str(h3msg):
+    """
+    Convert a QUIC or HTTP3 message in a human-readable format.
+    args:
+        h3msg: A QUIC / HTTP3 packet of type 'pyshark.packet.packet.Packet'
+    return:
+        msginfo: a string of a Q / H3 message with multiple layers and frames
+    """
+    msginfo = ''
+    # h3msg.show()
+    if type(h3msg) is type([]):
+        msginfo = "UNDERCONSTRUCTION"
+    else:
+        quic_layer_cnt = 0
+        for layer in h3msg.layers:
+            if layer.layer_name == 'quic':
+                quic_layer_cnt += 1
+                if 'header_form' in dir(layer) and layer.header_form == "1": #long header type (Initial | 0-RTT | Handshake | Retry)
+                    msginfo += '%s_%s' % ('Q', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]) 
+                    # print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]))
+                elif 'coalesced_padding_data' in dir(layer):
+                    msginfo += '%s_%s' % ('Q', QUIC_FRAMETYPE[0]) 
+                    # print("     (Layer %d) [%s] PKT_TYPE: Random_padding" % (quic_layer_cnt, 'QUIC'))
+                else: # short header type (1-RTT)
+                    msginfo += '%s_%s' % ('Q', QUIC_SHORTPACKETTYPE) 
+                    # print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_SHORTPACKETTYPE))
 
-def h2msg_from_pcap(f):
-    # Extract all http2 messages from pcapfile and return an array of http2 messages in scapy form
-    print("\n[STEP 2] Parsing http3 messages from pcapfile %s ..." % f)
-    # Get ip to gather client message 
-    client_ip = None
-    with open(f, 'rb') as f_pre:
-        pcapng = rdpcap(f_pre)
-        for buf in pcapng:
-            http2raw = buf.load[64:]
-            # Got client's message
-            if http2raw[:24] == b'\x50\x52\x49\x20\x2a\x20\x48\x54\x54\x50\x2f\x32\x2e\x30\x0d\x0a\x0d\x0a\x53\x4d\x0d\x0a\x0d\x0a':
-                client_ip = buf.load[16:20]
-                break
+                tmp_frames = ''
+                for frame_name in get_frames_of_layer(layer):
+                    tmp_frames += frame_name+","
+                if len(tmp_frames) > 0:
+                    msginfo += '(F:%s)' % tmp_frames[:-1]         
+                    # print("     \t\t- frame: %s" % frame_name )
 
-    h2msg_arr = []
-    with open(f, 'rb') as f:
-        pcapng = rdpcap(f)
-        frameid = 1
-        for buf in pcapng:  # for each http2 message
-            if buf.load[16:20] != client_ip:
-                continue
 
-            http2raw = buf.load[64:]
-            # handle magic
-            if http2raw[:24] == b'\x50\x52\x49\x20\x2a\x20\x48\x54\x54\x50\x2f\x32\x2e\x30\x0d\x0a\x0d\x0a\x53\x4d\x0d\x0a\x0d\x0a':
-                http2raw = http2raw[24:] 
-            tmpseq = h2.H2Seq(http2raw)
-            h2msg_arr.append(tmpseq)
-            frameid += 1
-    print("  [+] Parsing done! (Total %s messages.)" % len(h2msg_arr))
+            elif layer.layer_name == "http3":
+                quic_layer_cnt += 1
+                msginfo += "|"
+                # 1. Check stream type
+                if 'stream_type' in dir(layer): # always false????
+                    msginfo += '%s_%s' % ('H3', H3_STREAMTYPE[int(layer.stream_type)]) 
+                    # print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', H3_STREAMTYPE[int(layer.stream_type)]))
+                else:
+                    msginfo += '%s_%s' % ('H3', 'NONE') 
+                    # print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', "NONE"))
+                # 2. Check the frame type
+                tmp_frames = ''
+                for frame_name in get_frames_of_layer(layer):
+                    tmp_frames += frame_name+","
+                if len(tmp_frames) > 0:
+                    msginfo += '(F:%s)' % tmp_frames[:-1]         
+                    # print("     \t\t- frame: %s" % frame_name )
+                # for frame_name in get_frames_of_layer(layer):
+                #     print("     \t\t- frame: %s" % frame_name )
 
-    msgid = 1
-    # Debugging http2 messages frame by frame
-    # print("  [DBG] messages (shortened)")
-    for h2msg in h2msg_arr:
-        h2msg_str = h2msg_to_str(h2msg)
-        print("    - h2msg %d: %s" % (msgid, h2msg_str))
-        msgid += 1
+    return msginfo
 
-    # [NOTE] An HTTP2 message is a sequence of frames.
-    return h2msg_arr
+    # Case 1: h3msg is list of HTTP/2 Frame Sequence in Scapy (multiplexed message sequence)
+    # if type(h3msg) is type([]):
+    #     for h3msg_in_list in h3msg:
+    #         for h2frame in h3msg_in_list.frames:
+    #             frame_len = 0xdeadbeef # frame with deadbeef is malformed frame!
+    #             if h2frame.len is not None: # handle malformed frame
+    #                 frame_len = h2frame.len
+    #             if hasattr(h2frame, 'type') and hasattr(h2frame, 'len'):
+    #                 frameStr += (frameShortInfoArr[h2frame.type] + '(%x)' % frame_len + '-')
+    #         frameStr = frameStr[:-1]
+    #         frameStr += ' | '
+    #     frameStr = frameStr[:-3]
+    # # Case 2: h3msg is HTTP/2 Frame Sequence in Scapy
+    # else:
+    #     for h2frame in h3msg.frames:
+    #         frame_len = 0xdeadbeef # frame with deadbeef is malformed frame!
+    #         if h2frame.len is not None: # handle malformed frame
+    #             frame_len = h2frame.len
+    #         if hasattr(h2frame, 'type'):
+    #             frameStr += (frameShortInfoArr[h2frame.type] + '(%x)' % frame_len + '-')
+    #     frameStr = frameStr[:-1]
+    # return frameStr
 
 
 def h2frame_from_sniff(packet):
@@ -294,31 +308,7 @@ def framestr_to_h2seq(frameStrBuf):
     return h2seq
 
 
-def h2msg_to_str(h2msg):
-    frameStr = ''
-    # h2msg.show()
-    # Case 1: h2msg is list of HTTP/2 Frame Sequence in Scapy (multiplexed message sequence)
-    if type(h2msg) is type([]):
-        for h2msg_in_list in h2msg:
-            for h2frame in h2msg_in_list.frames:
-                frame_len = 0xdeadbeef # frame with deadbeef is malformed frame!
-                if h2frame.len is not None: # handle malformed frame
-                    frame_len = h2frame.len
-                if hasattr(h2frame, 'type') and hasattr(h2frame, 'len'):
-                    frameStr += (frameShortInfoArr[h2frame.type] + '(%x)' % frame_len + '-')
-            frameStr = frameStr[:-1]
-            frameStr += ' | '
-        frameStr = frameStr[:-3]
-    # Case 2: h2msg is HTTP/2 Frame Sequence in Scapy
-    else:
-        for h2frame in h2msg.frames:
-            frame_len = 0xdeadbeef # frame with deadbeef is malformed frame!
-            if h2frame.len is not None: # handle malformed frame
-                frame_len = h2frame.len
-            if hasattr(h2frame, 'type'):
-                frameStr += (frameShortInfoArr[h2frame.type] + '(%x)' % frame_len + '-')
-        frameStr = frameStr[:-1]
-    return frameStr
+
 
 def check_h2_response(ans, msg=None):
     # Check if h2 message received from sr.
@@ -344,6 +334,6 @@ def check_h2_response(ans, msg=None):
             # print(a)
             # print("-----")
             r = a[1] # received packet
-            if msg in h2msg_to_str(r):
+            if msg in h3msg_to_str(r):
                 check = True
     return check

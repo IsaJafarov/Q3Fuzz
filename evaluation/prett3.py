@@ -1,6 +1,5 @@
 #! /usr/bin/env python
-import util
-import smbuilder
+# Common type modules
 import os
 import sys
 import logging
@@ -13,6 +12,13 @@ from collections import deque
 from typing import BinaryIO, Callable, Deque, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
 
+# PRETT modules
+import util
+import states
+from statemachine import ProtoModel, MergeData, generate_sm, update_candidates, minimize_sm, expand_sm
+from transitions.extensions import GraphMachine as Machine
+
+# HTTP/3 with aioquic modules
 import asyncio
 import ssl
 import aioquic
@@ -30,37 +36,12 @@ from aioquic.h3.events import (
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import QuicEvent
 from aioquic.quic.logger import QuicFileLogger
-from aioquic.tls import CipherSuite, SessionTicket
+from aioquic.tls import CipherSuite
 
 logger = logging.getLogger("client")
-USER_AGENT = "aioquic/" + aioquic.__version__
 
-
-class URL:
-    def __init__(self, url: str) -> None:
-        parsed = urlparse(url)
-
-        self.authority = parsed.netloc
-        self.full_path = parsed.path or "/"
-        if parsed.query:
-            self.full_path += "?" + parsed.query
-        self.scheme = parsed.scheme
-
-class HttpRequest:
-    def __init__(
-        self,
-        method: str,
-        url: URL,
-        content: bytes = b"",
-        headers: Optional[Dict] = None,
-    ) -> None:
-        if headers is None:
-            headers = {}
-
-        self.content = content
-        self.headers = headers
-        self.method = method
-        self.url = url
+# Initialize state machine
+pm, sm = generate_sm()
 
 
 class HttpClient(QuicConnectionProtocol):
@@ -68,208 +49,238 @@ class HttpClient(QuicConnectionProtocol):
         super().__init__(*args, **kwargs)
 
         self.pushes: Dict[int, Deque[H3Event]] = {}
-        self._http: H3Connection = None
-        self._request_events: Dict[int, Deque[H3Event]] = {}
-        self._request_waiter: Dict[int, asyncio.Future[Deque[H3Event]]] = {}
         self._http = H3Connection(self._quic)
+        self.received_packets: Deque[H3Event] = []
+        self.sent_packets = []
+        self.next_state_id = 1
 
-    def http_event_received(self, event: H3Event) -> None:
-        if isinstance(event, (HeadersReceived, DataReceived)):
-            stream_id = event.stream_id
-            if stream_id in self._request_events:
-                # http
-                self._request_events[event.stream_id].append(event)
-                if event.stream_ended:
-                    request_waiter = self._request_waiter.pop(stream_id)
-                    request_waiter.set_result(self._request_events.pop(stream_id))
 
-            elif event.push_id in self.pushes:
-                # push
-                self.pushes[event.push_id].append(event)
-
-        elif isinstance(event, PushPromiseReceived):
-            self.pushes[event.push_id] = deque()
-            self.pushes[event.push_id].append(event)
 
     def quic_event_received(self, event: QuicEvent) -> None:
-        #  pass event to the HTTP layer
-        if self._http is not None:
-            for http_event in self._http.handle_event(event):
-                self.http_event_received(http_event)
+        """
+        Override the function of the parent class (QuicConnectionProtocol).
+        
+        The function is automatically called when a new quic event is received. The received events are saved in a list.
+        """
+        
+        #print("RECEIVED EVENT",end=": ")
+        #print( type(event) )
 
-    async def _request(self, request: HttpRequest) -> Deque[H3Event]:
+        self.received_packets.append(event)
+
+    
+
+    def craft_sample_headers_frame(self):
+        """
+        Craft a sample HEADERS frame
+        """
+
         stream_id = self._quic.get_next_available_stream_id()
-        self._http.send_headers(
-            stream_id=stream_id,
-            headers=[
-                (b":method", request.method.encode()),
-                (b":scheme", request.url.scheme.encode()),
-                (b":authority", request.url.authority.encode()),
-                (b":path", request.url.full_path.encode()),
-                (b"user-agent", USER_AGENT.encode()),
-            ]
-            + [(k.encode(), v.encode()) for (k, v) in request.headers.items()],
-            end_stream=not request.content,
-        )
-        if request.content:
-            self._http.send_data(
-                stream_id=stream_id, data=request.content, end_stream=True
-            )
+        print("\nCrafting a sample HEADERS frame (stream_id : %s)" % stream_id)
 
-        waiter = self._loop.create_future()
-        self._request_events[stream_id] = deque()
-        self._request_waiter[stream_id] = waiter
-        self.transmit()
-
-        return await asyncio.shield(waiter)
-
-    async def send_headers_frame(self):
-
-        # get stream id
-        stream_id = self._quic.get_next_available_stream_id()
-
-        # send headers
-        self._http.send_headers(
-            stream_id=stream_id,
-            headers=[
+        headers = [
                 (b":method", "GET".encode()),
                 (b":scheme", "HTTPS".encode()),
                 (b":authority", "prett3.com".encode()),
                 (b":path", "/".encode()),
-                (b"user-agent", USER_AGENT.encode()),
-            ],
-            end_stream=True
+                (b"user-agent", "PRETT3 client".encode()),
+            ]
+
+        frame_date = self._http._encode_headers(stream_id, headers)
+        self.sent_packets.append(("HEADERS", stream_id))
+
+        self._http._quic.send_stream_data(
+            stream_id, aioquic.h3.connection.encode_frame(FrameType.HEADERS, frame_date), False)
+    
+    def craft_sample_data_frame(self):
+        """
+        Craft a sample DATA frame
+        """
+        
+        stream_id = self._quic.get_next_available_stream_id()
+        print("\nCrafting a sample DATA frame (stream_id : %s)" % stream_id)
+
+        frame_date = "ASASASASASASASASASASASASASASASASASASASASASASASASASASASASASASASASAS".encode()
+        self.sent_packets.append(("DATA", stream_id))
+
+        self._http._quic.send_stream_data(
+            stream_id, aioquic.h3.connection.encode_frame(FrameType.DATA, frame_date), False)
+
+    def craft_sample_settings_frame(self):
+        """
+        Craft a sample SETTINGS frame
+        """
+        
+        print("\nCrafting a sample SETTINGS frame")
+
+        stream_id = self._quic.get_next_available_stream_id()
+
+        setting_params={
+            1:1, # QPACK_MAX_TABLE_CAPACITY
+            6:6, # MAX_FIELD_SECTION_SIZE
+            7:7, # QPACK_BLOCKED_STREAMS
+            8:8, # ENABLE_CONNECT_PROTOCOL
+            33:33, # H3_DATAGRAM
+            727725890:727725890, # ENABLE_WEBTRANSPORT
+            21:21 # DUMMY
+        }
+
+        self.sent_packets.append(("SETTINGS", stream_id))
+
+        self._http._quic.send_stream_data(
+            stream_id,
+            aioquic.h3.connection.encode_frame(FrameType.SETTINGS, 
+                                               aioquic.h3.connection.encode_settings(setting_params) 
+                                               ), False
         )
 
-        waiter = self._loop.create_future()
-        self._request_events[stream_id] = deque()
-        self._request_waiter[stream_id] = waiter
-        self.transmit()
+    def craft_sample_goaway_frame(self):
+        """
+        Craft a sample GOAWAY frame
+        """
+            
+        print("\nCrafting a sample GOAWAY frame")
 
-        return await asyncio.shield(waiter)
-
-    async def send_data_frame(self):
-
-        # get stream id
         stream_id = self._quic.get_next_available_stream_id()
 
-        # send data
-        self._http.send_data(
-                stream_id=stream_id, data="ASASASASASASASASASASASAS".encode(), end_stream=True
-            )
+        self.sent_packets.append(("GOAWAY", stream_id))
 
-        waiter = self._loop.create_future()
-        self._request_events[stream_id] = deque()
-        self._request_waiter[stream_id] = waiter
-        self.transmit()
-
-        return await asyncio.shield(waiter)
-
-    async def send_any_frame(self, frame_type: FrameType, data: bytes ):
-
-        # get stream id
-        stream_id = self._quic.get_next_available_stream_id()
-        # self._local_control_stream_id
-        
         self._http._quic.send_stream_data(
-            stream_id, aioquic.h3.connection.encode_frame(frame_type, data), False)
+            stream_id,
+            aioquic.h3.connection.encode_frame(FrameType.GOAWAY, 
+                                               "".encode()
+                                               ), False
+        )
 
-        #waiter = self._loop.create_future()
-        #self._request_events[stream_id] = deque()
-        #self._request_waiter[stream_id] = waiter
+    def craft_packet_by_bytes(self, packet_bytes: bytes):
+        """
+        Craft a packet based on bytes. The bytes should contain all the data, including the Frame Type.
+
+        :param packet_bytes: The bytes of the packet.
+        """
+        
+        print("\nCrafting a packet by bytes")
+        stream_id = self._quic.get_next_available_stream_id()
+
+        self._http._quic.send_stream_data(
+            stream_id, packet_bytes, False
+        )
+
+    async def send_and_receive_packets(self):
+        """
+        Send the crafted packet and wait for some time to receive the server's response. 
+        """
+
+        # remove the previously received packets from the list. We care about the ones that will be received from now on
+        self.received_packets = []
+        received_packets_once = []
+            
+        # send the packet
         self.transmit()
 
-        #return await asyncio.shield(waiter)
+        # wait for 2 seconds to receive packets sent from the server
+        print("\nWaiting 1 sec. to receive the server's response to our packet")
+        await asyncio.sleep(1) # waiting should be asynchronous. time.sleep() won't work.
+        
+        # the received packets
+        quic_events = self.received_packets
+        matched_packet = None
+
+        print("\n\n\tReceived Packets: \n")
+
+        for i, quic_event in enumerate(quic_events):
+            # print("%d. QUIC EVENT: " % (i+1), end="")
+            print(f"{i+1}. QUIC EVENT: {type(quic_event).__name__} (id: {quic_event.stream_id})")
+            # print(quic_event)
+
+            http_events = self._http.handle_event(quic_event)
+
+            for j, http_event in enumerate(http_events):
+                matched_packet = None
+                if hasattr(quic_event, 'stream_id'):
+                    for packet_type, packet_stream_id in self.sent_packets:
+                        if packet_stream_id == http_event.stream_id:
+                            matched_packet = packet_type
+                            break
+
+                # print("\n\t%d. HTTP/3 EVENT: " % (j+1), end="")
+                received_msg_short = type(http_event).__name__
+                received_msg_short = received_msg_short.replace("Received", "").upper()
+
+                print(f"\t{j+1}. HTTP/3 EVENT: {matched_packet} -> {received_msg_short}")
+                received_packets_once.append(received_msg_short)
+
+
+            print()
+
+        pm.num_of_states += 1
+        cand_s = states.State(name=str(pm.num_of_states), level=pm.current_level + 1, parent_state=pm.current_state,
+                msg_sent=matched_packet, msg_rcvd="|".join(received_packets_once))
+        sm.add_state(cand_s.name)
+        sm.add_transition(f"{cand_s.msg_sent}->{cand_s.msg_rcvd}", source=cand_s.parent_state, dest=cand_s.name)
+        pm.current_state = cand_s.name
+
 
 async def perform_packet_transmission(
     client: HttpClient,
 ) -> None:
-    # perform request
-    start = time.time()
 
-    # Send HEADERS frame
-    #http_events = await client.send_headers_frame()
+    print("\n\n [+] Packet Transmission: \n")
 
-    # Send DATA frame
-    #http_events = await client.send_data_frame()
-
-    # Send SETTINGS frame
-    await client.send_any_frame(FrameType.SETTINGS, "ASASAS".encode())
+    print("\nWaiting 1 sec. to receive the server's response to previously sent packets")
+    await asyncio.sleep(1)
     
 
-    # Send HEADERS frame
-    await client.send_any_frame(FrameType.HEADERS,   "ASASAS".encode() )
+    # client.craft_sample_headers_frame()
 
-    # Send DATA frame
-    await client.send_any_frame(FrameType.DATA, "ASASAS".encode())
+    # client.craft_sample_data_frame()
 
+    # client.craft_sample_settings_frame()
 
-    elapsed = time.time() - start
+    # client.craft_sample_goaway_frame()
+    
+    # Send packet bytes
+    #packet = aioquic.h3.connection.encode_frame(FrameType.GOAWAY, "".encode()) # sample packet bytes
+    #client.craft_packet_by_bytes( packet )
 
-    '''
-    # print speed
-    octets = 0
-    for http_event in http_events:
-        if isinstance(http_event, DataReceived):
-            octets += len(http_event.data)
-    logger.info(
-        "Response received: %d bytes in %.1f s (%.3f Mbps)"
-        % ( octets, elapsed, octets * 8 / elapsed / 1000000)
-    )
-
-    # output response
-    print_response(http_events=http_events)
-    '''
-
-def print_response( http_events: Deque[H3Event] ) -> None:
-    for http_event in http_events:
-        if isinstance(http_event, HeadersReceived):
-            for k, v in http_event.headers:
-                print(k.decode()+": "+v.decode())
-            
-        elif isinstance(http_event, DataReceived):
-            print(http_event.data)
-
-
-def save_session_ticket(ticket: SessionTicket) -> None:
-    """
-    Callback which is invoked by the TLS engine when a new session ticket
-    is received.
-    """
-    logger.info("New session ticket received")
-    if args.session_ticket:
-        with open(args.session_ticket, "wb") as fp:
-            pickle.dump(ticket, fp)
+    # await client.send_and_receive_packets()
 
 
 
 async def main(
     configuration: QuicConfiguration,
     url: str,
-    data: Optional[str],
     local_port: int,
     zero_rtt: bool,
     message: Optional[List],
 ) -> None:
     
+    print("\nConnection initialization...")
+
+    pm.current_state = "connected"
+
     async with connect(
         urlparse(url).netloc,
         443,
         configuration=configuration,
         create_protocol=HttpClient,
-        session_ticket_handler=save_session_ticket,
         local_port=local_port,
         wait_connected=not zero_rtt,
     ) as client:
         client = cast(HttpClient, client)
 
-        sm = smbuilder.modeller_h3(message, url)
-        # await perform_packet_transmission(
-        #             client=client
-        #     )
-        
+        await perform_packet_transmission(
+                    client=client
+            )
 
-        client._quic.close(error_code=ErrorCode.H3_NO_ERROR)
+    #client._quic.close(error_code=ErrorCode.H3_NO_ERROR)
+
+    # Last transition from the last state to finish state.
+    sm.add_transition(f"GOAWAY", source=pm.current_state, dest="finish")
+
+    graphname = "%s/diagram/level_" % "." + str(pm.current_level) + ".png"
+    sm.get_graph().draw(graphname, prog='dot')
+
 
 
 def init(args):
@@ -309,9 +320,6 @@ if __name__ == "__main__":
         help="use the specified congestion control algorithm",
     )
     parser.add_argument(
-        "-d", "--data", type=str, help="send the specified data in a POST request"
-    )
-    parser.add_argument(
         "--max-data",
         type=int,
         help="connection-wide flow control limit (default: %d)" % defaults.max_data,
@@ -334,12 +342,6 @@ if __name__ == "__main__":
         help="log secrets to a file, for use with Wireshark",
     )
     parser.add_argument(
-        "-s",
-        "--session-ticket",
-        type=str,
-        help="read and write session ticket from the specified file",
-    )
-    parser.add_argument(
         "-v", "--verbose", action="store_true", help="increase logging verbosity"
     )
     parser.add_argument(
@@ -360,10 +362,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    '''
     logging.basicConfig(
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
         level=logging.DEBUG if args.verbose else logging.INFO,
     )
+    '''
 
     # prepare configuration
     configuration = QuicConfiguration(
@@ -387,31 +391,22 @@ if __name__ == "__main__":
         configuration.quic_logger = QuicFileLogger(args.quic_log)
     if args.secrets_log:
         configuration.secrets_log_file = open(args.secrets_log, "a")
-    if args.session_ticket:
-        try:
-            with open(args.session_ticket, "rb") as fp:
-                configuration.session_ticket = pickle.load(fp)
-        except FileNotFoundError:
-            pass
 
     """ aioquic's code till here """
 
     ### General setting ###
-    init(args)
+    #init(args)
     
     ### Extract initial state machine ###
     http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
-    # sm = smbuilder.modeller_h3(http3_basic_messages, args)
-
-    #print( http3_basic_messages[0] )
 
     asyncio.run(
         main(
             configuration=configuration,
             url=args.url,
-            data=args.data,
             local_port=args.local_port,
             zero_rtt=args.zero_rtt,
             message=http3_basic_messages
         )
     )
+    

@@ -5,37 +5,46 @@ os.chdir(current_folder)
 
 def run_caddy(version):
     print("[+] Running caddy %s..." % version)
-    if version=='2.7.6':
+    if version=='2.4.6':
+        os.chdir("caddy-2.4.6")
+    elif version=='2.7.6':
         os.chdir("caddy-2.7.6")
-        os.system("pwd")
-        os.system("sudo ./caddy run")
+    elif version=='2.8.4':
+        os.chdir("caddy-2.8.4")
+    os.system("sudo ./caddy run")
 
 def run_nginx(version):
     print("[+] Running nginx %s..." % version)
-    if version=='1.25.5':
-        os.chdir("nginx-1.25.5")
-        os.chdir("nginx-1.25.5")
-        os.system("sudo ../installation-root/sbin/nginx")
+    if version=='1.23.4':
+        os.chdir("./nginx-1.23.4/nginx-1.23.4")
+    elif version=='1.25.5':
+        os.chdir("./nginx-1.25.5/nginx-1.25.5")
+    elif version=='1.27.0':
+        os.chdir("./nginx-1.27.0/nginx-1.27.0")
+    os.system("sudo ../installation-root/sbin/nginx")
 
 def run_openlitespeed(version):
     print("[+] Running openlitespeed %s..." % version)
-    if version=='1.8.1':
-        os.chdir("ols-1.8.1")
-        os.chdir("openlitespeed")
-        os.system("sudo /usr/local/lsws/bin/lswsctrl start")
+    os.system("sudo /usr/local/lsws/bin/lswsctrl start")
 
 def run_h2o(version):
     print("[+] Running h2o %s..." % version)
-    if version=='222b36d':
+    if version=='a429117':
+        os.chdir("h2o-a429117")
+        os.chdir("h2o-a429117babff09542d3517c4fa36c1ef769889c1")
+    elif version=='222b36d':
         os.chdir("h2o-222b36d")
         os.chdir("h2o-222b36d7bd3a98616eae82993552098747268d5e")
-        os.chdir("build")
-        os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
+    elif version=='16b13ee':
+        os.chdir("h2o-16b13ee")
+        os.chdir("h2o-16b13eee8ad7895b4fe3fcbcabee53bd52782562")
+    os.chdir("build")
+    os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HTTP/3 web servers runner')
     parser.add_argument("server", help="Server name (nginx, caddy, h2o, ols)")
-    parser.add_argument("version", help="Version (1.25.5 for nginx, 2.7.6 for caddy, 222b36d for h2o, 1.8.1 for openlitespeed)")
+    parser.add_argument("version", help="corresponding version(s) \n\t- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n\t- 2.4.6, 2.7.6, 2.8.4\t(for caddy)\n\t- a429117, 222b36d or 16b13ee\t(for h2o)\n\t- 1.7.15 or 1.8.1\t(for ols)")
     args = parser.parse_args()
     server = args.server
     version = args.version
