@@ -3,4 +3,4 @@
 ## Requirements
 - python 3.x
 - apt) tshark
-- pip) aioquic, pyshark
+- pip) aioquic v1.2.0, pyshark
