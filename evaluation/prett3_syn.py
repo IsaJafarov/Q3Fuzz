@@ -646,7 +646,7 @@ class HttpClient():
                     continue
                 elif frame_type==2: # ACK frame
                     continue
-                elif frame_type==6:
+                elif frame_type==6: # CRYPTO frame
                     self.handle_crypto(context, frame_type, buf)
                 elif frame_type>48:
                     raise QuicConnectionError(error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="Unknown frame type")
@@ -809,8 +809,6 @@ class HttpClient():
     
 
 
-
-    
     def complete_connection(self):
         """
         How aioquic's QuicConnection does it:
