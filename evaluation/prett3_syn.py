@@ -544,7 +544,7 @@ class HttpClient():
 
         crypto_buf = Buffer(capacity=CRYPTO_BUFFER_SIZE)
 
-        self.get_tls() # better to build tls myself to contruct transport params myself
+        self.get_tls() # better to build tls myself to construct transport params myself
         
         self._quic.tls._client_send_hello(crypto_buf)
         
@@ -846,6 +846,7 @@ class HttpClient():
         
         builder = self.get_builder(Epoch.HANDSHAKE)
 
+        # ACK
         print(">>> prett3.complete_connection: start. Adding ACK frame to the builder")
         buf = builder.start_frame(
                     QuicFrameType.ACK,
