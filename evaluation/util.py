@@ -1,9 +1,12 @@
 # -*- coding: UTF-8 -*-
 # Modules for HTTP3
 import pyshark 
+import nest_asyncio
+
+nest_asyncio.apply()
 
 # IETF specification
-QUIC_LONGPACKETTYPE = ['Initial', '0-RTT', 'Handshake', 'Retry']
+QUIC_LONGPACKETTYPE = ['INIT', '0-RTT', 'HANDSHAKE', 'RETRY']
 QUIC_SHORTPACKETTYPE = "1-RTT" # short packet does not have a type. It corresponds to 1-RTT only.
 QUIC_FRAMETYPE = ['PADDING', 'PING', 'ACK', 'ACK', 'RESET_STREAM', 'STOP_SENDING', 'CRYPTO', 'NEW_TOKEN', \
              'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', \
@@ -11,9 +14,9 @@ QUIC_FRAMETYPE = ['PADDING', 'PING', 'ACK', 'ACK', 'RESET_STREAM', 'STOP_SENDING
              'NEW_CONNECTION_ID', 'RETIRE_CONNECTION_ID', 'PATH_CHALLENGE', 'PATH_RESPONSE', 'CONNECTION_CLOSE', 'CONNECTION_CLOSE', 'HANDSHAKE_DONE', 'IMMEDIATE_ACK',\
              'DATAGRAM', 'DATAGRAM'] # ~0x21 frames so far
 
-H3_STREAMTYPE = ['Control Stream', 'Push Stream', 'QPACK Encoder Stream', 'QPACK Decoder Stream']
-H3_FRAMETYPE = ['DATA', 'HEADERS', 'Reserved', 'CANCEL_PUSH', 'SETTINGS', 'PUSH_PROMISE', 'Reserved', 'GOAWAY',\
-                'Reserved', 'Reserved', 'Unassigned', 'Unassigned', 'ORIGIN', 'MAX_PUSH_ID'] # ~0x0d frames so far
+H3_STREAMTYPE = ['CONTROL_STREAM', 'PUSH_STREAM', 'QPACK_ENCODER_STREAM', 'QPACK_DECODER_STREAM']
+H3_FRAMETYPE = ['DATA', 'HEADERS', 'RESERVED', 'CANCEL_PUSH', 'SETTINGS', 'PUSH_PROMISE', 'RESERVED', 'GOAWAY',\
+                'RESERVED', 'RESERVED', 'UNASSIGNED', 'UNASSIGNED', 'ORIGIN', 'MAX_PUSH_ID'] # ~0x0d frames so far
 
 
 ############# GENERAL #############
@@ -79,14 +82,14 @@ def h3msg_from_pcap(f, client_only=False): # for HTTP3
     Returns:
         quic_packet_list (FileCapture): QUIC or HTTP/3 messages that are seen in the pcap file.
     """
-    print("\n[STEP 2] Parsing QUIC messages from pcapfile %s ..." % f)
+    # print("\n[STEP 2] Parsing QUIC messages from pcapfile %s ..." % f)
     client_ip = None   # Get ip to gather client message 
     raw_cap = pyshark.FileCapture(f)
     quic_cap = pyshark.FileCapture(f, display_filter='quic')
     quic_packet_list = []
     quic_cap_cnt = 0
 
-    print("============= List of QUIC packets in pcap =============")
+    # print("============= List of QUIC packets in pcap =============")
     for packet in quic_cap:
         #print(packet)
         mark_client = " "
@@ -100,10 +103,11 @@ def h3msg_from_pcap(f, client_only=False): # for HTTP3
                 mark_client = "*"
         else:
             quic_packet_list.append(packet)
-        print("  [%d%s] %s" % (quic_cap_cnt, mark_client, packet.layers))
+        # print("  [%d%s] %s" % (quic_cap_cnt, mark_client, packet.layers))
 
-    print("  [+] Parsing done! (Extracted %d client messages out of all %d QUIC messages.)" % (len(quic_packet_list), quic_cap_cnt))
+    # print("  [+] Parsing done! (Extracted %d client messages out of all %d QUIC messages.)" % (len(quic_packet_list), quic_cap_cnt))
 
+    """
     quic_packet_cnt = 0
     print("\n  [DBG] Extracted messages")
     for quic_packet in quic_packet_list:
@@ -112,6 +116,7 @@ def h3msg_from_pcap(f, client_only=False): # for HTTP3
         print("  <PKT %d>---------------" % quic_packet_cnt)
         msginfo = h3msg_to_str(quic_packet)
         print(msginfo)
+    """
 
     return quic_packet_list
 
@@ -126,46 +131,49 @@ def h3msg_to_str(h3msg):
     msginfo = ''
     # h3msg.show()
     if type(h3msg) is type([]):
-        msginfo = "UNDERCONSTRUCTION"
+        msginfo = ""
     else:
         quic_layer_cnt = 0
         for layer in h3msg.layers:
             if layer.layer_name == 'quic':
+                if quic_layer_cnt != 0:
+                    msginfo += ' '
                 quic_layer_cnt += 1
                 if 'header_form' in dir(layer) and layer.header_form == "1": #long header type (Initial | 0-RTT | Handshake | Retry)
-                    msginfo += '%s_%s' % ('Q', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]) 
+                    msginfo += '[%s]%s' % ('Q', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]) 
                     # print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]))
                 elif 'coalesced_padding_data' in dir(layer):
-                    msginfo += '%s_%s' % ('Q', QUIC_FRAMETYPE[0]) 
+                    msginfo += '[%s]%s' % ('Q', QUIC_FRAMETYPE[0]) 
                     # print("     (Layer %d) [%s] PKT_TYPE: Random_padding" % (quic_layer_cnt, 'QUIC'))
                 else: # short header type (1-RTT)
-                    msginfo += '%s_%s' % ('Q', QUIC_SHORTPACKETTYPE) 
+                    msginfo += '[%s]%s' % ('Q', QUIC_SHORTPACKETTYPE) 
                     # print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_SHORTPACKETTYPE))
 
                 tmp_frames = ''
                 for frame_name in get_frames_of_layer(layer):
                     tmp_frames += frame_name+","
                 if len(tmp_frames) > 0:
-                    msginfo += '(F:%s)' % tmp_frames[:-1]         
+                    msginfo += '(%s)' % tmp_frames[:-1]         
                     # print("     \t\t- frame: %s" % frame_name )
 
 
             elif layer.layer_name == "http3":
+                if quic_layer_cnt != 0:
+                    msginfo += ' '
                 quic_layer_cnt += 1
-                msginfo += "|"
                 # 1. Check stream type
                 if 'stream_type' in dir(layer): # always false????
-                    msginfo += '%s_%s' % ('H3', H3_STREAMTYPE[int(layer.stream_type)]) 
+                    msginfo += '[%s]%s' % ('H3', H3_STREAMTYPE[int(layer.stream_type)]) 
                     # print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', H3_STREAMTYPE[int(layer.stream_type)]))
                 else:
-                    msginfo += '%s_%s' % ('H3', 'NONE') 
+                    msginfo += '[%s]%s' % ('H3', 'NONE') 
                     # print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', "NONE"))
                 # 2. Check the frame type
                 tmp_frames = ''
                 for frame_name in get_frames_of_layer(layer):
-                    tmp_frames += frame_name+","
+                    tmp_frames += frame_name.upper()+","
                 if len(tmp_frames) > 0:
-                    msginfo += '(F:%s)' % tmp_frames[:-1]         
+                    msginfo += '(%s)' % tmp_frames[:-1]         
                     # print("     \t\t- frame: %s" % frame_name )
                 # for frame_name in get_frames_of_layer(layer):
                 #     print("     \t\t- frame: %s" % frame_name )

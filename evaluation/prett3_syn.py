@@ -57,11 +57,19 @@ class HttpClient():
         # "[Failed to create decryption context: Decryption (checktag) failed: Checksum error]" TODO: find out why
         #self.host_cid = self._quic._peer_cid.cid
     
+    def send_quic_packet(self, packet):
+        # QUIC payload 추출
+        quic_payload = bytes.fromhex(packet.quic.payload.raw_value)
+        print("----")
+        
+        # QUICConnection을 통해 패킷 전송
+        self._quic.send_datagram_frame(quic_payload)
+        print("----")
 
-    def replicate_sample_msg(self, h3msg):
+    def replay_sample_msg(self, h3msg):
         for layer in h3msg.layers:
             if layer.layer_name == 'quic':
-                continue
+                self.send_quic_packet(h3msg)
             elif layer.layer_name == 'http3':
                 h3_field_type = int(layer.get_field_value("http3.frame_type", raw=True))
                 print(h3_field_type)
@@ -1014,7 +1022,7 @@ def main(
     time.sleep(0.1)
 
     for msg in sample_msg:
-        h3_data = h3client.replicate_sample_msg(msg)
+        h3_data = h3client.replay_sample_msg(msg)
 
 
     # headers_data = h3client.craft_sample_headers_frame()
