@@ -1,49 +1,36 @@
 #! /usr/bin/env python
-import aioquic.h3
-import aioquic.h3.connection
-import util
-import pyshark
 import os
 import sys
-import logging
-import subprocess
 import time
-import pickle
+import socket
+import logging
 import argparse
+import ssl
+import traceback
 from datetime import datetime
 from collections import deque
-from typing import BinaryIO, Callable, Deque, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
-import aioquic.buffer
+
+import pyshark
 import asyncio
-import ssl
 import aioquic
-import wsproto
-import wsproto.events
-from aioquic.h3.connection import H3_ALPN, ErrorCode, H3Connection, FrameType, StreamType, encode_frame, encode_settings
-from aioquic.h3.events import (
-    DataReceived,
-    H3Event,
-    HeadersReceived,
-    PushPromiseReceived,
-)
+from aioquic.buffer import Buffer
+from aioquic.h3.connection import H3_ALPN, H3Connection, FrameType, encode_frame, encode_settings
+from aioquic.h3.events import DataReceived, HeadersReceived, H3Event, PushPromiseReceived
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import QuicEvent
 from aioquic.quic.packet_builder import QuicPacketBuilder
 from aioquic.quic.packet import QuicFrameType, QuicPacketType
 from aioquic.quic.logger import QuicFileLogger
-from aioquic.quic.connection import *
+from aioquic.quic.connection import QuicConnection, QuicNetworkPath
 from aioquic.tls import CipherSuite, Epoch
-import socket
 
-
-
+import util  # PRETT3 project module
 
 logger = logging.getLogger("client")
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.5)
 network_path = QuicNetworkPath('prett3.com')
-
 
 class HttpClient():
     def __init__(self, quic_conf: QuicConfiguration, hostname: str) -> None:
@@ -58,33 +45,152 @@ class HttpClient():
         #self.host_cid = self._quic._peer_cid.cid
     
     def send_quic_packet(self, packet):
-        # QUIC payload 추출
-        quic_payload = bytes.fromhex(packet.quic.payload.raw_value)
-        print("----")
-        
-        # QUICConnection을 통해 패킷 전송
-        self._quic.send_datagram_frame(quic_payload)
-        print("----")
+        """
+        Reconstruct and send a QUIC packet based on its frame type.
+        Handles three key QUIC packet types:
+        1. 1-RTT(ACK)
+        2. 1-RTT(STREAM) H3(SETTINGS)
+        3. 1-RTT(STREAM) H3(HEADERS)
+        """
+        try:
+            # Determine the QUIC frame type from the hex value
+            if hasattr(packet.quic, 'frame_type'):
+                frame_type_hex = int(packet.quic.frame_type, 16)  # Convert hex to int
+                
+                # Look up the frame type in QUIC_FRAMETYPE list
+                if frame_type_hex < len(util.QUIC_FRAMETYPE):
+                    quic_frame_type_name = util.QUIC_FRAMETYPE[frame_type_hex]
+                    print(f"\033[92mReplaying 1-RTT({quic_frame_type_name}) QUIC packet\033[0m")
+                    
+                    # Handle ACK or STREAM frames based on frame type
+                    if quic_frame_type_name == 'ACK':
+                        quic_frame_type = QuicFrameType.ACK
+                        quic_payload = b''  # ACK does not need a payload
+
+                    elif 'STREAM' in quic_frame_type_name:
+                        quic_frame_type = QuicFrameType.STREAM_BASE
+                        
+                        # HTTP/3 layer processing
+                        if hasattr(packet, 'http3'):
+                            h3_layer = packet.http3
+
+                            # Check for H3 SETTINGS frame
+                            if hasattr(h3_layer, 'frame_type'):
+                                h3_frame_type_hex = int(h3_layer.frame_type, 16)  # Convert hex to int
+
+                                if h3_frame_type_hex < len(util.H3_FRAMETYPE):
+                                    h3_frame_type_name = util.H3_FRAMETYPE[h3_frame_type_hex]
+
+                                    if h3_frame_type_name == 'SETTINGS':
+                                        print(f"\033[92mReplaying H3(SETTINGS) frame\033[0m")
+                                        quic_payload = self.build_h3_settings_frame(h3_layer)
+
+                                    elif h3_frame_type_name == 'HEADERS':
+                                        print(f"\033[92mReplaying H3(HEADERS) frame\033[0m")
+                                        quic_payload = self.build_h3_headers_frame(h3_layer)
+
+                                    else:
+                                        print(f"\033[93mUnknown H3 frame type: {h3_frame_type_name}, skipping...\033[0m")
+                                        return
+                                else:
+                                    print(f"\033[93mInvalid H3 frame type index: {h3_frame_type_hex}, skipping...\033[0m")
+                                    return
+                        else:
+                            print("\033[93mNo H3 layer found in STREAM packet, skipping...\033[0m")
+                            return
+                    else:
+                        print(f"\033[93mUnsupported QUIC frame type: {quic_frame_type_name}, skipping...\033[0m")
+                        return
+                else:
+                    print(f"\033[93mInvalid QUIC frame type index: {frame_type_hex}, skipping...\033[0m")
+                    return
+            else:
+                print(f"[-] Frame type not found, skipping packet...")
+                return
+
+            # Create a new builder for each packet
+            builder = self.get_builder(Epoch.ONE_RTT)
+
+            # Add the payload to the builder with the determined frame type
+            buf = builder.start_frame(quic_frame_type, capacity=len(quic_payload))
+            buf.push_bytes(quic_payload)
+
+            # Flush the builder and send the packet
+            self.send_quic_frames_from_builder(builder)
+            print("QUIC packet replayed successfully.")
+
+        except Exception as e:
+            print(f"[-] send_quic_packet(): An error occurred: {e}")
+            traceback.print_exc()  # Print detailed traceback information
+
+    def build_h3_settings_frame(self, h3_layer):
+        """
+        Builds and returns a SETTINGS frame for the H3 layer
+        """
+        settings_data = bytes.fromhex(h3_layer.payload.raw_value)
+        return aioquic.h3.connection.encode_frame(FrameType.SETTINGS, settings_data)
+
+    def build_h3_headers_frame(self, h3_layer):
+        """
+        Builds and returns a HEADERS frame for the H3 layer
+        """
+        headers_data = bytes.fromhex(h3_layer.payload.raw_value)
+        return aioquic.h3.connection.encode_frame(FrameType.HEADERS, headers_data)
+
+    def send_quic_stream(self, frame_data, stream_id):
+        """
+        Function to send frame_data over the QUIC stream.
+        Uses the stream_id from h3msg to send over the same stream.
+        """
+        builder = self.get_builder(Epoch.ONE_RTT)
+
+        buf = builder.start_frame(
+            QuicFrameType.STREAM_BASE | 2,
+            capacity=4,  # Capacity setting for stream transmission
+        )
+
+        # Use the extracted stream_id
+        buf.push_uint_var(stream_id)  # Use the stream_id extracted from h3msg
+
+        buf.push_uint16(len(frame_data) | 0x4000)  # Set the length of the data
+        buf.push_bytes(frame_data)  # Add the actual frame data to the stream
+
+        # Send the packet
+        self.send_quic_frames_from_builder(builder)
 
     def replay_sample_msg(self, h3msg):
+        """
+        Function to replay QUIC and HTTP/3 packets from h3msg.
+        Uses the same stream_id from the h3msg for QUIC stream transmission.
+        """
         for layer in h3msg.layers:
             if layer.layer_name == 'quic':
+                # Process QUIC packet
                 self.send_quic_packet(h3msg)
+
             elif layer.layer_name == 'http3':
+                # Process HTTP/3 packet
+
+                # 1. Extract stream_id from the HTTP/3 layer
+                stream_id_value = layer.get_field_value("http3.stream_id", raw=True)
+                if stream_id_value is None:
+                    print("No stream_id found in the HTTP/3 packet, skipping...")
+                    continue  # Skip this message if there's no stream_id
+
+                stream_id = int(stream_id_value)
+
+                # 2. Extract frame type
                 h3_field_type = int(layer.get_field_value("http3.frame_type", raw=True))
-                print(h3_field_type)
-                h3_field_payload = bytes(layer.get_field_value("http3.frame_payload", raw=True), "utf-8")
+                
+                # 3. Extract frame payload
+                h3_field_payload = bytes.fromhex(layer.get_field_value("http3.frame_payload", raw=True))
+                
+                # 4. Rebuild the HTTP/3 frame
                 frame_data = aioquic.h3.connection.encode_frame(h3_field_type, h3_field_payload)
-                print("done")
+                
+                # 5. Send the frame over the QUIC stream using the extracted stream_id
+                self.send_quic_stream(frame_data, stream_id)
 
-                # frames = util.get_frames_of_layer(layer)
-                # for frame in frames:
-                #     print(frame)
-                #     print(FrameType.HEADERS)
-                # frame_data = aioquic.h3.connection.encode_frame(FrameType.HEADERS, frame_data)
-
-
-    
     def craft_sample_headers_frame(self):
         """
         Craft a sample HEADERS frame
@@ -132,7 +238,7 @@ class HttpClient():
         elif epoch==Epoch.HANDSHAKE: quic_packet_type = QuicPacketType.HANDSHAKE
         elif epoch==Epoch.ONE_RTT: quic_packet_type = QuicPacketType.ONE_RTT
 
-        print(">>> prett3.get_builder. quic_packet_type={}, crypto_pair={}".format(quic_packet_type, crypto_pair))
+        # print(">>> prett3.get_builder. quic_packet_type={}, crypto_pair={}".format(quic_packet_type, crypto_pair))
         
         builder.start_packet(quic_packet_type, crypto_pair)
 
@@ -187,7 +293,7 @@ class HttpClient():
         datagrams, packets = builder.flush()
 
         for data in datagrams:
-            print("\nSending message: len={}\n".format( len(data) ))
+            print("Sending message: len={}".format( len(data) ))
             sock.sendto(data, (self.hostname, 443))
     
     # TODO: do we really need to implement this method ourselves?
@@ -386,7 +492,7 @@ class HttpClient():
                 available_versions=self.quic_conf.supported_versions,
             ),
         )
-        print(">>> prett3.serialize_transport_parameters. quic_transport_parameters={}".format(quic_transport_parameters))
+        # print(">>> prett3.serialize_transport_parameters. quic_transport_parameters={}".format(quic_transport_parameters))
 
         buf = Buffer(capacity=3 * self._quic._max_datagram_size)
         push_quic_transport_parameters(buf, quic_transport_parameters)
@@ -447,7 +553,7 @@ class HttpClient():
 
         # packet spaces
         def create_crypto_pair(epoch: tls.Epoch) -> CryptoPair:
-            print(">>> prett3.get_tls.create_crypto_pair: start. epoch={}".format(epoch))
+            # print(">>> prett3.get_tls.create_crypto_pair: start. epoch={}".format(epoch))
             epoch_name = ["initial", "0rtt", "handshake", "1rtt"][epoch.value]
             
             recv_secret_name = "server_%s_secret" % epoch_name
@@ -506,7 +612,7 @@ class HttpClient():
     # TODO: do we really need to implement this method ourselves?
     def update_traffic_key( self, direction: tls.Direction, epoch: tls.Epoch, cipher_suite: tls.CipherSuite, secret: bytes,
     ) -> None:
-        print(">>> prett3.update_traffic_key: starts: direction={}, epoch={}, cipher_suite={}, secret={}".format(direction.name, epoch.name, cipher_suite.name, secret) )
+        # print(">>> prett3.update_traffic_key: starts: direction={}, epoch={}, cipher_suite={}, secret={}".format(direction.name, epoch.name, cipher_suite.name, secret) )
 
         if (
             self._quic._crypto_packet_version is not None
@@ -518,7 +624,7 @@ class HttpClient():
         secrets_log_file = self._quic._configuration.secrets_log_file
         if secrets_log_file is not None:
             label_row = True == (direction == tls.Direction.DECRYPT)
-            print(">>> prett3.update_traffic_key: label_row={}".format(label_row))
+            # print(">>> prett3.update_traffic_key: label_row={}".format(label_row))
             label = SECRETS_LABELS[label_row][epoch.value]
             secrets_log_file.write(
                 "%s %s %s\n" % (label, self._quic.tls.client_random.hex(), secret.hex())
@@ -527,12 +633,12 @@ class HttpClient():
 
         crypto = self._quic._cryptos[epoch]
         if direction == tls.Direction.ENCRYPT:
-            print(">>> prett3._update_traffic_key: setting up outgoing crypto")
+            # print(">>> prett3._update_traffic_key: setting up outgoing crypto")
             crypto.send.setup(
                 cipher_suite=cipher_suite, secret=secret, version=self._quic._version
             )
         else:
-            print(">>> prett3._update_traffic_key: setting up incoming crypto")
+            # print(">>> prett3._update_traffic_key: setting up incoming crypto")
             crypto.recv.setup(
                 cipher_suite=cipher_suite, secret=secret, version=self._quic._version
             )
@@ -573,14 +679,14 @@ class HttpClient():
 
     def handle_crypto(self, context: QuicReceiveContext, frame_type: int, buf:Buffer):
 
-        print(">>> prett3.handle_crypto: start: frame_type={}, buf={}".format(frame_type, buf.data) )
+        # print(">>> prett3.handle_crypto: start: frame_type={}, buf={}".format(frame_type, buf.data) )
         offset = buf.pull_uint_var()
         length = buf.pull_uint_var()
         if offset + length > UINT_VAR_MAX:
             raise QuicConnectionError( error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="offset + length cannot exceed 2^62 - 1")
         frame = QuicStreamFrame(offset=offset, data=buf.pull_bytes(length))
         
-        print(">>> prett3.handle_crypto: epoch={}".format(context.epoch) )
+        # print(">>> prett3.handle_crypto: epoch={}".format(context.epoch) )
         stream = self._quic._crypto_streams[context.epoch]
         pending = offset + length - stream.receiver.starting_offset()
         if pending > MAX_PENDING_CRYPTO:
@@ -632,7 +738,7 @@ class HttpClient():
 
     def process_payload(self, context: QuicReceiveContext, plain: bytes, crypto_frame_required: bool = False) -> Tuple[bool, bool]:
 
-        print(">>> prett3.process_payload: start")
+        # print(">>> prett3.process_payload: start")
         
         buf = Buffer(data=plain)
 
@@ -680,7 +786,7 @@ class HttpClient():
                     self.handle_crypto(context, frame_type, buf)
                 elif frame_type>48:
                     raise QuicConnectionError(error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="Unknown frame type")
-                print(">>> prett3.process_payload: frame #{}, type={}".format(i, frame_type))
+                # print(">>> prett3.process_payload: frame #{}, type={}".format(i, frame_type))
             except BufferReadError:
                 raise QuicConnectionError(
                     error_code=QuicErrorCode.FRAME_ENCODING_ERROR,
@@ -711,19 +817,19 @@ class HttpClient():
 
     def receive_datagram(self, data: bytes, now: float) -> None:
 
-        print(">>> prett3.receive_datagram: start. data_length={}".format(len(data)) )
+        # print(">>> prett3.receive_datagram: start. data_length={}".format(len(data)) )
 
         buf = Buffer(data=data)
         i=1
         while not buf.eof():
-            print(">>> prett3.receive_datagram: layer #{}".format(i))
+            # print(">>> prett3.receive_datagram: layer #{}".format(i))
             i+=1
 
             start_off = buf.tell()
 
             try:
                 header = pull_quic_header(buf, host_cid_length=self.quic_conf.connection_id_length)
-                print(">>> prett3.receive_datagram: quic_header={}".format(header))
+                # print(">>> prett3.receive_datagram: quic_header={}".format(header))
             except ValueError:
                 return
 
@@ -752,11 +858,11 @@ class HttpClient():
             buf.seek(end_off)
 
             
-            print(">>> prett3.receive_datagram. Decrypting the packet...")
+            # print(">>> prett3.receive_datagram. Decrypting the packet...")
             plain_header, plain_payload, packet_number = crypto.decrypt_packet(
                 data[start_off:end_off], encrypted_off, space.expected_packet_number)
 
-            print(">>> prett3.receive_datagram. \n\tPacket Number={}\n\tPlain Header={}\n\tPlain Payload={}".format(packet_number, plain_header, plain_payload))
+            # print(">>> prett3.receive_datagram. \n\tPacket Number={}\n\tPlain Header={}\n\tPlain Payload={}".format(packet_number, plain_header, plain_payload))
                 
             
             # check reserved bits
@@ -850,12 +956,12 @@ class HttpClient():
         _update_traffic_key() (when called automatically) calls _push_crypto_data() to write data from HANDSHAKE's full buffer to its stream
         """
 
-        print("\n>>> prett3.complete_connection: start")
+        # print("\n>>> prett3.complete_connection: start")
         
         builder = self.get_builder(Epoch.HANDSHAKE)
 
         # ACK
-        print(">>> prett3.complete_connection: start. Adding ACK frame to the builder")
+        # print(">>> prett3.complete_connection: start. Adding ACK frame to the builder")
         buf = builder.start_frame(
                     QuicFrameType.ACK,
                     capacity=ACK_FRAME_CAPACITY,
@@ -867,7 +973,7 @@ class HttpClient():
         buf.push_uint_var(1) # ack range
 
         # CRYPTO
-        print(">>> prett3.complete_connection: Adding CRYPTO frame to the builder")
+        # print(">>> prett3.complete_connection: Adding CRYPTO frame to the builder")
         str_data = self._quic._crypto_streams[Epoch.HANDSHAKE].sender.get_frame(1135).data # TODO: calculate max_size dynamically instead of giving static number
         buf = builder.start_frame(
                 QuicFrameType.CRYPTO,
@@ -989,7 +1095,7 @@ class HttpClient():
         try:
             while True:
                 data, addr = sock.recvfrom(2048) # 1024 causes problems
-                print("\nReceived message: len={}\n".format(len(data)))
+                print("Received message: len={}".format(len(data)))
                 self.receive_datagram(data, now=time.process_time())
         except socket.timeout: pass
 
@@ -999,37 +1105,47 @@ def main(
     sample_msg: pyshark.FileCapture
 ) -> None:
 
+    # Step 1: Initialize the HTTP/3 client with QUIC configuration
     h3client = HttpClient(configuration, urlparse(url).netloc)
 
+    # Step 2: Establish the initial connection (handshake)
+    print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
     h3client.connect()
-    h3client.read_from_buffer()
-
+    h3client.read_from_buffer()  # Receive any response from the server
 
     time.sleep(0.1)
 
-
+    # Step 3: Complete the connection (finish handshake)
+    print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
     h3client.complete_connection()
-    h3client.read_from_buffer()
+    h3client.read_from_buffer()  # Receive any response from the server
+
+    time.sleep(0.1)
     
-
-    time.sleep(0.1)
-
-
-    h3client.open_qpack_streams()
-    h3client.read_from_buffer()
-
-
-    time.sleep(0.1)
+    # Step 4: Replay only 1-RTT messages from sample_msg
+    print("\033[93m\n[Replaying 1-RTT messages...]\033[0m")
 
     for msg in sample_msg:
-        h3_data = h3client.replay_sample_msg(msg)
+        try:
+            if hasattr(msg, 'quic'):
+                # Skip long header QUIC packets (identified by 'header_form' == "1")
+                if hasattr(msg.quic, 'header_form') and msg.quic.header_form == "1":
+                    print(f"\033[90mSkipping long header QUIC message: {util.h3msg_to_str(msg)}\033[0m")
+                    continue
+                
+                # Process only short header (1-RTT) QUIC packets
+                print(f"\033[92mReplaying short header (1-RTT) QUIC message: {util.h3msg_to_str(msg)}\033[0m")
+                h3client.replay_sample_msg(msg)
+                h3client.read_from_buffer()
+                time.sleep(0.1)
+            else:
+                print(f"\033[92mNo QUIC layer found in message: {util.h3msg_to_str(msg)}\033[0m")
+
+        except AttributeError:
+            print(f"\033[92mError processing message: {util.h3msg_to_str(msg)}\033[0m")
 
 
-    # headers_data = h3client.craft_sample_headers_frame()
-    # print(type(headers_data))
-    # # h3client.send_quic_stream(headers_data)
-    # # h3client.read_from_buffer()
-    
+    print("\033[93m\n[Replay completed]\033[0m")
 
 
 def init(args):
@@ -1146,10 +1262,8 @@ if __name__ == "__main__":
     if args.secrets_log:
         configuration.secrets_log_file = open(args.secrets_log, "a")
 
-    """ aioquic's code till here """
-
     ### General setting ###
-    #init(args)
+    init(args)
     
     ### Extract initial state machine ###
     http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
