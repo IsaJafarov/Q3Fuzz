@@ -1,9 +1,9 @@
 # -*- coding: UTF-8 -*-
 # Modules for HTTP3
 import pyshark 
-import nest_asyncio
+#import nest_asyncio
 
-nest_asyncio.apply()
+#nest_asyncio.apply()
 
 # IETF specification
 QUIC_LONGPACKETTYPE = ['INIT', '0-RTT', 'HANDSHAKE', 'RETRY']
