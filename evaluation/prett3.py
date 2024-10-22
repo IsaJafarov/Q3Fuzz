@@ -15,12 +15,6 @@ from collections import deque
 from typing import BinaryIO, Callable, Deque, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
 
-# PRETT modules
-import util
-import states
-from statemachine import ProtoModel, MergeData, generate_sm, update_candidates, minimize_sm, expand_sm
-from transitions.extensions import GraphMachine as Machine
-
 # HTTP/3 with aioquic modules
 import aioquic.buffer
 import asyncio
@@ -51,14 +45,12 @@ sock.settimeout(0.5)
 network_path = QuicNetworkPath('prett3.com')
 connect_v = None # temporary
 
-# Initialize state machine
-pm, sm = generate_sm()
-
 class HttpClient():
     def __init__(self, quic_conf: QuicConfiguration, hostname: str) -> None:
         
         self.quic_conf = quic_conf
         self.quic_conf.original_version = 1
+        self.quic_conf.server_name = "prett3.com"
         self._quic = QuicConnection(configuration=self.quic_conf)
         self._http = H3Connection(self._quic)
         self.hostname = hostname
@@ -115,8 +107,8 @@ class HttpClient():
         elif epoch==Epoch.HANDSHAKE: quic_packet_type = QuicPacketType.HANDSHAKE
         elif epoch==Epoch.ONE_RTT: quic_packet_type = QuicPacketType.ONE_RTT
 
-        print(">>> prett3.get_builder. quic_packet_type={}, crypto_pair={}".format(quic_packet_type, crypto_pair))
-        print(">>> prett3.get_builder. crypto valid={}".format(crypto_pair.send.is_valid()))
+        #print(">>> prett3.get_builder. quic_packet_type={}, crypto_pair={}".format(quic_packet_type, crypto_pair))
+        #print(">>> prett3.get_builder. crypto valid={}".format(crypto_pair.send.is_valid()))
         builder.start_packet(quic_packet_type, crypto_pair)
 
         self._http._quic._packet_number += 1
@@ -333,32 +325,32 @@ def main(
     url: str
 ) -> None:
 
+    # Step 1: Initialize the HTTP/3 client with QUIC configuration
     h3client = HttpClient(configuration, urlparse(url).netloc)
 
-
+    # Step 2: Establish the initial connection (handshake)
+    print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
     h3client.connect()
-    h3client.read_from_buffer()
+    print("1. sending crypto validity: {}".format( h3client._quic._cryptos[Epoch.HANDSHAKE].send.is_valid() ))
 
+    h3client.read_from_buffer()  # Receive any response from the server
 
+    print("After connect, sending crypto validity: {}".format( h3client._quic._cryptos[Epoch.HANDSHAKE].send.is_valid() ))
 
-    #sys.exit()
-    time.sleep(5)
-
-
+    time.sleep(0.1)
+    
+    # Step 3: Complete the connection (finish handshake)
+    print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
     h3client.complete_connection()
-    h3client.read_from_buffer()
+    h3client.read_from_buffer()  # Receive any response from the server
 
+    time.sleep(0.1)
     
     #sys.exit()
-    
-    time.sleep(5)
-    h3client.open_qpack_streams()
-    h3client.read_from_buffer()
-
-    time.sleep(5)
     headers_data = h3client.craft_sample_headers_frame()
     h3client.send_quic_stream(headers_data)
     h3client.read_from_buffer()
+    
 
 def init(args):
     print("\n[STEP 1] Initializing...")
@@ -478,10 +470,9 @@ if __name__ == "__main__":
     #init(args)
     
     ### Extract initial state machine ###
-    http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
-    # main(
-    #         configuration=configuration,
-    #         url=args.url
-    #     )
+    #http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
+    main(
+             configuration=configuration,
+             url=args.url
+    )
     
-    # 

