@@ -32,17 +32,19 @@ from aioquic.quic.connection import *
 logger = logging.getLogger("client")
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
-network_path = QuicNetworkPath('prett3.com')
+
 
 class HttpClient():
     def __init__(self, quic_conf: QuicConfiguration, hostname: str) -> None:
         
         self.quic_conf = quic_conf
         self.quic_conf.original_version = 1
-        self.quic_conf.server_name = "prett3.com" # OLS requires
+        self.hostname = hostname
+        self.quic_conf.server_name = hostname # OLS requires. normally set in async module's connect()
+        self.network_path = QuicNetworkPath(hostname)
         self._quic = QuicConnection(configuration=self.quic_conf)
         self._http = H3Connection(self._quic)
-        self.hostname = hostname
+        
     
     def send_quic_packet(self, packet):
         """
@@ -718,7 +720,7 @@ class HttpClient():
             context = QuicReceiveContext(
                 epoch=epoch,
                 host_cid=header.destination_cid,
-                network_path=network_path,
+                network_path=self.network_path,
                 quic_logger_frames=None, #quic_logger_frames,
                 time=now,
                 version=header.version,
@@ -940,7 +942,6 @@ def main(
 
     #time.sleep(1)
 
-    
     # Step 4: Replay only 1-RTT messages from sample_msg
     print("\033[93m\n[Replaying 1-RTT messages...]\033[0m")
 
