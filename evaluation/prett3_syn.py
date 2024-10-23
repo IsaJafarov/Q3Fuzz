@@ -25,6 +25,11 @@ from aioquic.quic.connection import QuicConnection, QuicNetworkPath
 from aioquic.tls import CipherSuite, Epoch
 
 import util  # PRETT3 project module
+from states import StateList, State
+import statemachine as stma
+import smbuilder
+from urllib.parse import urlparse
+from transitions.extensions import GraphMachine as Machine
 from aioquic.quic.connection import *
 
 PRIORITY_UPDATE_FRAME_TYPE = 0x800f0700
@@ -854,49 +859,140 @@ class HttpClient():
         else:  # If only QUIC layer is present, send the QUIC packet
             self.send_quic_packet(quic_frame_type_hex, quic_payload)  # Pass the extracted QUIC payload
 
+    def test_connection_and_replay(
+        self,
+        configuration: QuicConfiguration,
+        url: str,
+        sample_msg: pyshark.FileCapture
+    ) -> None:
+        """
+        테스트 함수로 HTTP/3 연결을 설정하고 메시지 리플레이를 수행하며 상태머신을 활용합니다.
+        """
+        # Step 1: Initialize the HTTP/3 client with QUIC configuration
+        h3client = HttpClient(configuration, urlparse(url).netloc)
+
+        # Step 2: Establish the initial connection (handshake)
+        print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
+        h3client.connect()
+        h3client.read_from_buffer()  # Receive any response from the server
+
+        # Step 3: Complete the connection (finish handshake)
+        print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
+        h3client.complete_connection()
+        h3client.read_from_buffer()  # Receive any response from the server
+
+        # Step 4: 상태머신 생성 및 메시지 주고받기 기록 처리
+        print("\033[93m\n[Replaying messages with state machine...]\033[0m")
+        
+        # 상태 머신 초기화 및 메시지 처리
+        pm, sm = stma.generate_sm()
+        pm.testmsgs = sample_msg  # 메시지 리스트 저장
+        pm.dst_ip = url  # 서버 주소 설정
+
+        initial_state = "connected"  # 처음 상태는 이미 존재하는 connected
+        current_state = initial_state
+
+        for i, msg in enumerate(sample_msg):
+            if i > 3 + 5:
+                break
+            if hasattr(msg, 'quic'):
+                # 1-RTT QUIC 패킷만 처리
+                if hasattr(msg.quic, 'header_form') and msg.quic.header_form == "1":
+                    print(f"\033[90m[+] Skipping long header QUIC message: {util.h3msg_to_str(msg)}\033[0m")
+                    continue
+
+                # 보낸 메시지 출력
+                print(f"\033[92m[+] Replaying 1-RTT QUIC message: {util.h3msg_to_str(msg)}\033[0m")
+                
+                # 메시지 리플레이 및 상태 전이 추가
+                h3client.replay_sample_msg(msg)
+                h3client.read_from_buffer()
+
+                # 보낸 메시지와 응답을 상태머신에 기록 및 상태 전이 추가
+                sent_msg_str = util.h3msg_to_str(msg)
+                received_msg_str = f"Response {i + 1}"  # 응답 메시지를 실제로 받을 경우에 교체
+                new_state = f"State {i + 1}"
+
+                # 새로운 상태 추가
+                pm.state_list.add_state(State(new_state, i + 1, msg_sent=sent_msg_str, msg_rcvd=received_msg_str))
+
+                # 상태 머신에 전이 추가 (첫 번째 상태는 connected에서 시작)
+                sm.add_transition(trigger=sent_msg_str + "\n / " + received_msg_str, source=current_state, dest=new_state)
+
+                # 상태 업데이트
+                current_state = new_state
+                
+                time.sleep(0.1)
+            else:
+                print(f"\033[92mNo QUIC layer found in message: {util.h3msg_to_str(msg)}\033[0m")
+
+        # Step 5: 상태머신 그래프 그리기
+        self.draw_state_machine_graph(sm)
+
+        print("\033[93m\n[Replay completed]\033[0m")
+        pm.state_list.print_state_list()  # 상태 목록 출력
+
+    def draw_state_machine_graph(self, sm):
+        """
+        상태 머신을 그래프로 그리는 함수. Machine의 get_graph() 메소드를 사용합니다.
+        """
+        # 상태 머신 그래프를 파일로 저장
+        graph = sm.get_graph()
+        graph_name = "state_machine_graph.png"
+
+        # 세로로 긴 그래프를 그리도록 설정 ('dot' 프로그래프에 rankdir=TB를 추가)
+        graph.draw(graph_name, prog='dot', args='-Grankdir=TB')  # 'TB'는 Top to Bottom, 세로 방향
+
+        print(f"[+] Graph saved as {graph_name}")
+
 def main(
     configuration: QuicConfiguration,
     url: str,
     sample_msg: pyshark.FileCapture
 ) -> None:
 
-    # Step 1: Initialize the HTTP/3 client with QUIC configuration
+
+    # HTTP/3 연결 설정 및 리플레이 테스트
     h3client = HttpClient(configuration, urlparse(url).netloc)
+    h3client.test_connection_and_replay(configuration, url, sample_msg)
 
-    # Step 2: Establish the initial connection (handshake)
-    print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
-    h3client.connect()
-    h3client.read_from_buffer()  # Receive any response from the server
+    # # Step 1: Initialize the HTTP/3 client with QUIC configuration
+    # h3client = HttpClient(configuration, urlparse(url).netloc)
 
-    #time.sleep(1)
+    # # Step 2: Establish the initial connection (handshake)
+    # print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
+    # h3client.connect()
+    # h3client.read_from_buffer()  # Receive any response from the server
 
-    # Step 3: Complete the connection (finish handshake)
-    print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
-    h3client.complete_connection()
-    h3client.read_from_buffer()  # Receive any response from the server
+    # #time.sleep(1)
 
-    #time.sleep(1)
+    # # Step 3: Complete the connection (finish handshake)
+    # print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
+    # h3client.complete_connection()
+    # h3client.read_from_buffer()  # Receive any response from the server
 
-    # Step 4: Replay only 1-RTT messages from sample_msg
-    print("\033[93m\n[Replaying 1-RTT messages...]\033[0m")
+    # #time.sleep(1)
 
-    for msg in sample_msg:
-        if hasattr(msg, 'quic'):
-            # Skip long header QUIC packets (identified by 'header_form' == "1")
-            if hasattr(msg.quic, 'header_form') and msg.quic.header_form == "1":
-                print(f"\033[90m[+] Skipping long header QUIC message: {util.h3msg_to_str(msg)}\033[0m")
-                continue
+    # # Step 4: Replay only 1-RTT messages from sample_msg
+    # print("\033[93m\n[Replaying 1-RTT messages...]\033[0m")
+
+    # for msg in sample_msg:
+    #     if hasattr(msg, 'quic'):
+    #         # Skip long header QUIC packets (identified by 'header_form' == "1")
+    #         if hasattr(msg.quic, 'header_form') and msg.quic.header_form == "1":
+    #             print(f"\033[90m[+] Skipping long header QUIC message: {util.h3msg_to_str(msg)}\033[0m")
+    #             continue
             
-            # Process only short header (1-RTT) QUIC packets
-            print(f"\033[92m[+] Replaying 1-RTT QUIC message: {util.h3msg_to_str(msg)}\033[0m")
-            h3client.replay_sample_msg(msg)
-            h3client.read_from_buffer()
-            time.sleep(0.1)
-        else:
-            print(f"\033[92mNo QUIC layer found in message: {util.h3msg_to_str(msg)}\033[0m")
+    #         # Process only short header (1-RTT) QUIC packets
+    #         print(f"\033[92m[+] Replaying 1-RTT QUIC message: {util.h3msg_to_str(msg)}\033[0m")
+    #         h3client.replay_sample_msg(msg)
+    #         h3client.read_from_buffer()
+    #         time.sleep(0.1)
+    #     else:
+    #         print(f"\033[92mNo QUIC layer found in message: {util.h3msg_to_str(msg)}\033[0m")
 
 
-    print("\033[93m\n[Replay completed]\033[0m")
+    # print("\033[93m\n[Replay completed]\033[0m")
     
 
 def init(args):
