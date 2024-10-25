@@ -1,2 +1,16 @@
 Development Note and Troubleshoot
 
+[Running]
+- Without keylogging
+$ sudo python3 prett3_syn.py https://prett3.com sample_traffics/ch_n_ng_n.pcapng
+- With keylogging for debug use
+$ sudo python3 prett3_syn.py https://prett3.com sample_traffics/ch_n_ng_n.pcapng -l prett3_secret.keylog
+
+[Troubleshooting]
+- If 1-RTT packets do not contain any of H3 messages, equip Wireshark with SSLKEYLOG of the specified pcap.
+
+[Mechanism]
+# prett3_syn.py
+- Establish the connection using QUIC frames such as Init and Handshake.
+- Then it replays foreseen QUIC/H3 packets stored in a specified pcap file.
+  (Note that it sends 1-RTT messages only, skipping Init and Handshake messages.)
