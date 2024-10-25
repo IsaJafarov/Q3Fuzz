@@ -32,12 +32,9 @@ from urllib.parse import urlparse
 from transitions.extensions import GraphMachine as Machine
 from aioquic.quic.connection import *
 
-<<<<<<< HEAD
-=======
 PRIORITY_UPDATE_FRAME_TYPE = 0x800f0700
 
 logger = logging.getLogger("client")
->>>>>>> 7adedb444b1b1d4b7a3c14f1ceb1f94df16f6f12
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
 
@@ -751,13 +748,6 @@ class HttpClient():
             print("No valid payload found for PRIORITY_UPDATE frame, using default payload.")
             priority_data = b'\x00\x01\x02'  # Example priority payload
 
-<<<<<<< HEAD
-    # Step 4: Replay only 1-RTT messages from sample_msg
-    print("\033[93m\n[Replaying 1-RTT messages...]\033[0m")
-    '''
-    for msg in sample_msg:
-        try:
-=======
         return aioquic.h3.connection.encode_frame(0x000f0700, priority_data)
 
     def build_h3_headers_frame(self, h3_layer):
@@ -905,7 +895,6 @@ class HttpClient():
         for i, msg in enumerate(sample_msg):
             if i > 3 + 5:
                 break
->>>>>>> 7adedb444b1b1d4b7a3c14f1ceb1f94df16f6f12
             if hasattr(msg, 'quic'):
                 # 1-RTT QUIC 패킷만 처리
                 if hasattr(msg.quic, 'header_form') and msg.quic.header_form == "1":
@@ -1003,18 +992,8 @@ def main(
     #         print(f"\033[92mNo QUIC layer found in message: {util.h3msg_to_str(msg)}\033[0m")
 
 
-<<<<<<< HEAD
-    print("\033[93m\n[Replay completed]\033[0m")
-    '''
-    
-    headers_data = h3client.craft_sample_headers_frame()
-    h3client.send_quic_stream(headers_data)
-    h3client.read_from_buffer()
-    
-=======
     # print("\033[93m\n[Replay completed]\033[0m")
     
->>>>>>> 7adedb444b1b1d4b7a3c14f1ceb1f94df16f6f12
 
 def init(args):
     print("\n[STEP 1] Initializing...")
