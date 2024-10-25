@@ -29,7 +29,6 @@ import aioquic.tls as tls
 from aioquic.quic.connection import *
 import concurrent.futures
 
-logger = logging.getLogger("client")
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
 
