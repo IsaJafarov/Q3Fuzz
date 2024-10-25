@@ -11,8 +11,6 @@ from datetime import datetime
 from collections import deque
 from urllib.parse import urlparse
 
-import pyshark
-import asyncio
 import aioquic
 from aioquic.buffer import Buffer
 from aioquic.h3.connection import H3_ALPN, H3Connection, StreamType, FrameType, encode_frame, encode_settings
