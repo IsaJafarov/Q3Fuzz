@@ -821,7 +821,7 @@ def main(
         attack_end_time = time.time()
         attack_end_time_pretty = datetime.fromtimestamp(attack_end_time).strftime('%Y-%m-%d %H:%M:%S')
         print("\033[31mAttack Completes at {}\033[0m".format(attack_end_time_pretty))
-        time.sleep(55)
+        time.sleep(15)
         
 
     

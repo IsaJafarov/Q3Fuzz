@@ -5,10 +5,5 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
-<<<<<<< HEAD
-.keylog
-evaluation/_*
-evaluation/diagram/
-=======
 *.keylog
->>>>>>> d9b35a64835b9d115115053741411a1f8a0f5217
+__pycache__/
