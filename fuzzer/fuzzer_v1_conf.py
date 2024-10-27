@@ -9,8 +9,7 @@ class FuzzingConf():
             self.assign_random_values()
         else:
             self.assign_values_from_file(config_file)
-        
-        print( json.dumps(self.__dict__, indent=1) )
+
 
     def assign_random_values(self):
 
@@ -49,7 +48,6 @@ class FuzzingConf():
         self.method_header = random.choice( ['GET']*7 + ['POST', 'PUT', 'DELETE', 'HEAD', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH', 'ASAS'])
         self.path_header = random.choice(['/100k.html', '/600k.html'])
         self.user_agent_length = random.randint(0, 2000)
-
         
 
     def assign_values_from_file(self, config_file):
@@ -95,3 +93,5 @@ class FuzzingConf():
         self.path_header = config['path_header']
         self.user_agent_length = config['user_agent_length']
  
+    def __str__(self):
+        return json.dumps(self.__dict__, indent=1)

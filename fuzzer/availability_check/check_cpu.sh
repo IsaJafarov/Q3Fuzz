@@ -9,6 +9,6 @@ do
 	#echo $cpu
 
 	if (( $(echo "$cpu > 20" | bc -l) )); then
-  		echo "CPU reached $cpu at $(date)"
+  		echo "CPU reached $cpu% at $(date)"
     fi
 done
