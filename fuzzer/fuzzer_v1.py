@@ -28,6 +28,7 @@ from aioquic.quic.connection import *
 import concurrent.futures
 from fuzzer_v1_conf import FuzzingConf
 import traceback
+from tqdm import tqdm
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
@@ -801,8 +802,9 @@ def main(
     def run_attack():
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
-            print("\033[31mStart running the attack for {} seconds with {} parallel connections and {} sec interval\033[0m".format(60, 100, 5))
-            while time.time() - attack_start_time < 61:                
+            print("\033[31mStart running the attack for with {} parallel connections {} times with {} sec interval\033[0m".format(100, 5, 5))
+            #while time.time() - attack_start_time < 61:            
+            for i in tqdm( range(0, 5) ):
                 for i in range(100):
                     # Submit each iteration as a separate task
                     futures.append(executor.submit(execute_attack, fuzzing_conf, url, once))
@@ -819,7 +821,7 @@ def main(
         attack_end_time = time.time()
         attack_end_time_pretty = datetime.fromtimestamp(attack_end_time).strftime('%Y-%m-%d %H:%M:%S')
         print("\033[31mAttack Completes at {}\033[0m".format(attack_end_time_pretty))
-        time.sleep(60)
+        time.sleep(55)
         
 
     
