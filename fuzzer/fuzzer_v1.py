@@ -29,6 +29,7 @@ import concurrent.futures
 from fuzzer_v1_conf import FuzzingConf
 import traceback
 from tqdm import tqdm
+import json
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
@@ -50,6 +51,9 @@ class HttpClient():
         self._quic = QuicConnection(configuration=self.quic_conf)
         self._http = H3Connection(self._quic)
         self.fuzzing_conf = fuzzing_conf
+
+    def __str__(self) -> str:
+        return json.dumps(self.__dict__, indent=1)
     
     def craft_sample_headers_frame(self):
         """
@@ -802,13 +806,13 @@ def main(
     def run_attack():
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
-            print("\033[31mStart running the attack for with {} parallel connections {} times with {} sec interval\033[0m".format(100, 5, 5))
+            print("\033[31mStart running the attack for with {} parallel connections {} times with {} sec interval\033[0m".format(20, 60, 1))
             #while time.time() - attack_start_time < 61:            
-            for i in tqdm( range(0, 5) ):
-                for i in range(100):
+            for i in tqdm( range(0, 60), colour='red' ):
+                for i in range(20):
                     # Submit each iteration as a separate task
                     futures.append(executor.submit(execute_attack, fuzzing_conf, url, once))
-                time.sleep(5)
+                time.sleep(1)
 
 
     while True: # new attack parameters at every iteration
@@ -821,7 +825,10 @@ def main(
         attack_end_time = time.time()
         attack_end_time_pretty = datetime.fromtimestamp(attack_end_time).strftime('%Y-%m-%d %H:%M:%S')
         print("\033[31mAttack Completes at {}\033[0m".format(attack_end_time_pretty))
-        time.sleep(15)
+        
+        # Let the server rest
+        for i in tqdm( range(0, 30), colour='green' ):
+            time.sleep(1)
         
 
     
