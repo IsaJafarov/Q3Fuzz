@@ -10,3 +10,6 @@ sudo apt purge -y command-not-found
 
 sudo systemctl stop packagekit
 sudo systemctl disable packagekit
+
+sudo systemctl stop fwupd
+sudo systemctl disable fwupd
