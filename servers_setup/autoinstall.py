@@ -122,7 +122,7 @@ def install_openlitespeed(version):
         os.system("sudo /usr/local/lsws/bin/lswsctrl start")
 
 def install_h2o(version):
-    os.system("sudo apt install -y unzip cmake build-essential")
+    os.system("sudo apt install -y unzip cmake build-essential libssl-dev zlib1g-dev")
     if version=='a429117':
         os.system("sudo rm -r ./h2o-a429117; mkdir ./h2o-a429117")
         os.chdir("h2o-a429117")

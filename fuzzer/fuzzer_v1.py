@@ -806,6 +806,7 @@ def main(
     def run_attack():
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
+            print(fuzzing_conf)
             print("\033[31mStart running the attack for with {} parallel connections {} times with {} sec interval\033[0m".format(20, 60, 1))
             #while time.time() - attack_start_time < 61:            
             for i in tqdm( range(0, 60), colour='red' ):
@@ -820,7 +821,7 @@ def main(
         attack_start_time_pretty = datetime.fromtimestamp(attack_start_time).strftime('%Y-%m-%d %H:%M:%S')
         print("\n\033[31mNew Attack Starts at {}\033[0m".format(attack_start_time_pretty))
         fuzzing_conf = FuzzingConf(config_file)
-        print(fuzzing_conf)
+        
         run_attack()
         attack_end_time = time.time()
         attack_end_time_pretty = datetime.fromtimestamp(attack_end_time).strftime('%Y-%m-%d %H:%M:%S')

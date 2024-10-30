@@ -2,5 +2,7 @@
 
 ## Requirements
 - python 3.x
-- apt) tshark
-- pip) aioquic v1.2.0, pyshark
+- pyshark and aioquic packages
+```
+$ pip3 install pyshark aioquic==1.2.0
+```

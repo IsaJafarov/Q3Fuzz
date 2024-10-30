@@ -10,5 +10,7 @@ do
 
 	if (( $(echo "$cpu > 20" | bc -l) )); then
   		echo "CPU reached $cpu% at $(date)"
+		ps -Ao user,uid,comm,pid,pcpu,tty --sort=-pcpu | head -n 6
+		echo
     fi
 done
