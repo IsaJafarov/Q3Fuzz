@@ -2,7 +2,7 @@
 
 # this script runs on an honest client's machine
 
-server_addresses=("fuzzserver1" "fuzzserver2" "prett3.com")
+server_addresses=("fuzzserver1" "fuzzserver2" "fuzzserver3" "prett3.com")
 
 while true;
 do

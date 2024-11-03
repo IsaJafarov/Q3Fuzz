@@ -13,3 +13,29 @@ sudo systemctl disable packagekit
 
 sudo systemctl stop fwupd
 sudo systemctl disable fwupd
+
+sudo systemctl stop man-db.service
+sudo systemctl disable man-db.service
+
+apt-get remove -y ubuntu-release-upgrader-core
+
+sudo systemctl stop snapd.service
+sudo systemctl disable snapd.service
+sudo systemctl stop snapd.socket
+sudo systemctl disable snapd.socket
+
+sudo apt remove -y landscape-common
+
+
+sudo systemctl stop cron.service
+sudo systemctl disable cron.service
+
+sudo systemctl stop apt-daily-upgrade.service
+sudo systemctl disable apt-daily-upgrade.service
+
+sudo systemctl stop ufw.service
+sudo systemctl disable ufw.service
+
+# for cloud-id processes
+sudo systemctl stop cloud-init && sudo systemctl disable cloud-init
+sudo systemctl stop cloud-init-local && sudo systemctl disable cloud-init-local

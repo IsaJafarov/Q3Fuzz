@@ -13,31 +13,36 @@ class FuzzingConf():
 
     def assign_random_values(self):
 
+        def choose_size():
+            return random.choice( list(range(-1000, 10000, 100)) + list(range(10000, 100000, 5000)) + list(range(1000000, 2000000, 10000)) )
+        
         # transport params
-        self.ack_delay_exponent = random.randint(-0, 25) # 3, no negative, RFC says <=20 integer
-        self.active_connection_id_limit = random.randint(0, 50) # 8 no negative
-        self.max_idle_timeout = random.randint(0, 10000) # 6000 no negative
-        self.initial_max_data = random.randint(-1000, 2000000) # 1048576
-        self.initial_max_stream_data_bidi_local = random.randint(-100, 2000000) # 1048576
-        self.initial_max_stream_data_bidi_remote = random.randint(-100, 2000000) # 1048576
-        self.initial_max_stream_data_uni = random.randint(-100, 2000000) # 1048576
-        self.initial_max_streams_bidi = random.randint(0, 300) #128 no  negative
-        self.initial_max_streams_uni = random.randint(-1, 300) # 128
-        self.max_ack_delay = random.randint(0, 100) #25 no negative
-        self.max_datagram_frame_size = random.randint(-1000, 2000000) # doesn't exist
+        self.ack_delay_exponent = random.choice( list(range(0, 10)) + list(range(10, 25, 5)) ) #  3, no negative, RFC says <=20 integer
+        self.active_connection_id_limit = random.choice( list(range(0, 10)) + list(range(10, 50, 5)) ) # 8 no negative
+        self.max_idle_timeout = random.choice( list(range(0, 10000, 100 )) ) # 6000 no negative
+        self.initial_max_data = choose_size() # 1048576
+        self.initial_max_stream_data_bidi_local = choose_size() # 1048576
+        self.initial_max_stream_data_bidi_remote = choose_size() # 1048576
+        self.initial_max_stream_data_uni = choose_size() # 1048576
+        self.initial_max_streams_bidi = random.choice( range(0, 300, 5)) #128 no  negative
+        self.initial_max_streams_uni = random.choice( range(0, 300, 5)) # 128
+        self.max_ack_delay = random.choice( range(0, 100, 5) ) #25 no negative
+        self.max_datagram_frame_size = choose_size() # doesn't exist
         self.quic_version = random.randint(0, 4)
 
+        # random.choice( list(range()) + list(range()) )
+
         # complete connection
-        self.largest_acknowledged = random.randint(0, 100) # no negative
-        self.ack_delay = random.randint(0, 200) # 106 no negative
+        self.largest_acknowledged = random.choice( list(range(0, 20)) + list(range(20, 100, 10)) ) # no negative
+        self.ack_delay = random.choice( range(0, 200, 5) ) # 106 no negative
         self.ack_range_count = random.randint(0, 5) #0
-        self.ack_range = random.randint(0, 50) # 1 no negative
+        self.ack_range = random.choice( range(0, 50, 5) ) # 1 no negative
 
         # open qpack streams
-        self.qpack_max_table_capacity = random.randint(-100, 100000) # 4096
-        self.qpack_blocked_streams = random.randint(0, 200)# 16
+        self.qpack_max_table_capacity = random.choice( list(range(-100, 10000, 200)) + list(range(10000, 100000, 5000)) ) # 4096
+        self.qpack_blocked_streams = random.choice( list(range(0, 20)) + list(range(20, 200, 10)) ) # 16
         self.enable_connect = random.randint(0, 2) # 1
-        self.dummy = random.randint(0, 100)# 1 no negative
+        self.dummy = random.choice( list(range(0, 5)) + list(range(5, 100, 5)) ) # 1 no negative
 
         self.control_stream_id = random.randint(0, 4) # 2
         self.encoder_stream_id = random.randint(0, 8) # 6 no negative
@@ -46,7 +51,7 @@ class FuzzingConf():
         # headers frame
         self.request_stream_id = random.randint(-1, 4) # 0
         self.method_header = random.choice( ['GET']*7 + ['POST', 'PUT', 'DELETE', 'HEAD', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH', 'ASAS'])
-        self.path_header = random.choice(['/100k.html', '/600k.html'])
+        self.path_header = random.choice(['/100k.html', '/300k.html', '/600k.html'])
         self.user_agent_length = random.randint(0, 2000)
         
 
