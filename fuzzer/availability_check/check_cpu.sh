@@ -10,7 +10,7 @@ do
 
 	if (( $(echo "$cpu > 20" | bc -l) )); then
   		echo "CPU reached $cpu% at $(date)"
-		top -b -n 1 | grep -E "CPU|caddy"
+		top -b -n 1 | grep -E "CPU|caddy|nginx|h2o|litespeed"
 		echo
     fi
 done
