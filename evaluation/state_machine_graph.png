@@ -1,0 +1,29 @@
+---
+State Machine
+---
+stateDiagram-v2
+  direction LR
+  classDef s_default fill:white,color:black
+  classDef s_inactive fill:white,color:black
+  classDef s_parallel color:black,fill:white
+  classDef s_active color:red,fill:darksalmon
+  classDef s_previous color:blue,fill:azure
+  
+  state "connected" as connected
+  Class connected s_active
+  state "finish" as finish
+  Class finish s_default
+  
+  connected --> State 4: [Q]1-RTT(STREAM,STREAM,STREAM) [H3]NONE(SETTINGS,RESERVED) [H3]NONE [H3]NONE
+ / Response 4
+  State 4 --> State 5: [Q]1-RTT(STREAM) [H3]NONE(HEADERS)
+ / Response 5
+  State 5 --> State 6: [Q]1-RTT(ACK,STREAM) [H3]NONE
+ / Response 6
+  State 6 --> State 7: [Q]1-RTT(ACK)
+ / Response 7
+  State 7 --> State 8: [Q]1-RTT(ACK)
+ / Response 8
+  State 8 --> State 9: [Q]1-RTT(ACK)
+ / Response 9
+  [*] --> connected
