@@ -30,6 +30,7 @@ from fuzzer_v1_conf import FuzzingConf
 import traceback
 from tqdm import tqdm
 import json
+from rich.traceback import install
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
@@ -80,7 +81,7 @@ class HttpClient():
         
         #print("\nCrafting a sample DATA frame")
 
-        data = "A"*10
+        data = "A" * self.fuzzing_conf.data_length
 
         return aioquic.h3.connection.encode_frame(FrameType.DATA, data.encode())
 
@@ -779,9 +780,15 @@ def execute_attack(fuzzing_conf: FuzzingConf, url: str, once: bool):
         headers_data = h3client.craft_sample_headers_frame()
         h3client.send_quic_stream(headers_data)
         h3client.read_from_buffer()
+
+        if once: print("\033[93m\n[Sending DATA frame...]\033[0m")
+        data = h3client.craft_sample_data_frame()
+        h3client.send_quic_stream(data)
+        h3client.read_from_buffer()
+        
     except Exception as e:
-        if once: print(traceback.format_exc())
-        else: pass #print(str(e))
+        if once: raise e # print rich traceback
+        else: pass
 
 
 def main(
@@ -837,6 +844,8 @@ def main(
     
 
 if __name__ == "__main__":
+    install()
+
     defaults = QuicConfiguration(is_client=True)
 
     parser = argparse.ArgumentParser(description="HTTP/3 client")

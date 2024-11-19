@@ -54,6 +54,8 @@ class FuzzingConf():
         self.path_header = random.choice(['/100k.html', '/300k.html', '/600k.html'])
         self.user_agent_length = random.randint(0, 2000)
         
+        # data frame
+        self.data_length = random.choice( list(range(0, 2000, 100)) )
 
     def assign_values_from_file(self, config_file):
 
@@ -98,5 +100,8 @@ class FuzzingConf():
         self.path_header = config['path_header']
         self.user_agent_length = config['user_agent_length']
  
+        # data frame
+        self.data_length = config['data_length'] 
+
     def __str__(self):
         return json.dumps(self.__dict__, indent=1)
