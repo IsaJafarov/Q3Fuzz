@@ -270,14 +270,19 @@ class HttpClient():
 
     def handle_crypto(self, context: QuicReceiveContext, frame_type: int, buf:Buffer):
 
-        # print(">>> prett3.handle_crypto: start: frame_type={}, buf={}".format(frame_type, buf.data) )
         offset = buf.pull_uint_var()
         length = buf.pull_uint_var()
+        data = buf.pull_bytes(length)
+        print(("\033[31mCRYPTO frame received. " +
+                  "Offset={}, " +
+                  "Length={}, " +
+                  "Crypto Data={} \033[0m")
+            .format(offset, length, data ))
+        
         if offset + length > UINT_VAR_MAX:
             raise QuicConnectionError( error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="offset + length cannot exceed 2^62 - 1")
-        frame = QuicStreamFrame(offset=offset, data=buf.pull_bytes(length))
+        frame = QuicStreamFrame(offset=offset, data=data)
         
-        # print(">>> prett3.handle_crypto: epoch={}".format(context.epoch) )
         stream = self._quic._crypto_streams[context.epoch]
         pending = offset + length - stream.receiver.starting_offset()
         if pending > MAX_PENDING_CRYPTO:
@@ -332,7 +337,7 @@ class HttpClient():
         """
         Handle a PADDING frame.
         """
-        print("\033[31m\n[PADDING frame received]\033[0m".format())
+        print("\033[31m\nPADDING frame received\033[0m".format())
 
         """
         # consume padding
@@ -350,7 +355,7 @@ class HttpClient():
         """
         Handle a PING frame.
         """
-        print("\033[31m\n[PING frame received]\033[0m".format())
+        print("\033[31m\nPING frame received\033[0m".format())
 
     def handle_ack_frame(
         self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -366,6 +371,14 @@ class HttpClient():
             ack_range_count = buf.pull_uint_var()
             ack_count = buf.pull_uint_var()  # first ack range
             rangeset.add(end - ack_count, end + 1)
+            
+            print(("\033[31m\nACK frame received. " +
+                  "Largest Acknowledged={}, " +
+                  "Ack Delay={}, " +
+                  "Ack Range Count={}, " +
+                  "First Ack Range={} \033[0m")
+            .format(end, delay, ack_range_count, ack_count ))
+            
             end -= ack_count
             for _ in range(ack_range_count):
                 end -= buf.pull_uint_var() + 2
@@ -373,8 +386,6 @@ class HttpClient():
                 rangeset.add(end - ack_count, end + 1)
                 end -= ack_count
             
-            print("\033[31m\n[ACK frame received. Largest Acknowledged={}, Ack Delay={}, Ack Range Count={}, First Ack Range={}  ]\033[0m"
-              .format(end, delay, ack_range_count, ack_count ))
             
             return rangeset, delay
 
@@ -414,7 +425,7 @@ class HttpClient():
         error_code = buf.pull_uint_var()
         final_size = buf.pull_uint_var()
 
-        print("\033[31m\n[RESET_STREAM frame received. Stream ID={}, Error Code={}, Final Size={}]\033[0m"
+        print("\033[31m\nRESET_STREAM frame received. Stream ID={}, Error Code={}, Final Size={}\033[0m"
               .format(stream_id, error_code, final_size))
 
         """
@@ -461,7 +472,7 @@ class HttpClient():
         stream_id = buf.pull_uint_var()
         error_code = buf.pull_uint_var()  # application error code
 
-        print("\033[31m\n[STOP_SENDING frame received. Stream ID={}, Error Code={}]\033[0m"
+        print("\033[31m\nSTOP_SENDING frame received. Stream ID={}, Error Code={}\033[0m"
               .format(stream_id, error_code))
 
         """
@@ -486,7 +497,7 @@ class HttpClient():
         length = buf.pull_uint_var()
         token = buf.pull_bytes(length)
 
-        print("\033[31m\n[RESET_STREAM frame received. Length={}, Token={}]\033[0m"
+        print("\033[31m\nRESET_STREAM frame received. Length={}, Token={}\033[0m"
               .format(length, token))
 
         """
@@ -527,7 +538,7 @@ class HttpClient():
             offset=offset, data=data, fin=bool(frame_type & 1)
         )
         
-        print("\033[31m\n[STREAM frame received. Stream ID={}, Offset={}, Length={}, Stream Data={}]\033[0m"
+        print("\033[31m\nSTREAM frame received. Stream ID={}, Offset={}, Length={}, Stream Data={}\033[0m"
               .format(stream_id, offset, length, data))
         
         """
@@ -574,7 +585,7 @@ class HttpClient():
         """
         max_data = buf.pull_uint_var()
         
-        print("\033[31m\n[MAX_DATA frame received. MAX DATA={}]\033[0m"
+        print("\033[31m\nMAX_DATA frame received. MAX DATA={}\033[0m"
               .format(max_data))
 
         """
@@ -593,7 +604,7 @@ class HttpClient():
         stream_id = buf.pull_uint_var()
         max_stream_data = buf.pull_uint_var()
 
-        print("\033[31m\n[MAX_STREAM_DATA frame received. Stream ID={}, Max Stream Data={}]\033[0m"
+        print("\033[31m\nMAX_STREAM_DATA frame received. Stream ID={}, Max Stream Data={}\033[0m"
               .format(stream_id, max_stream_data))
 
         """
@@ -621,7 +632,7 @@ class HttpClient():
                 reason_phrase="Maximum Streams cannot exceed 2^60",
             )
 
-        print("\033[31m\n[STREAM frame received. Stream ID={}, Offset={}, Length={}, Stream Data={}]\033[0m"
+        print("\033[31m\nSTREAM frame received. Stream ID={}, Offset={}, Length={}, Stream Data={}\033[0m"
               .format(stream_id, offset, length, data))
 
         """
@@ -660,7 +671,7 @@ class HttpClient():
         """
         limit = buf.pull_uint_var()
 
-        print("\033[31m\n[DATA_BLOCKED  frame received. Limit={}]\033[0m"
+        print("\033[31m\nDATA_BLOCKED  frame received. Limit={}\033[0m"
               .format(limit))
 
     def handle_stream_data_blocked_frame(
@@ -672,7 +683,7 @@ class HttpClient():
         stream_id = buf.pull_uint_var()
         limit = buf.pull_uint_var()
 
-        print("\033[31m\n[STREAM_DATA_BLOCKED frame received. Stream ID={}, Limit={}]\033[0m"
+        print("\033[31m\nSTREAM_DATA_BLOCKED frame received. Stream ID={}, Limit={}\033[0m"
               .format(stream_id, limit))
         
         """
@@ -690,7 +701,7 @@ class HttpClient():
         """
         limit = buf.pull_uint_var()
 
-        print("\033[31m\n[STREAMS_BLOCKED frame received. Limit={}]\033[0m"
+        print("\033[31m\nSTREAMS_BLOCKED frame received. Limit={}\033[0m"
               .format(limit))
         
         """
@@ -714,7 +725,7 @@ class HttpClient():
         connection_id = buf.pull_bytes(length)
         stateless_reset_token = buf.pull_bytes(STATELESS_RESET_TOKEN_SIZE)
         
-        print("\033[31m\n[NEW_CONNECTION_ID frame received. Sequence Number={}, Retire Prior To={}, Length={}, Connection Id={}, stateless Reset Token]\033[0m"
+        print("\033[31m\nNEW_CONNECTION_ID frame received. Sequence Number={}, Retire Prior To={}, Length={}, Connection Id={}, stateless Reset Token\033[0m"
               .format(sequence_number, retire_prior_to, length, connection_id, stateless_reset_token))
 
         """
@@ -807,7 +818,7 @@ class HttpClient():
         """
         sequence_number = buf.pull_uint_var()
         
-        print("\033[31m\n[RETIRE_CONNECTION_ID frame received. Sequence Number={}]\033[0m"
+        print("\033[31m\nRETIRE_CONNECTION_ID frame received. Sequence Number={}\033[0m"
               .format(sequence_number))
 
         """
@@ -845,7 +856,7 @@ class HttpClient():
         """
         data = buf.pull_bytes(8)
 
-        print("\033[31m\n[PATH_CHALLENGE frame received. Data={}]\033[0m"
+        print("\033[31m\nPATH_CHALLENGE frame received. Data={}\033[0m"
               .format(data))
 
         """
@@ -860,7 +871,7 @@ class HttpClient():
         """
         data = buf.pull_bytes(8)
 
-        print("\033[31m\n[STREAM frame received. Data={}]\033[0m"
+        print("\033[31m\nSTREAM frame received. Data={}\033[0m"
               .format(data))
 
         """
@@ -892,7 +903,7 @@ class HttpClient():
         except UnicodeDecodeError:
             reason_phrase = ""
 
-        print("\033[31m\n[CONNECTION_CLOSE frame received. Error Code={}, Frame Type={}, Reason Phrase Length={}, Reason Phrase={}]\033[0m"
+        print("\033[31m\nCONNECTION_CLOSE frame received. Error Code={}, Frame Type={}, Reason Phrase Length={}, Reason Phrase={}\033[0m"
               .format(error_code, frame_type, reason_length, reason_phrase))
 
         """
@@ -911,7 +922,7 @@ class HttpClient():
         """
         Handle a HANDSHAKE_DONE frame.
         """
-        print("\033[31m\n[HANDSHAKE DONE frame received]\033[0m"
+        print("\033[31m\nHANDSHAKE DONE frame received\033[0m"
               .format())
         """
         # for clients, the handshake is now confirmed
@@ -934,7 +945,7 @@ class HttpClient():
             length = buf.capacity - start
         data = buf.pull_bytes(length)
 
-        print("\033[31m\n[DATAGRAM frame received. Length={}, Data={}]\033[0m"
+        print("\033[31m\nDATAGRAM frame received. Length={}, Data={}\033[0m"
               .format(length, data))
 
         """
