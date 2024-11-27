@@ -1,16 +1,24 @@
 import states
-import smbuilder
 from transitions.extensions import GraphMachine as Machine
+from prett3_syn import HttpClient
+
 import util
+import json
 import time
 import logging
 import sys
 from collections import OrderedDict
 import copy
+import traceback
+from urllib.parse import urlparse
 
 class ProtoModel(object):
     def __init__(self, name):
         self.name = name
+
+        # For HTTP/3 communication
+        self.configuration = None
+        self.keylog = None
 
         # overall status
         self.is_pruning = False
@@ -43,7 +51,7 @@ def generate_sm():
     return pm, sm
 
 """
-******* TODO - update to http3 *******
+******* TODO - implement for PRETT3 under construction *******
 def get_move_state_h3msgs(pm, target_state):
     # Get state moving message to reach current state
     # Return list of H2 messages
@@ -65,22 +73,137 @@ def get_move_state_h3msgs(pm, target_state):
     return move_state_h2msgs
 """
 
+def modeller_h3(conf, keylog, url, sample_msg, outdir):
+    g_start_time = time.time()
+    print("\n[STEP 3] Modeling started at %s" % time.ctime(g_start_time))
+    # pm : modeling status, 
+    # sm : state machine data structure using Machines package 
+    pm, sm = generate_sm()
+    pm.testmsgs = sample_msg
+    pm.dst_ip = url
+    pm.configuration = conf
+    pm.keylog = keylog
 
-def update_candidates(pm, sm, h2msg_sent, h2msg_rcvd, elapsedTime):
+    while True: # for each level
+        ### Expanding ###
+        print("[LEVEL %d] STATE MACHINE EXPANSION started at %s" % (pm.current_level, time.ctime(time.time())))
+        pm.is_pruning = False
+        # Retrieve valid states of previous level (unique states in prev. level so far) (for level 1, it is the initial state '0')
+        leaf_states = pm.state_list.get_states_by_level(pm.current_level)
+        expand_sm(pm, sm, leaf_states)
+        print("[LEVEL %d] STATE MACHINE EXPANSION ended at %s" % (pm.current_level, time.ctime(time.time())))
+
+        pm.state_list.print_state_list()
+        pm.candidate_state_list.print_state_list()
+
+        """
+        ******* TODO - implement for PRETT3 under construction *******
+        ### Pruning ###
+        print("[LEVEL %d] STATE MACHINE MINIMIZATION started at %s" % (pm.current_level, time.ctime(time.time())))
+        is_pruning = True
+        minimize_sm(pm, sm)
+        print("[LEVEL %d] STATE MACHINE MINIMIZATION ended at %s" % (pm.current_level, time.ctime(time.time())))
+
+        ### Finishing current level ... ###
+        elapsed_time = time.time() - g_start_time
+        pm.candidate_state_list.state_list = []  # clear candidate state list
+
+        print("[LEVEL %d] Elapsed time for this level: %s" % (pm.current_level, elapsed_time))
+        
+        if len(pm.state_list.get_states_by_level(pm.current_level+1)) == 0: # Jobs finished
+            break
+
+        """
+
+        ### Graph drawing ###
+        graphname = "%s/level_" % outdir + str(pm.current_level) + ".png"
+        sm.get_graph().draw(graphname, prog='dot')
+        with open(graphname.replace(".png", ".json"), "w") as jsonfile:
+            json.dump(sm.markup, jsonfile, indent=2)
+
+        pm.current_level = pm.current_level + 1
+
+        #******* TODO - to be removed for further process in the next level *******
+        print("\033[31m\nPRETT3 STOPPED.\033[0m")
+        sys.exit()
+        
+
+    elapsed_time = time.time() - g_start_time
+    print ("[+] All jobs done. Total elapsed time is ", elapsed_time)
+    ### Graph drawing ###
+    graphname = "%s/level_" % outdir + str(pm.current_level-1) + "(fin).png"
+    sm.get_graph().draw(graphname, prog='dot')
+    with open(graphname.replace(".png", ".json"), "w") as jsonfile:
+        json.dump(sm.markup, jsonfile, indent=2)
+    logger.info(pm.transition_info)
+    sys.exit()
+
+
+def send_receive_http3(pm, h3client, mov_msg_list, h3msg_sent, parent_elapedTime):
+    h3msg_rcvd = ''
+    elapsed_time = 0.0
+
+    try:
+        is_already_closed = False
+        
+        ### INITIAL CONNECTION ###
+        # Establish initial connection by sending handshake messages
+        print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
+        h3client.connect()
+        h3client.read_from_buffer()  # Receive any response from the server
+
+        # Complete the connection by sending handshake completion messages
+        print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
+        h3client.complete_connection()
+        h3client.read_from_buffer()  # Receive any response from the server
+
+        if len(mov_msg_list) > 1:
+            print("\033[93m\n[Sending state moving message...]\033[0m")
+
+        ### SENDING STATE MOVING MESSAGES ###
+        for mov_msg in mov_msg_list:
+            print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg)}")
+            state_msg = h3client.replay_sample_msg(mov_msg)  # Send HTTP/3 state-moving message
+            if state_msg:
+                print(f"  [+] Received state-moving response: {state_msg}")
+                # h3msg_rcvd.append(state_msg)
+                
+        ### SENDING TARGET MSG ###
+        if is_already_closed is False: # check for goaway in state moving (TODO)
+            print("\033[93m\n[Sending testing message...]\033[0m")
+            print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
+            h3msg_rcvd = h3client.replay_sample_msg(h3msg_sent)  # Send HTTP/3 target message
+            
+
+    except Exception as e:
+        print("Exception message: {}".format(e))
+        print(traceback.format_exc())
+        sys.exit()
+
+    print("  [SUMMARY] (%s) => %s => %s (%d sec.)" % (
+    util.h3msg_to_str(mov_msg_list).replace("|", "=>"), util.h3msg_to_str(h3msg_sent), h3msg_rcvd, elapsed_time))
+    # print("  ==================================")
+
+    return h3msg_rcvd, elapsed_time
+
+def update_candidates(pm, sm, h3msg_sent, h3msg_rcvd, elapsedTime):
     # sm : state machine, current_state : current state,
-    # spyld_str : send h2 frame sequence in string, h2msg_sent : send h2 frame sequence,
-    # rpyld_str : response h2 frame sequence in string, h2msg_rcvd : response h2 frame sequence
-    # elapsedTime : elapsed time for response of h2msg_rcvd to h2msg_sent
+    # spyld_str : send h2 frame sequence in string, h3msg_sent : send h2 frame sequence,
+    # rpyld_str : response h2 frame sequence in string, h3msg_rcvd : response h2 frame sequence
+    # elapsedTime : elapsed time for response of h3msg_rcvd to h3msg_sent
     # Build and fix a state machine based on the response
 
     # No valid state found yet. Add candidate states in protocol model first.
     pm.num_of_states += 1
     cand_s = states.State(name=str(pm.num_of_states), level=pm.current_level + 1, parent_state=pm.current_state,
-                          h2msg_sent=h2msg_sent, h2msg_rcvd=h2msg_rcvd, elapsedTime=elapsedTime)
+                          msg_sent=h3msg_sent, msg_rcvd=h3msg_rcvd, elapsedTime=elapsedTime)
     pm.candidate_state_list.add_state(cand_s)
-    print("    [+] Candidate state %s added (%s -> %s)" % (cand_s.name, cand_s.parent_state.name, cand_s.name))
-    logger.info("    [+] Candidate state %s added (%s -> %s)" % (cand_s.name, cand_s.parent_state.name, cand_s.name))
+    print("  [+] Candidate state %s added (%s -> %s)" % (cand_s.name, cand_s.parent_state.name, cand_s.name))
 
+
+    # TODO - 2 lines below to be removed: THIS IS TEMPORARY CODE FOR GENERATING EXPANDED STATE MACHINE
+    sm.add_state(cand_s.name)
+    sm.add_transition(h3msg_sent + " / " + h3msg_rcvd + "\n", source="connected", dest=cand_s.name)
 
 def check_dupstate(pm, md, cand_s, mode):
     if mode == 'p':
@@ -123,7 +246,6 @@ def check_dupstate(pm, md, cand_s, mode):
 
     else:
         print("[ERROR] (check_dupstate()) Invalid mode.")
-        logger.info("[ERROR] (check_dupstate()) Invalid mode.")
         sys.exit()
 
 
@@ -138,7 +260,6 @@ def update_sm(pm, sm, cand_s, md):
         # Finished
         if int(cand_s.elapsedTime) == 0:
             print("  [lv.%d-MINIMIZATION-STATE %s] It is finishing state!" % (pm.current_level, cand_s.name))
-            logger.info("  [lv.%d-MINIMIZATION-STATE %s] It is finishing state!" % (pm.current_level, cand_s.name))
             if len(sm.get_transitions(trigger=md.t_label + "\n", source=cand_s.parent_state.name, dest='fin')) > 0:
                 return
             sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest='fin')
@@ -155,40 +276,48 @@ def expand_sm(pm, sm, leaf_states):
     for leaf_state in leaf_states:
         sr_dict = OrderedDict()
         try:
-            print("  [lv.%d-EXPANSION-LEAF] Expanding leaf state %s (%d/%d leaves)" % (pm.current_level,
-                leaf_state.name, leafstate_num, len(leaf_states)))
-            # logger.info("  [lv.%d-EXPANSION-LEAF] Expanding leaf state %s (%d/%d leaves)" % (pm.current_level,
-                # leaf_state.name, leafstate_num, len(leaf_states)))
+            print("    [LV %d | EXP | LEAF %d/%d] Expanding leaf state \'%s\'..." % (pm.current_level, leafstate_num, len(leaf_states),
+                leaf_state.name))
         except Exception as e:
             print(e)
             print(leaf_state)
-
-
-        # TODO - update to HTTP/3
-        # move_state_h3msgs_list = get_move_state_h3msgs(pm, leaf_state)
+            
         move_state_h3msgs_list = []
 
         message_num = 1
         pm.current_state = leaf_state
         parent_elapsed_time = leaf_state.elapsedTime
+        skipped_messages = 0
         for h3msg_sent in pm.testmsgs:
-            print("    [lv.%d-EXPANSION-STATE-\'%s\'] move Frame: %s, send Frame: %s (%d/%d msgs)" % (pm.current_level,
-                leaf_state.name, util.h3msg_to_str(move_state_h3msgs_list), util.h3msg_to_str(h3msg_sent), message_num,
-                len(pm.testmsgs)))
-            # logger.info("    [lv.%d-EXPANSION-STATE-\'%s\'] move Frame: %s, send Frame: %s (%d/%d msgs)" % (pm.current_level,
-                # leaf_state.name, util.h3msg_to_str(move_state_h3msgs_list), util.h3msg_to_str(h3msg_sent), message_num,
-                # len(pm.testmsgs)))
-            h3msg_rcvd, elapsedTime = smbuilder.send_receive_http3(pm, move_state_h3msgs_list, h3msg_sent,
+            if 'INIT' in util.h3msg_to_str(h3msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(h3msg_sent):
+                skipped_messages += 1
+                continue
+
+            h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc, pm.keylog)
+
+            print("┌────────────────────────────────────────────────────────────────────────────────────")
+            print("│    [LV %d | EXP | LEAF %d/%d | State '%s' | MSG %d/%d]         " %
+                (pm.current_level, leafstate_num, len(leaf_states), leaf_state.name, message_num, len(pm.testmsgs)-skipped_messages))
+            print("│    - Moving MSG: %s                                            " % 
+                util.h3msg_to_str(move_state_h3msgs_list))
+            print("│    - Test MSG  : %s                                            " % 
+                util.h3msg_to_str(h3msg_sent))
+            print("└────────────────────────────────────────────────────────────────────────────────────")
+
+            h3msg_rcvd_str, elapsedTime = send_receive_http3(pm, h3client, move_state_h3msgs_list, h3msg_sent,
                                                                      parent_elapsed_time)
-            update_candidates(pm, sm, h3msg_sent, h3msg_rcvd, elapsedTime)
+
+
             message_num += 1
             h3msg_sent_str = util.h3msg_to_str(h3msg_sent)
-            h3msg_rcvd_str = util.h3msg_to_str(h3msg_rcvd)
-            sr_dict[h3msg_sent_str] = h2msg_rcvd_str + " (%s)" % str(int(elapsedTime))
+
+            update_candidates(pm, sm, h3msg_sent_str, h3msg_rcvd_str, elapsedTime)
+            sr_dict[h3msg_sent_str] = h3msg_rcvd_str + " (%s)" % str(int(elapsedTime))
         leafstate_num += 1
         pm.current_state.child_sr_dict = sr_dict
 
-
+"""
+******* TODO - implement for PRETT3 under construction *******
 ## if Elapsed time is 0, it means end state
 def minimize_sm(pm, sm):
     # Among candidate states in the next level, unique states in current level are determined in minimize_sm() via pruning.
@@ -250,3 +379,4 @@ def minimize_sm(pm, sm):
                 logger.info("  [lv.%d-MINIMIZATION-STATE %s] -> **** Unique state %s found ****" % (pm.current_level, cand_s.name, cand_s.name))
 
         update_sm(pm, sm, cand_s, md)
+"""

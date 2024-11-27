@@ -1,9 +1,9 @@
 # -*- coding: UTF-8 -*-
 # Modules for HTTP3
-import pyshark 
-#import nest_asyncio
-
-#nest_asyncio.apply()
+import pyshark
+import re
+from aioquic.buffer import Buffer
+from aioquic.quic.packet import QuicFrameType, QuicPacketType
 
 # IETF specification
 QUIC_LONGPACKETTYPE = ['INIT', '0-RTT', 'HANDSHAKE', 'RETRY']
@@ -91,7 +91,6 @@ def h3msg_from_pcap(f, client_only=False): # for HTTP3
 
     # print("============= List of QUIC packets in pcap =============")
     for packet in quic_cap:
-        #print(packet)
         mark_client = " "
         quic_cap_cnt += 1
         if client_ip == None and packet.quic.header_form == "1" and packet.quic.long_packet_type == "0": # The first INITIAL packet type of QUIC
@@ -141,12 +140,15 @@ def h3msg_to_str(h3msg):
                 quic_layer_cnt += 1
                 if 'header_form' in dir(layer) and layer.header_form == "1": #long header type (Initial | 0-RTT | Handshake | Retry)
                     msginfo += '[%s]%s' % ('Q', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]) 
+                    # msginfo += '[%s]%s' % ('Q', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]) 
                     # print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]))
                 elif 'coalesced_padding_data' in dir(layer):
                     msginfo += '[%s]%s' % ('Q', QUIC_FRAMETYPE[0]) 
+                    # msginfo += '[%s]%s' % ('Q', QUIC_SHORTPACKETTYPE) 
                     # print("     (Layer %d) [%s] PKT_TYPE: Random_padding" % (quic_layer_cnt, 'QUIC'))
                 else: # short header type (1-RTT)
-                    msginfo += '[%s]%s' % ('Q', QUIC_SHORTPACKETTYPE) 
+                    msginfo += '[%s]' % ('Q') 
+                    # msginfo += '[%s]%s' % ('Q', QUIC_SHORTPACKETTYPE) 
                     # print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_SHORTPACKETTYPE))
 
                 tmp_frames = ''
@@ -166,7 +168,7 @@ def h3msg_to_str(h3msg):
                     msginfo += '[%s]%s' % ('H3', H3_STREAMTYPE[int(layer.stream_type)]) 
                     # print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', H3_STREAMTYPE[int(layer.stream_type)]))
                 else:
-                    msginfo += '[%s]%s' % ('H3', 'NONE') 
+                    msginfo += '[%s]%s' % ('H3', '') 
                     # print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', "NONE"))
                 # 2. Check the frame type
                 tmp_frames = ''
@@ -180,35 +182,7 @@ def h3msg_to_str(h3msg):
 
     return msginfo
 
-    # Case 1: h3msg is list of HTTP/2 Frame Sequence in Scapy (multiplexed message sequence)
-    # if type(h3msg) is type([]):
-    #     for h3msg_in_list in h3msg:
-    #         for h2frame in h3msg_in_list.frames:
-    #             frame_len = 0xdeadbeef # frame with deadbeef is malformed frame!
-    #             if h2frame.len is not None: # handle malformed frame
-    #                 frame_len = h2frame.len
-    #             if hasattr(h2frame, 'type') and hasattr(h2frame, 'len'):
-    #                 frameStr += (frameShortInfoArr[h2frame.type] + '(%x)' % frame_len + '-')
-    #         frameStr = frameStr[:-1]
-    #         frameStr += ' | '
-    #     frameStr = frameStr[:-3]
-    # # Case 2: h3msg is HTTP/2 Frame Sequence in Scapy
-    # else:
-    #     for h2frame in h3msg.frames:
-    #         frame_len = 0xdeadbeef # frame with deadbeef is malformed frame!
-    #         if h2frame.len is not None: # handle malformed frame
-    #             frame_len = h2frame.len
-    #         if hasattr(h2frame, 'type'):
-    #             frameStr += (frameShortInfoArr[h2frame.type] + '(%x)' % frame_len + '-')
-    #     frameStr = frameStr[:-1]
-    # return frameStr
-
-
-def h2frame_from_sniff(packet):
-    sniff_frame = h2.H2Frame(str(packet))
-    return sniff_frame
-
-
+"""
 def framestr_to_h2seq(frameStrBuf):
     global dst_ip
     # move_state_msg_arr: ['HE-SE-SE', DE-PE, ....]
@@ -255,13 +229,13 @@ def framestr_to_h2seq(frameStrBuf):
             args = "/index.html"
 
             headerArgs = ":method " + msg + "\n\
-			:path " + args + "\n\
-			:authority " + dst_ip + "\n\
-			:scheme https\n\
-			accept-encoding: gzip, deflate\n\
-			accept-language: ko-KR\n\
-			accept: text/html\n\
-			user-agent: Scapy HTTP/2 Module\n"
+            :path " + args + "\n\
+            :authority " + dst_ip + "\n\
+            :scheme https\n\
+            accept-encoding: gzip, deflate\n\
+            accept-language: ko-KR\n\
+            accept: text/html\n\
+            user-agent: Scapy HTTP/2 Module\n"
 
             tblhdr = h2.HPackHdrTable()
             qry_frontpage = tblhdr.parse_txt_hdrs(
@@ -345,3 +319,5 @@ def check_h2_response(ans, msg=None):
             if msg in h3msg_to_str(r):
                 check = True
     return check
+
+"""
