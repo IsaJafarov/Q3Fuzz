@@ -689,7 +689,7 @@ class HttpClient():
         print(">>> open_qpack_streams: start")
 
         settings={
-            aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: 2323,# self._http._max_table_capacity,
+            aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: self._http._max_table_capacity,
             aioquic.h3.connection.Setting.QPACK_BLOCKED_STREAMS: self._http._blocked_streams,
             aioquic.h3.connection.Setting.ENABLE_CONNECT_PROTOCOL: 1,
             aioquic.h3.connection.Setting.DUMMY: 1
