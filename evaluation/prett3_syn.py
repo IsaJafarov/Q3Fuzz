@@ -11,7 +11,6 @@ import traceback
 import aioquic.quic
 import aioquic.quic.rangeset
 import pyshark
-import pyshark.packet
 from pyshark.packet.packet import Packet
 import asyncio
 import aioquic
@@ -2686,7 +2685,7 @@ class HttpClient():
         ### Send the test message (QUIC or HTTP/3) ###
         for layer in h3msg.layers:
             if layer.layer_name == 'quic':
-                print("layer: quic")
+                
                 quic_frame_type_hex = layer.get_field_value("quic.frame_type", raw=True)
                 # Extract stream ID and payload from QUIC layer
                 for field in layer.frame.fields:
@@ -2710,7 +2709,7 @@ class HttpClient():
                         quic_payload = layer.payload.raw_value
 
             elif layer.layer_name == 'http3':
-                print("layer: http3")
+                
                 h3_field_type_hex = layer.get_field_value("http3.frame_type", raw=True)
                 if h3_field_type_hex is not None:
                     h3_field_type = int(h3_field_type_hex, 16)
