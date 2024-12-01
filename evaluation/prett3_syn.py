@@ -11,6 +11,8 @@ import traceback
 import aioquic.quic
 import aioquic.quic.rangeset
 import pyshark
+import pyshark.packet
+from pyshark.packet.packet import Packet
 import asyncio
 import aioquic
 from aioquic.buffer import Buffer
@@ -24,6 +26,7 @@ from aioquic.quic.logger import QuicFileLogger
 from aioquic.quic.connection import QuicConnection, QuicNetworkPath
 from aioquic.quic.rangeset import RangeSet
 from aioquic.tls import CipherSuite, Epoch
+import pyshark.packet.packet
 
 # PRETT3 project module
 import util  
@@ -133,6 +136,7 @@ class HttpClient():
                 self.serialize_transport_parameters(),
             )
         ]
+    
 
         # TLS session resumption
         '''
@@ -1335,7 +1339,7 @@ class HttpClient():
         """
 
         settings={
-            aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: 2323,# self._http._max_table_capacity,
+            aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: self._http._max_table_capacity,
             aioquic.h3.connection.Setting.QPACK_BLOCKED_STREAMS: self._http._blocked_streams,
             aioquic.h3.connection.Setting.ENABLE_CONNECT_PROTOCOL: 1,
             aioquic.h3.connection.Setting.DUMMY: 1
@@ -1380,6 +1384,7 @@ class HttpClient():
         
         
         # Frame 2
+        #'''
         buf2 = builder.start_frame(
                 QuicFrameType.STREAM_BASE | 2,
                 capacity=4, #checked
@@ -1388,8 +1393,9 @@ class HttpClient():
         #buf2.push_uint_var(0) # offset
         buf2.push_uint16( len(stream6_frame.data) | 0x4000 )  #(16385) #(len(stream6_frame.data) | 0x4000)
         buf2.push_bytes(stream6_frame.data)
+        #'''
 
-
+        #'''
         # Frame 3
         buf3 = builder.start_frame(
                 QuicFrameType.STREAM_BASE | 2,
@@ -1399,7 +1405,7 @@ class HttpClient():
         #buf3.push_uint_var(0) # offset
         buf3.push_uint16(len(stream10_frame.data) | 0x4000) #(16385) | 0x4000)
         buf3.push_bytes(stream10_frame.data)        
-
+        #'''
         self.send_quic_frames_from_builder(builder)
 
     #### FOR SENDING PACKETS ####
@@ -1462,30 +1468,43 @@ class HttpClient():
 
         return aioquic.h3.connection.encode_frame(FrameType.HEADERS, headers_data)
 
-    def send_quic_stream(self, frames, stream_id):
+    def send_quic_stream(self, fin_bit:bool, stream_id:int, offset:int, h3_frame_data:bytes):
         """
         Send multiple HTTP/3 frames over the QUIC stream. Each frame is written into its own 
         QUIC stream frame within the same QUIC packet.
         """
+
         builder = self.get_builder(Epoch.ONE_RTT)
 
         # For each HTTP/3 frame, we start a new frame in the QUIC stream
-        for frame in frames:
-            frame_length = len(frame)
-            
-            # Start the frame for the QUIC stream
-            buf = builder.start_frame(QuicFrameType.STREAM_BASE | 2, capacity=4)
+        #for frame in frames:
+        
+        # Start the frame for the QUIC stream
+        
+        # Determine Stream Type
+        stream_type = QuicFrameType.STREAM_BASE | 2 # sets LEN bit (bit position is 1)
+        if offset!=0:
+            stream_type = stream_type | 4 # sets OFF bit (bit position is 2)
+        if fin_bit:
+            stream_type = stream_type | 1 # sets FIN bit (bit position is 0)
 
-            # Push stream ID (encoded as varint)
-            buf.push_uint_var(stream_id)
+        buf = builder.start_frame(stream_type, capacity=4)
 
-            # Push frame length (encoded as varint)
-            buf.push_uint_var(frame_length)
+        # Push stream ID (encoded as varint)
+        buf.push_uint_var(stream_id)
 
-            # Push frame data (actual HTTP/3 frame bytes)
-            buf.push_bytes(frame)
+        # Push OffSet value. Push only when the offset bit in the type is set to 1
+        if offset != 0:
+            buf.push_uint_var(offset)
 
-            # print(f"Prepared QUIC frame for stream ID {stream_id} with length {frame_length}")
+        # Push frame length (encoded as varint)
+        frame_length = len(h3_frame_data)
+        buf.push_uint_var(frame_length)
+
+        # Push frame data (actual HTTP/3 frame bytes)
+        buf.push_bytes(h3_frame_data)
+
+        # print(f"Prepared QUIC frame for stream ID {stream_id} with length {frame_length}")
 
         # Send the combined frames in one QUIC stream message
         self.send_quic_frames_from_builder(builder)
@@ -1704,6 +1723,7 @@ class HttpClient():
         return decrypted_payload
 
     #### FOR HANDLING PACKETS ####
+    
     def is_http3_stream(self, stream_id: int) -> bool:
         """
         Determine if the given stream ID corresponds to an HTTP/3 stream.
@@ -2079,13 +2099,15 @@ class HttpClient():
             ack_count = buf.pull_uint_var()  # first ack range
             rangeset.add(end - ack_count, end + 1)
             
-            # print(("\033[31m\nACK frame received. " +
-            #       "Largest Acknowledged={}, " +
-            #       "Ack Delay={}, " +
-            #       "Ack Range Count={}, " +
-            #       "First Ack Range={} \033[0m")
-            # .format(end, delay, ack_range_count, ack_count ))
-            
+            '''
+            print(("\033[31m\nACK frame received. " +
+                   "Largest Acknowledged={}, " +
+                   "Ack Delay={}, " +
+                   "Ack Range Count={}, " +
+                   "First Ack Range={} \033[0m")
+            .format(end, delay, ack_range_count, ack_count ))
+            '''
+
             end -= ack_count
             for _ in range(ack_range_count):
                 end -= buf.pull_uint_var() + 2
@@ -2646,42 +2668,66 @@ class HttpClient():
             self._quic._loss.peer_completed_address_validation = True
         """
 
-    def replay_sample_msg(self, h3msg):
+    def replay_sample_msg(self, h3msg: Packet):
         """
         Replay QUIC and HTTP/3 packets from h3msg and capture responses.
         """
-        stream_id = 0
         h3_frames = []
         quic_frame_type_hex = None
         quic_payload = None
 
+        @dataclass
+        class QuicStreamInfo:
+            fin_bit:bool = False
+            stream_id:int = 0
+            offset:int = 0        
+        quic_streams = []
+
         ### Send the test message (QUIC or HTTP/3) ###
         for layer in h3msg.layers:
             if layer.layer_name == 'quic':
+                print("layer: quic")
                 quic_frame_type_hex = layer.get_field_value("quic.frame_type", raw=True)
                 # Extract stream ID and payload from QUIC layer
                 for field in layer.frame.fields:
                     if 'STREAM' in str(field):  
-                        stream_id_info = field.showname  
-                        if 'id=' in stream_id_info:
-                            stream_id = int(stream_id_info.split('id=')[1].split()[0])
+                        stream_info = field.showname
+
+                        quic_stream_info = QuicStreamInfo()
+                        if 'id=' in stream_info:
+                            stream_id = int(stream_info.split('id=')[1].split()[0])
+                            quic_stream_info.stream_id = stream_id
+                        if 'fin=' in stream_info:
+                            fin_bit = int(stream_info.split('fin=')[1].split()[0])
+                            quic_stream_info.fin_bit = fin_bit
+                        if 'off=' in stream_info:
+                            offset = int(stream_info.split('off=')[1].split()[0])
+                            quic_stream_info.offset = offset
+                        quic_streams.append(quic_stream_info)
+                        
                     # Extract QUIC payload
                     if hasattr(layer, 'payload'):
                         quic_payload = layer.payload.raw_value
 
             elif layer.layer_name == 'http3':
+                print("layer: http3")
                 h3_field_type_hex = layer.get_field_value("http3.frame_type", raw=True)
                 if h3_field_type_hex is not None:
                     h3_field_type = int(h3_field_type_hex, 16)
 
                     if h3_field_type == FrameType.SETTINGS:
-                        h3_frames.append(self.build_h3_settings_frame(layer))
+                        h3_frames.append(self.build_h3_settings_frame(layer)) 
                     elif h3_field_type == PRIORITY_UPDATE_FRAME_TYPE:
-                        h3_frames.append(self.build_h3_priority_update_frame(layer))
+                        h3_frames.append(self.build_h3_priority_update_frame(layer)) 
                     elif h3_field_type == FrameType.HEADERS:
                         h3_frames.append(self.build_h3_headers_frame(layer))
-        if h3_frames:
-            self.send_quic_stream(h3_frames, stream_id) # If HTTP/3 frames are found, send them over QUIC stream
+                        
+        
+        # check if there is HTTP/3 layer data in the packet
+        if h3_frames: 
+            # Send HTTP/3 frames on respective streams
+            for quic_stream, h3_frame in zip(quic_streams, h3_frames) :
+                self.send_quic_stream(quic_stream.fin_bit, quic_stream.stream_id, quic_stream.offset, h3_frame)
         else:
             self.send_quic_packet(quic_frame_type_hex, quic_payload)
 
@@ -2747,7 +2793,7 @@ def init(args):
 
 
 if __name__ == "__main__":
-    install()
+    install() # for beautiful tracebacks
 
     defaults = QuicConfiguration(is_client=True)
     keylog_file = None

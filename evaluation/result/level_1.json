@@ -1,0 +1,104 @@
+{
+  "initial": "connected",
+  "transitions": [
+    {
+      "source": "connected",
+      "dest": "1",
+      "trigger": "[Q](STREAM) [H3](SETTINGS,RESERVED) / ACK\n"
+    },
+    {
+      "source": "connected",
+      "dest": "2",
+      "trigger": "[Q](STREAM,STREAM) [H3](PRIORITY_UPDATE) [H3](HEADERS) / ACK,STREAM(0)[HEADERS],STREAM(0)[None]\n"
+    },
+    {
+      "source": "connected",
+      "dest": "3",
+      "trigger": "[Q](ACK) / CLOSE\n"
+    },
+    {
+      "source": "connected",
+      "dest": "4",
+      "trigger": "[Q](ACK) / CLOSE\n"
+    },
+    {
+      "source": "connected",
+      "dest": "6",
+      "trigger": "[Q](ACK) / CLOSE\n"
+    },
+    {
+      "source": "connected",
+      "dest": "7",
+      "trigger": "[Q](ACK) / CLOSE\n"
+    },
+    {
+      "source": "connected",
+      "dest": "8",
+      "trigger": "[Q](ACK) / CLOSE\n"
+    },
+    {
+      "source": "connected",
+      "dest": "9",
+      "trigger": "[Q](ACK) / CLOSE\n"
+    },
+    {
+      "source": "connected",
+      "dest": "5",
+      "trigger": "[Q](STREAM,STREAM,STREAM) [H3](PRIORITY_UPDATE) [H3] [H3](HEADERS) / ACK,STOP\n"
+    }
+  ],
+  "states": [
+    {
+      "name": "connected"
+    },
+    {
+      "name": "finish"
+    },
+    {
+      "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "3"
+    },
+    {
+      "name": "4"
+    },
+    {
+      "name": "5"
+    },
+    {
+      "name": "6"
+    },
+    {
+      "name": "7"
+    },
+    {
+      "name": "8"
+    },
+    {
+      "name": "9"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "connected",
+      "name": "HTTP/3 State Machine",
+      "class-name": "statemachine.ProtoModel"
+    }
+  ]
+}

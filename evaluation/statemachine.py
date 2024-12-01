@@ -11,6 +11,7 @@ from collections import OrderedDict
 import copy
 import traceback
 from urllib.parse import urlparse
+from pyshark.packet.packet import Packet
 
 class ProtoModel(object):
     def __init__(self, name):
@@ -139,10 +140,10 @@ def modeller_h3(conf, keylog, url, sample_msg, outdir):
     sys.exit()
 
 
-def send_receive_http3(pm, h3client, mov_msg_list, h3msg_sent, parent_elapedTime):
+def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg_sent: Packet, parent_elapedTime):
     h3msg_rcvd = ''
     elapsed_time = 0.0
-
+    
     try:
         is_already_closed = False
         
@@ -186,7 +187,7 @@ def send_receive_http3(pm, h3client, mov_msg_list, h3msg_sent, parent_elapedTime
 
     return h3msg_rcvd, elapsed_time
 
-def update_candidates(pm, sm, h3msg_sent, h3msg_rcvd, elapsedTime):
+def update_candidates(pm: ProtoModel, sm: Machine, h3msg_sent, h3msg_rcvd, elapsedTime):
     # sm : state machine, current_state : current state,
     # spyld_str : send h2 frame sequence in string, h3msg_sent : send h2 frame sequence,
     # rpyld_str : response h2 frame sequence in string, h3msg_rcvd : response h2 frame sequence
@@ -205,7 +206,7 @@ def update_candidates(pm, sm, h3msg_sent, h3msg_rcvd, elapsedTime):
     sm.add_state(cand_s.name)
     sm.add_transition(h3msg_sent + " / " + h3msg_rcvd + "\n", source="connected", dest=cand_s.name)
 
-def check_dupstate(pm, md, cand_s, mode):
+def check_dupstate(pm: ProtoModel, md, cand_s, mode):
     if mode == 'p':
         # Case 1. Parent:
         # Compare its SR dict with that of its parent
@@ -249,7 +250,7 @@ def check_dupstate(pm, md, cand_s, mode):
         sys.exit()
 
 
-def update_sm(pm, sm, cand_s, md):
+def update_sm(pm: ProtoModel, sm: Machine, cand_s, md):
     # Mergable
     if md.src_s is not None and md.dst_s is not None:
         if len(sm.get_transitions(trigger=md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name)) > 0:
@@ -270,7 +271,7 @@ def update_sm(pm, sm, cand_s, md):
             sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest=cand_s.name)
 
 
-def expand_sm(pm, sm, leaf_states):
+def expand_sm(pm: ProtoModel, sm: Machine, leaf_states):
     # Find candidate states in the next level from leaf states found in the current level.
     leafstate_num = 1
     for leaf_state in leaf_states:
