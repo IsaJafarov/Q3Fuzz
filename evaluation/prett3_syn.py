@@ -2757,19 +2757,6 @@ class HttpClient():
 
         return response_packets
 
-    def draw_state_machine_graph(self, sm):
-        """
-        상태 머신을 그래프로 그리는 함수. Machine의 get_graph() 메소드를 사용합니다.
-        """
-        # 상태 머신 그래프를 파일로 저장
-        graph = sm.get_graph()
-        graph_name = "state_machine_graph.png"
-
-        # 세로로 긴 그래프를 그리도록 설정 ('dot' 프로그래프에 rankdir=TB를 추가)
-        graph.draw(graph_name, prog='dot', args='-Grankdir=TB')  # 'TB'는 Top to Bottom, 세로 방향
-
-        print(f"[+] Graph saved as {graph_name}")
-
 def main(
     configuration: QuicConfiguration,
     url: str,
