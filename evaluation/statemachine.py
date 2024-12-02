@@ -1,5 +1,5 @@
 import states
-from transitions.extensions import GraphMachine as Machine
+from transitions.extensions import GraphMachine
 from prett3_syn import HttpClient
 
 import util
@@ -30,7 +30,7 @@ class ProtoModel(object):
         # State searching information
         self.current_state = 0
         self.num_of_states = 0
-        self.state_list = states.StateList(state_list=[states.State('connected', 1)])  # basic state '0' in level 1
+        self.state_list = states.StateList(state_list=[states.State('Init', 1)])  # basic state '0' in level 1
         self.candidate_state_list = states.StateList(state_list=[])
 
         # Transition information
@@ -48,7 +48,7 @@ class MergeData():
 
 def generate_sm():
     pm = ProtoModel("HTTP/3 State Machine")
-    sm = Machine(model=pm, states=['connected', 'finish'], initial='connected', auto_transitions=False)
+    sm = GraphMachine(model=pm, states=['Init', 'Finish'], initial='Init', auto_transitions=False)
     return pm, sm
 
 """
@@ -118,7 +118,30 @@ def modeller_h3(conf, keylog, url, sample_msg, outdir):
 
         ### Graph drawing ###
         graphname = "%s/level_" % outdir + str(pm.current_level) + ".png"
-        sm.get_graph().draw(graphname, prog='dot')
+        graph = sm.get_graph()
+        # Style setting on the entire graph
+        graph.graph_attr.update(
+            {
+                # 'fontname': 'DejaVu Sans',
+                'fontsize': '10',
+                'overlap': 'false'
+            })
+        # Style setting on nodes
+        for node in graph.nodes():
+            node.attr.update({
+                'shape': 'ellipse',
+                'fontname': 'DejaVu Sans',
+                'fontsize': '12',
+                'label': node.name
+            })
+        # Style setting on edges
+        for edge in graph.edges():
+            edge.attr.update({
+                'fontname': 'DejaVu Sans',
+                'fontsize': '10',
+                'labeldistance': '1.0'
+            })
+        graph.draw(graphname, prog='dot')
         with open(graphname.replace(".png", ".json"), "w") as jsonfile:
             json.dump(sm.markup, jsonfile, indent=2)
 
@@ -132,11 +155,10 @@ def modeller_h3(conf, keylog, url, sample_msg, outdir):
     elapsed_time = time.time() - g_start_time
     print ("[+] All jobs done. Total elapsed time is ", elapsed_time)
     ### Graph drawing ###
-    graphname = "%s/level_" % outdir + str(pm.current_level-1) + "(fin).png"
-    sm.get_graph().draw(graphname, prog='dot')
-    with open(graphname.replace(".png", ".json"), "w") as jsonfile:
-        json.dump(sm.markup, jsonfile, indent=2)
-    logger.info(pm.transition_info)
+    # graphname = "%s/level_" % outdir + str(pm.current_level-1) + "(fin).png"
+    # sm.get_graph().draw(graphname, prog='dot')
+    # with open(graphname.replace(".png", ".json"), "w") as jsonfile:
+    #     json.dump(sm.markup, jsonfile, indent=2)
     sys.exit()
 
 
@@ -187,7 +209,7 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
 
     return h3msg_rcvd, elapsed_time
 
-def update_candidates(pm: ProtoModel, sm: Machine, h3msg_sent, h3msg_rcvd, elapsedTime):
+def update_candidates(pm: ProtoModel, sm: GraphMachine, h3msg_sent, h3msg_rcvd, elapsedTime):
     # sm : state machine, current_state : current state,
     # spyld_str : send h2 frame sequence in string, h3msg_sent : send h2 frame sequence,
     # rpyld_str : response h2 frame sequence in string, h3msg_rcvd : response h2 frame sequence
@@ -204,7 +226,7 @@ def update_candidates(pm: ProtoModel, sm: Machine, h3msg_sent, h3msg_rcvd, elaps
 
     # TODO - 2 lines below to be removed: THIS IS TEMPORARY CODE FOR GENERATING EXPANDED STATE MACHINE
     sm.add_state(cand_s.name)
-    sm.add_transition(h3msg_sent + " / " + h3msg_rcvd + "\n", source="connected", dest=cand_s.name)
+    sm.add_transition(h3msg_sent + " / " + h3msg_rcvd + "\n", source="Init", dest=cand_s.name)
 
 def check_dupstate(pm: ProtoModel, md, cand_s, mode):
     if mode == 'p':
@@ -250,7 +272,7 @@ def check_dupstate(pm: ProtoModel, md, cand_s, mode):
         sys.exit()
 
 
-def update_sm(pm: ProtoModel, sm: Machine, cand_s, md):
+def update_sm(pm: ProtoModel, sm: GraphMachine, cand_s, md):
     # Mergable
     if md.src_s is not None and md.dst_s is not None:
         if len(sm.get_transitions(trigger=md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name)) > 0:
@@ -271,7 +293,7 @@ def update_sm(pm: ProtoModel, sm: Machine, cand_s, md):
             sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest=cand_s.name)
 
 
-def expand_sm(pm: ProtoModel, sm: Machine, leaf_states):
+def expand_sm(pm: ProtoModel, sm: GraphMachine, leaf_states):
     # Find candidate states in the next level from leaf states found in the current level.
     leafstate_num = 1
     for leaf_state in leaf_states:

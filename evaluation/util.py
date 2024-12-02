@@ -2,6 +2,7 @@
 # Modules for HTTP3
 import pyshark
 import re
+import traceback
 from aioquic.buffer import Buffer
 from aioquic.quic.packet import QuicFrameType, QuicPacketType
 
@@ -127,58 +128,57 @@ def h3msg_to_str(h3msg):
     return:
         msginfo: a string of a Q / H3 message with multiple layers and frames
     """
+
     msginfo = ''
-    # h3msg.show()
-    if type(h3msg) is type([]):
-        msginfo = ""
+    stream_map = []  # A list to store stream IDs from QUIC STREAM frames
+
+    if type(h3msg) is list:
+        for h3msg_sub in h3msg:
+            msginfo += h3msg_to_str(h3msg_sub) + " | "
+        if msginfo != '':
+            msginfo = msginfo.rstrip(" | ")
     else:
-        quic_layer_cnt = 0
+        http3_layer_idx = 0  # Index to track HTTP/3 layer processing
         for layer in h3msg.layers:
             if layer.layer_name == 'quic':
-                if quic_layer_cnt != 0:
-                    msginfo += ' '
-                quic_layer_cnt += 1
-                if 'header_form' in dir(layer) and layer.header_form == "1": #long header type (Initial | 0-RTT | Handshake | Retry)
-                    msginfo += '[%s]%s' % ('Q', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]) 
-                    # msginfo += '[%s]%s' % ('Q', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]) 
-                    # print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]))
-                elif 'coalesced_padding_data' in dir(layer):
-                    msginfo += '[%s]%s' % ('Q', QUIC_FRAMETYPE[0]) 
-                    # msginfo += '[%s]%s' % ('Q', QUIC_SHORTPACKETTYPE) 
-                    # print("     (Layer %d) [%s] PKT_TYPE: Random_padding" % (quic_layer_cnt, 'QUIC'))
-                else: # short header type (1-RTT)
-                    msginfo += '[%s]' % ('Q') 
-                    # msginfo += '[%s]%s' % ('Q', QUIC_SHORTPACKETTYPE) 
-                    # print("     (Layer %d) [%s] PKT_TYPE: %s" % (quic_layer_cnt, 'QUIC', QUIC_SHORTPACKETTYPE))
+                # Handle QUIC Long Header
+                if 'header_form' in dir(layer) and layer.header_form == "1":  # Long header type
+                    if msginfo:
+                        msginfo += ','
+                    msginfo += QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]
+                    continue  # Skip further processing for long headers
 
-                tmp_frames = ''
-                for frame_name in get_frames_of_layer(layer):
-                    tmp_frames += frame_name+","
-                if len(tmp_frames) > 0:
-                    msginfo += '(%s)' % tmp_frames[:-1]         
-                    # print("     \t\t- frame: %s" % frame_name )
-
+                # Handle Short Header and frames
+                if 'header_form' in dir(layer) and layer.header_form == "0":  # Short header type
+                    for frame_name in get_frames_of_layer(layer):
+                        if "STREAM" in frame_name.upper():  # Handle STREAM frames
+                            stream_id = getattr(layer, 'stream_stream_id', None)
+                            if stream_id:
+                                stream_id = int(stream_id)  # Convert to integer if needed
+                                stream_map.append(stream_id)  # Append to stream map
+                        else:
+                            # Include non-STREAM frames directly in msginfo
+                            if msginfo:
+                                msginfo += ','
+                            msginfo += frame_name.upper()
 
             elif layer.layer_name == "http3":
-                if quic_layer_cnt != 0:
-                    msginfo += ' '
-                quic_layer_cnt += 1
-                # 1. Check stream type
-                if 'stream_type' in dir(layer): # always false????
-                    msginfo += '[%s]%s' % ('H3', H3_STREAMTYPE[int(layer.stream_type)]) 
-                    # print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', H3_STREAMTYPE[int(layer.stream_type)]))
+                # Match HTTP/3 layer to the corresponding QUIC STREAM frame
+                if http3_layer_idx < len(stream_map):
+                    stream_id = stream_map[http3_layer_idx]
+                    http3_layer_idx += 1
                 else:
-                    msginfo += '[%s]%s' % ('H3', '') 
-                    # print("     (Layer %d) [%s] STREAM_TYPE: %s" % (quic_layer_cnt, 'HTTP3', "NONE"))
-                # 2. Check the frame type
+                    raise ValueError("HTTP/3 layer count exceeds QUIC STREAM frames.")
+
+                # Extract HTTP/3 frames
                 tmp_frames = ''
                 for frame_name in get_frames_of_layer(layer):
-                    tmp_frames += frame_name.upper()+","
-                if len(tmp_frames) > 0:
-                    msginfo += '(%s)' % tmp_frames[:-1]         
-                    # print("     \t\t- frame: %s" % frame_name )
-                # for frame_name in get_frames_of_layer(layer):
-                #     print("     \t\t- frame: %s" % frame_name )
+                    tmp_frames += frame_name.upper() + ","
+
+                frame_info = tmp_frames[:-1] if len(tmp_frames) > 0 else 'None'
+                if msginfo:
+                    msginfo += ','
+                msginfo += 'STREAM(%s)[%s]' % (stream_id, frame_info)
 
     return msginfo
 
