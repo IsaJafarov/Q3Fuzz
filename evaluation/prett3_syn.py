@@ -976,168 +976,6 @@ class HttpClient():
         self._quic._retry_source_connection_id = header.source_cid
         self.connect()
 
-    def receive_datagram(self, data: bytes, now: float) -> None:
-
-        buf = Buffer(data=data)
-        i=0
-        while not buf.eof():
-            i+=1
-            #print("\tQUIC layer #{}".format(i),end=" ")
-
-            start_off = buf.tell()
-
-            try:
-                header = pull_quic_header(buf, host_cid_length=self.quic_conf.connection_id_length)
-            except ValueError:
-                return
-            #print("(Type: {})".format(header.packet_type.name))
-
-            # Check destination CID matches.
-            destination_cid_seq: Optional[int] = None
-            for connection_id in self._quic._host_cids:
-                if header.destination_cid == connection_id.cid:
-                    destination_cid_seq = connection_id.sequence_number
-                    break
-            if destination_cid_seq is None:
-                return
-
-            # Handle version negotiation packet.
-            if header.packet_type == QuicPacketType.VERSION_NEGOTIATION:
-                self._quic._receive_version_negotiation_packet(header=header, now=now)
-                return
-
-            # Check long header packet protocol version.
-            if (
-                header.version is not None
-                and header.version not in self.quic_conf.supported_versions
-            ):
-                return
-            
-            # Handle retry packet.
-            if header.packet_type == QuicPacketType.RETRY:
-                self.handle_retry_packet(header=header,
-                    packet_without_tag=buf.data_slice(
-                        start_off, buf.tell() - RETRY_INTEGRITY_TAG_SIZE
-                    ))
-                return
-
-
-            crypto_frame_required = False
-
-            # Determine crypto and packet space.
-            epoch = get_epoch(header.packet_type)
-            if epoch == tls.Epoch.INITIAL:
-                crypto = self._quic._cryptos_initial[header.version]
-            else:
-                crypto = self._quic._cryptos[epoch]
-            if epoch == tls.Epoch.ZERO_RTT:
-                space = self._quic._spaces[tls.Epoch.ONE_RTT]
-            else:
-                space = self._quic._spaces[epoch]
-
-            
-            # decrypt packet
-            encrypted_off = buf.tell() - start_off
-            end_off = start_off + header.packet_length
-            buf.seek(end_off)
-
-            
-            # print(">>> prett3.receive_datagram. Decrypting the packet...")
-            try:
-                plain_header, plain_payload, packet_number = crypto.decrypt_packet(
-                        data[start_off:end_off], encrypted_off, space.expected_packet_number)
-            except KeyUnavailableError as exc:
-                # If a client receives HANDSHAKE or 1-RTT packets before it has
-                # handshake keys, it can assume that the server's INITIAL was lost.
-                if (
-                    epoch in (tls.Epoch.HANDSHAKE, tls.Epoch.ONE_RTT)
-                    and not self._quic._crypto_retransmitted
-                ):
-                    self._quic._loss.reschedule_data(now=now)
-                    self._quic._crypto_retransmitted = True
-                continue
-            except CryptoError as exc:
-                continue
-            
-            #print("Received packet: \n\tPacket Number={}\n\tPlain Header={}\n\tPlain Payload={}".format(packet_number, plain_header, plain_payload))
-            
-            # check reserved bits
-            if header.packet_type == QuicPacketType.ONE_RTT:
-                reserved_mask = 0x18
-            else:
-                reserved_mask = 0x0C
-            if plain_header[0] & reserved_mask:
-                self._quic.close(
-                    error_code=QuicErrorCode.PROTOCOL_VIOLATION,
-                    frame_type=QuicFrameType.PADDING,
-                    reason_phrase="Reserved bits must be zero",)
-                return
-
-
-            # raise expected packet number
-            if packet_number > space.expected_packet_number:
-                space.expected_packet_number = packet_number + 1
-
-            # update state
-            if self._quic._peer_cid.sequence_number is None:
-                self._quic._peer_cid.cid = header.source_cid
-                self._quic._peer_cid.sequence_number = 0
-
-            if self._quic._state == QuicConnectionState.FIRSTFLIGHT:
-                self._quic._remote_initial_source_connection_id = header.source_cid
-                self._quic._set_state(QuicConnectionState.CONNECTED)
-
-            # update spin bit
-            if (header.packet_type == QuicPacketType.ONE_RTT
-                and packet_number > self._quic._spin_highest_pn):
-                
-                spin_bit = get_spin_bit(plain_header[0])
-                self._spin_bit = not spin_bit # for clients
-                self._spin_highest_pn = packet_number
-                
-            # handle payload
-            context = QuicReceiveContext(
-                epoch=epoch,
-                host_cid=header.destination_cid,
-                network_path=self.network_path,
-                quic_logger_frames=None, #quic_logger_frames,
-                time=now,
-                version=header.version,
-            )
-            
-            try:
-                #is_ack_eliciting, is_probing = \
-                self.process_payload( context, plain_payload, crypto_frame_required=crypto_frame_required )
-            except QuicConnectionError:
-                pass
-
-            if self._quic._state in END_STATES or self._quic._close_pending:
-                return
-
-            # update idle timeout
-            self._quic._close_at = now + self._quic._idle_timeout()
-
-            '''
-            # update network path
-            if not network_path.is_validated and epoch == tls.Epoch.HANDSHAKE:
-                network_path.is_validated = True
-            if network_path not in self._quic._network_paths:
-                self._quic._network_paths.append(network_path)
-            idx = self._quic._network_paths.index(network_path)
-            if idx and not is_probing and packet_number > space.largest_received_packet:
-                self._quic._network_paths.pop(idx)
-                self._quic._network_paths.insert(0, network_path)
-            
-            # record packet as received
-            if not space.discarded:
-                if packet_number > space.largest_received_packet:
-                    space.largest_received_packet = packet_number
-                    space.largest_received_time = now
-                space.ack_queue.add(packet_number)
-                if is_ack_eliciting and space.ack_at is None:
-                    space.ack_at = now + self._quic._ack_delay
-            '''
-
     def complete_connection(self):
         """
         How aioquic's QuicConnection does it:
@@ -1437,15 +1275,16 @@ class HttpClient():
                 data, addr = self.sock.recvfrom(2048)  # Adjust buffer size as needed
                 # print("\tread_from_buffer(): Received message: len={}".format(len(data)))
 
-                res += '|'.join(self.receive_datagram(data, now=time.process_time()))
-                res += '||'
+                res_per_packet = self.receive_datagram(data, now=time.process_time())
+                res += res_per_packet
+                res += '|'
 
         except socket.timeout:
             # Return parsed packets after timeout
-            res = res.rstrip('||')
+            res = res.rstrip('|')
             return res
 
-    def receive_datagram(self, data: bytes, now: float) -> list:
+    def receive_datagram(self, data: bytes, now: float) -> str:
         """
         Process a received QUIC datagram, decrypt and return any decrypted packet data.
         
@@ -1456,13 +1295,13 @@ class HttpClient():
         Returns:
             decrypted_payload: List of decrypted QUIC or HTTP/3 layer from processed packets.
         """
-        decrypted_payload = []
+        res_per_packet = ''
 
         buf = Buffer(data=data)
         i=0
         while not buf.eof():
             i+=1
-            msg_per_layer = ''
+  
             # print("\tQUIC layer #{}".format(i),end=" ")
 
             start_off = buf.tell()
@@ -1522,8 +1361,6 @@ class HttpClient():
             end_off = start_off + header.packet_length
             buf.seek(end_off)
 
-            
-            # print(">>> prett3.receive_datagram. Decrypting the packet...")
             try:
                 plain_header, plain_payload, packet_number = crypto.decrypt_packet(
                         data[start_off:end_off], encrypted_off, space.expected_packet_number)
@@ -1588,11 +1425,9 @@ class HttpClient():
             
             try:
                 #is_ack_eliciting, is_probing = \
-                msg_per_layer += self.process_payload( context, plain_payload, crypto_frame_required=crypto_frame_required )
+                res_per_packet += self.process_payload( context, plain_payload, crypto_frame_required=crypto_frame_required )
             except QuicConnectionError:
                 pass
-
-            decrypted_payload.append(msg_per_layer)
 
             if self._quic._state in END_STATES or self._quic._close_pending:
                 return
@@ -1600,7 +1435,7 @@ class HttpClient():
             # update idle timeout
             self._quic._close_at = now + self._quic._idle_timeout()
 
-        return decrypted_payload
+        return res_per_packet
 
     #### FOR HANDLING PACKETS ####
     
@@ -1667,15 +1502,18 @@ class HttpClient():
                 
                 elif frame_type >= 0x08 and frame_type <= 0x0F: # STREAM frame
                     stream_id, stream_data = self.handle_stream_frame(context, frame_type, buf)
-                    msg_per_layer += f'STREAM({stream_id})'
-                    if self.is_http3_stream(stream_id):
-                        http3_stream_msg = self.process_http3_payload(stream_data)
-                        if http3_stream_msg != '':
-                            msg_per_layer += f'[{self.process_http3_payload(stream_data)}],'
-                        else:
-                            msg_per_layer += ','
-                    # print(msg_per_layer)
-                
+                    # Special frame indicating the end of stream
+                    if frame_type == 0x0F:
+                        msg_per_layer += f'STREAM({stream_id})[END]'
+                    else:
+                        msg_per_layer += f'STREAM({stream_id})'
+                        if self.is_http3_stream(stream_id):
+                            http3_stream_msg = self.process_http3_payload(stream_data)
+                            if http3_stream_msg != '':
+                                msg_per_layer += f'[{self.process_http3_payload(stream_data)}],'
+                            else:
+                                msg_per_layer += ','
+                    
                 elif frame_type==0x10:
                     self.handle_max_data_frame(context, frame_type, buf)
                 
@@ -1710,7 +1548,7 @@ class HttpClient():
                 elif frame_type==0x1B:
                     self.handle_path_response_frame(context, frame_type, buf)
 
-                elif frame_type==0x1C:
+                elif frame_type==0x1C or frame_type==0x1D:
                     self.handle_connection_close_frame(context, frame_type, buf)
                     msg_per_layer += 'CC,'
 
@@ -2069,8 +1907,8 @@ class HttpClient():
         stream_id = buf.pull_uint_var()
         error_code = buf.pull_uint_var()  # application error code
 
-        print("\033[31m\nSTOP_SENDING frame received. Stream ID={}, Error Code={}\033[0m"
-              .format(stream_id, error_code))
+        # print("\033[31m\nSTOP_SENDING frame received. Stream ID={}, Error Code={}\033[0m"
+        #       .format(stream_id, error_code))
 
         """
         # check stream direction

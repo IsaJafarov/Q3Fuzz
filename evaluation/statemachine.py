@@ -171,17 +171,17 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
         
         ### INITIAL CONNECTION ###
         # Establish initial connection by sending handshake messages
-        print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
+        # print("\033[93m\n[Establishing connection via Crypto message...]\033[0m")
         h3client.connect()
         h3client.read_from_buffer()  # Receive any response from the server
 
         # Complete the connection by sending handshake completion messages
-        print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
+        # print("\033[93m\n[Finishing handshake using Handshake message...]\033[0m")
         h3client.complete_connection()
         h3client.read_from_buffer()  # Receive any response from the server
 
-        if len(mov_msg_list) > 1:
-            print("\033[93m\n[Sending state moving message...]\033[0m")
+        # if len(mov_msg_list) > 1:
+        #     print("\033[93m\n[Sending state moving message...]\033[0m")
 
         ### SENDING STATE MOVING MESSAGES ###
         for mov_msg in mov_msg_list:
@@ -193,8 +193,8 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
                 
         ### SENDING TARGET MSG ###
         if is_already_closed is False: # check for goaway in state moving (TODO)
-            print("\033[93m\n[Sending testing message...]\033[0m")
-            print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
+            print("  [+] Sending testing message...")
+            # print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
             # h3msg_sent.show()
             h3msg_rcvd = h3client.replay_sample_msg(h3msg_sent)  # Send HTTP/3 target message
             
@@ -204,7 +204,7 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
         print(traceback.format_exc())
         sys.exit()
 
-    print("  [SUMMARY] (%s) => %s => %s (%d sec.)" % (
+    print("\033[92m  [SUMMARY] (%s) => %s => %s (%d sec.)\033[0m" % (
     util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd, elapsed_time))
     # print("  ==================================")
 
