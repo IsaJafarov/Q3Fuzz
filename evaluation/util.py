@@ -120,6 +120,29 @@ def h3msg_from_pcap(f, client_only=False): # for HTTP3
 
     return quic_packet_list
 
+def extract_quic_stream_frames(layer):
+    """
+    Extract all STREAM frame IDs from a QUIC layer.
+    args:
+        layer: A QUIC layer object from pyshark.
+    return:
+        stream_ids: A list of stream IDs from STREAM frames.
+    """
+    stream_ids = []
+
+    # Iterate through all fields in the QUIC layer
+    for frame in layer.frame.all_fields:
+        if "STREAM" in frame.showname.upper():  # Check if this field represents a STREAM frame
+            # Extract the stream_id directly from the showname
+            stream_details = frame.showname
+            for part in stream_details.split():
+                if part.startswith("id="):
+                    stream_id = part.split("=")[1]
+                    stream_ids.append(stream_id)
+                    break  # Only need the id, stop further parsing for this frame
+
+    return stream_ids
+
 def h3msg_to_str(h3msg):
     """
     Convert a QUIC or HTTP3 message in a human-readable format.
@@ -130,7 +153,7 @@ def h3msg_to_str(h3msg):
     """
 
     msginfo = ''
-    stream_map = []  # A list to store stream IDs from QUIC STREAM frames
+    stream_frames = []  # A list to store stream IDs from QUIC STREAM frames
 
     if type(h3msg) is list:
         for h3msg_sub in h3msg:
@@ -150,22 +173,19 @@ def h3msg_to_str(h3msg):
 
                 # Handle Short Header and frames
                 if 'header_form' in dir(layer) and layer.header_form == "0":  # Short header type
-                    for frame_name in get_frames_of_layer(layer):
-                        if "STREAM" in frame_name.upper():  # Handle STREAM frames
-                            stream_id = getattr(layer, 'stream_stream_id', None)
-                            if stream_id:
-                                stream_id = int(stream_id)  # Convert to integer if needed
-                                stream_map.append(stream_id)  # Append to stream map
-                        else:
-                            # Include non-STREAM frames directly in msginfo
+                    # print(get_frames_of_layer(layer))
+                    stream_frames = extract_quic_stream_frames(layer)
+                    if len(stream_frames) == 0:
+                        # Include non-STREAM frames directly in msginfo
+                        for frame_name in get_frames_of_layer(layer):
                             if msginfo:
                                 msginfo += ','
                             msginfo += frame_name.upper()
 
             elif layer.layer_name == "http3":
                 # Match HTTP/3 layer to the corresponding QUIC STREAM frame
-                if http3_layer_idx < len(stream_map):
-                    stream_id = stream_map[http3_layer_idx]
+                if http3_layer_idx < len(stream_frames):
+                    stream_id = stream_frames[http3_layer_idx]
                     http3_layer_idx += 1
                 else:
                     raise ValueError("HTTP/3 layer count exceeds QUIC STREAM frames.")
@@ -175,7 +195,8 @@ def h3msg_to_str(h3msg):
                 for frame_name in get_frames_of_layer(layer):
                     tmp_frames += frame_name.upper() + ","
 
-                frame_info = tmp_frames[:-1] if len(tmp_frames) > 0 else 'None'
+                # TODO: NULL can be QPACK Encoder Stream. Now we treat such stream containing NULL frame.
+                frame_info = tmp_frames[:-1] if len(tmp_frames) > 0 else 'NULL'
                 if msginfo:
                     msginfo += ','
                 msginfo += 'STREAM(%s)[%s]' % (stream_id, frame_info)

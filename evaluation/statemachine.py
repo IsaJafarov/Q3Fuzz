@@ -195,6 +195,7 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
         if is_already_closed is False: # check for goaway in state moving (TODO)
             print("\033[93m\n[Sending testing message...]\033[0m")
             print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
+            # h3msg_sent.show()
             h3msg_rcvd = h3client.replay_sample_msg(h3msg_sent)  # Send HTTP/3 target message
             
 
@@ -204,7 +205,7 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
         sys.exit()
 
     print("  [SUMMARY] (%s) => %s => %s (%d sec.)" % (
-    util.h3msg_to_str(mov_msg_list).replace("|", "=>"), util.h3msg_to_str(h3msg_sent), h3msg_rcvd, elapsed_time))
+    util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd, elapsed_time))
     # print("  ==================================")
 
     return h3msg_rcvd, elapsed_time
