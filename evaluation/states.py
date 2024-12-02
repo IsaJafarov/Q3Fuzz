@@ -1,6 +1,6 @@
 class State:
 	def __init__(self, name, level, parent_state=None, spyld=None, msg_sent=None, rpyld=None, msg_rcvd=None,
-				 elapsedTime=0, child_sr_dict=None, is_abnormal=False):
+	 child_sr_dict=None, is_abnormal=False):
 		self.name = name
 		self.level = level
 		self.parent_state = parent_state
@@ -9,7 +9,6 @@ class State:
 		# response h2 sequence
 		self.msg_rcvd = msg_rcvd
 		# connection TTL time after receiving a response (to reach itself)
-		self.elapsedTime = elapsedTime
 		self.child_sr_dict = child_sr_dict
 		# security violation checking variable
 		self.isAbnormal = is_abnormal
@@ -55,11 +54,4 @@ class StateList:
 			print("State name : %s" % state.name)
 			print("Sent payload : " + str(state.spyld))
 			print ("Receive payload : "+str(state.rpyld))
-
-	def get_allElapsedTime_by_level(self, level):
-		elapsedTimeArr = []
-		for state in self.state_list:
-			if state.level == level:
-				elapsedTimeArr.append(state.elapsedTime)
-		return elapsedTimeArr
 

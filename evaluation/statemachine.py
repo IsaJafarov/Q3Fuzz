@@ -162,9 +162,8 @@ def modeller_h3(conf, keylog, url, sample_msg, outdir):
     sys.exit()
 
 
-def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg_sent: Packet, parent_elapedTime):
+def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg_sent: Packet):
     h3msg_rcvd = ''
-    elapsed_time = 0.0
     
     try:
         is_already_closed = False
@@ -204,23 +203,22 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
         print(traceback.format_exc())
         sys.exit()
 
-    print("\033[92m  [SUMMARY] (%s) => %s => %s (%d sec.)\033[0m" % (
-    util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd, elapsed_time))
+    print("\033[92m  [SUMMARY] (%s) => %s => %s\033[0m" % (
+    util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd))
     # print("  ==================================")
 
-    return h3msg_rcvd, elapsed_time
+    return h3msg_rcvd
 
-def update_candidates(pm: ProtoModel, sm: GraphMachine, h3msg_sent, h3msg_rcvd, elapsedTime):
+def update_candidates(pm: ProtoModel, sm: GraphMachine, h3msg_sent, h3msg_rcvd):
     # sm : state machine, current_state : current state,
     # spyld_str : send h2 frame sequence in string, h3msg_sent : send h2 frame sequence,
     # rpyld_str : response h2 frame sequence in string, h3msg_rcvd : response h2 frame sequence
-    # elapsedTime : elapsed time for response of h3msg_rcvd to h3msg_sent
     # Build and fix a state machine based on the response
 
     # No valid state found yet. Add candidate states in protocol model first.
     pm.num_of_states += 1
     cand_s = states.State(name=str(pm.num_of_states), level=pm.current_level + 1, parent_state=pm.current_state,
-                          msg_sent=h3msg_sent, msg_rcvd=h3msg_rcvd, elapsedTime=elapsedTime)
+                          msg_sent=h3msg_sent, msg_rcvd=h3msg_rcvd)
     pm.candidate_state_list.add_state(cand_s)
     print("  [+] Candidate state %s added (%s -> %s)" % (cand_s.name, cand_s.parent_state.name, cand_s.name))
 
@@ -310,7 +308,6 @@ def expand_sm(pm: ProtoModel, sm: GraphMachine, leaf_states):
 
         message_num = 1
         pm.current_state = leaf_state
-        parent_elapsed_time = leaf_state.elapsedTime
         skipped_messages = 0
         for h3msg_sent in pm.testmsgs:
             if 'INIT' in util.h3msg_to_str(h3msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(h3msg_sent):
@@ -328,15 +325,14 @@ def expand_sm(pm: ProtoModel, sm: GraphMachine, leaf_states):
                 util.h3msg_to_str(h3msg_sent))
             print("└────────────────────────────────────────────────────────────────────────────────────")
 
-            h3msg_rcvd_str, elapsedTime = send_receive_http3(pm, h3client, move_state_h3msgs_list, h3msg_sent,
-                                                                     parent_elapsed_time)
+            h3msg_rcvd_str = send_receive_http3(pm, h3client, move_state_h3msgs_list, h3msg_sent)
 
 
             message_num += 1
             h3msg_sent_str = util.h3msg_to_str(h3msg_sent)
 
-            update_candidates(pm, sm, h3msg_sent_str, h3msg_rcvd_str, elapsedTime)
-            sr_dict[h3msg_sent_str] = h3msg_rcvd_str + " (%s)" % str(int(elapsedTime))
+            update_candidates(pm, sm, h3msg_sent_str, h3msg_rcvd_str)
+            sr_dict[h3msg_sent_str] = h3msg_rcvd_str
         leafstate_num += 1
         pm.current_state.child_sr_dict = sr_dict
 
