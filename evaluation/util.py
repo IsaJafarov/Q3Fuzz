@@ -174,33 +174,3 @@ def h3msg_to_str(h3msg):
                 msginfo += 'STREAM(%s)[%s]' % (stream_id, frame_info)
 
     return msginfo
-
-"""
-def check_h2_response(ans, msg=None):
-    # Check if h2 message received from sr.
-
-    # Detailed information about ans
-    # ans is a list of QueryAnswer tuple
-    # therefore, a Queryanswer is (Query (s), Answer (r))
-    check = False
-    # print(ans)
-    # FUNCTION 1: checking h2 message presence
-    if msg is None:
-        for a in ans:
-            # print("-----")
-            # print(a)
-            # print("-----")
-            r = a[1] # received packet
-            if r.haslayer(h2.H2Seq):
-                check = True
-    # FUNCTION 2 : checking specific message
-    else:           
-        for a in ans:
-            # print("-----")
-            # print(a)
-            # print("-----")
-            r = a[1] # received packet
-            if msg in h3msg_to_str(r):
-                check = True
-    return check
-"""

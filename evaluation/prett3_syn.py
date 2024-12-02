@@ -226,7 +226,7 @@ class HttpClient():
         """
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
-        self.sock.settimeout(0.4)
+        self.sock.settimeout(0.2)
         
         crypto_buf = Buffer(capacity=CRYPTO_BUFFER_SIZE)
 
@@ -1276,8 +1276,9 @@ class HttpClient():
                 # print("\tread_from_buffer(): Received message: len={}".format(len(data)))
 
                 res_per_packet = self.receive_datagram(data, now=time.process_time())
-                res += res_per_packet
-                res += '|'
+                if res_per_packet != '':
+                    res += res_per_packet
+                    res += '|'
 
         except socket.timeout:
             # Return parsed packets after timeout
@@ -2377,7 +2378,7 @@ class HttpClient():
             self._quic._loss.peer_completed_address_validation = True
         """
 
-    def replay_sample_msg(self, h3msg: Packet):
+    def replay_sample_msg(self, h3msg: Packet, is_moving: bool):
         """
         Replay QUIC and HTTP/3 packets from h3msg and capture responses.
         """
@@ -2442,28 +2443,32 @@ class HttpClient():
 
         response_packets = self.read_from_buffer()
 
-        # Explicitly close the QUIC connection using CONNECTION_CLOSE frame
-        self._quic.close(
-            error_code=QuicErrorCode.NO_ERROR,
-            frame_type=QuicFrameType.APPLICATION_CLOSE,
-            reason_phrase="Normal connection closure after message replay",
-        )
+        if is_moving:
+            pass
 
-        # Send CONNECTION_CLOSE frame using send_quic_packet
-        # Define the payload to include error_code and reason_phrase according to the QUIC specification.
-        connection_close_payload = Buffer(capacity=256)
-        connection_close_payload.push_uint_var(QuicErrorCode.NO_ERROR)  # Error code (NO_ERROR)
-        connection_close_payload.push_uint_var(0)  # Frame type (0 since no specific frame is indicated)
-        reason_phrase = "Normal connection closure after message replay"
-        connection_close_payload.push_uint16(len(reason_phrase))
-        connection_close_payload.push_bytes(reason_phrase.encode('utf-8'))
+        else:
+            # Explicitly close the QUIC connection using CONNECTION_CLOSE frame
+            self._quic.close(
+                error_code=QuicErrorCode.NO_ERROR,
+                frame_type=QuicFrameType.APPLICATION_CLOSE,
+                reason_phrase="Normal connection closure after message replay",
+            )
 
-        self.send_quic_packet(
-            quic_frame_type=QuicFrameType.APPLICATION_CLOSE,  # Use APPLICATION_CLOSE for QUIC-level closure
-            quic_payload=connection_close_payload.data  # Include the correctly formatted payload
-        )
+            # Send CONNECTION_CLOSE frame using send_quic_packet
+            # Define the payload to include error_code and reason_phrase according to the QUIC specification.
+            connection_close_payload = Buffer(capacity=256)
+            connection_close_payload.push_uint_var(QuicErrorCode.NO_ERROR)  # Error code (NO_ERROR)
+            connection_close_payload.push_uint_var(0)  # Frame type (0 since no specific frame is indicated)
+            reason_phrase = "Normal connection closure after message replay"
+            connection_close_payload.push_uint16(len(reason_phrase))
+            connection_close_payload.push_bytes(reason_phrase.encode('utf-8'))
 
-        self.sock.close()
+            self.send_quic_packet(
+                quic_frame_type=QuicFrameType.APPLICATION_CLOSE,  # Use APPLICATION_CLOSE for QUIC-level closure
+                quic_payload=connection_close_payload.data  # Include the correctly formatted payload
+            )
+
+            self.sock.close()
 
         return response_packets
 

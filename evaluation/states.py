@@ -1,23 +1,12 @@
 class State:
-	def __init__(self, name, level, parent_state=None, spyld=None, msg_sent=None, rpyld=None, msg_rcvd=None,
+	def __init__(self, name, level, parent_state=None, msg_sent=None, msg_rcvd_str=None,
 	 child_sr_dict=None, is_abnormal=False):
 		self.name = name
 		self.level = level
 		self.parent_state = parent_state
-		# send h2 sequence
-		self.msg_sent = msg_sent
-		# response h2 sequence
-		self.msg_rcvd = msg_rcvd
-		# connection TTL time after receiving a response (to reach itself)
+		self.msg_sent = msg_sent # Pyshark packet: Requested QUIC and HTTP/3 message to reach this state from its parent
+		self.msg_rcvd_str = msg_rcvd_str # Str: Responsed QUIC and HTTP/3 message to reach this state from its parent
 		self.child_sr_dict = child_sr_dict
-		# security violation checking variable
-		self.isAbnormal = is_abnormal
-
-	def set_abnormal(self):
-		self.isAbnormal = True
-
-	def is_abnormal(self):
-		return self.isAbnormal
 
 class StateList:
 	def __init__(self, state_list=[]):
