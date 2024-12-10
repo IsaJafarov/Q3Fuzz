@@ -7,14 +7,17 @@ import json
 import time
 import logging
 import sys
+from typing import List
 from collections import OrderedDict
 import copy
 import traceback
 from urllib.parse import urlparse
 from pyshark.packet.packet import Packet
+from pyshark import FileCapture
+from aioquic.quic.configuration import QuicConfiguration
 
 class ProtoModel(object):
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.name = name
 
         # For HTTP/3 communication
@@ -51,7 +54,7 @@ def generate_sm():
     sm = GraphMachine(model=pm, states=['Init', 'Finish'], initial='Init', auto_transitions=False)
     return pm, sm
 
-def get_move_state_h3msgs(pm, target_state):
+def get_move_state_h3msgs(pm:ProtoModel, target_state:states.State) -> List[Packet]:
     # Get state moving message to reach current state
     # Return list of QUIC / HTTP3 messages
     state_moving_msgs = []
@@ -69,15 +72,16 @@ def get_move_state_h3msgs(pm, target_state):
             break
 
     state_moving_msgs.reverse()
+    
     return state_moving_msgs
 
-def modeller_h3(conf, keylog, url, sample_msg, outdir):
+def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Packet], outdir:str) -> None:
     g_start_time = time.time()
     print("\n[STEP 3] Modeling started at %s" % time.ctime(g_start_time))
     # pm : modeling status, 
     # sm : state machine data structure using Machines package 
     pm, sm = generate_sm()
-    pm.testmsgs = sample_msg
+    pm.testmsgs = sample_msgs
     pm.dst_ip = url
     pm.configuration = conf
     pm.keylog = keylog
@@ -153,7 +157,7 @@ def modeller_h3(conf, keylog, url, sample_msg, outdir):
     #     json.dump(sm.markup, jsonfile, indent=2)
     sys.exit()
 
-def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg_sent: Packet):
+def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Packet], h3msg_sent:Packet) -> str:
     h3msg_rcvd = ''
     
     try:
@@ -190,11 +194,12 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
 
     print("\033[92m  [SUMMARY] (%s) => %s => %s\033[0m" % (
     util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd))
+    time.sleep(1)
     # print("  ==================================")
 
     return h3msg_rcvd
 
-def update_candidates(pm: ProtoModel, sm: GraphMachine, msg_sent, msg_rcvd):
+def update_candidates(pm:ProtoModel, sm:GraphMachine, msg_sent:Packet, msg_rcvd:str) -> None:
     """
     Update candidate node (expanded in the current level) in pm and sm.
     args:
@@ -211,7 +216,7 @@ def update_candidates(pm: ProtoModel, sm: GraphMachine, msg_sent, msg_rcvd):
     pm.candidate_state_list.add_state(cand_s)
     print("  [+] Candidate state %s added (%s -> %s)" % (cand_s.name, cand_s.parent_state.name, cand_s.name))
 
-def check_dupstate(pm: ProtoModel, md, cand_s, mode):
+def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -> bool:
     if mode == 'p':
         # Case 1. Parent:
         # Compare its SR dict with that of its parent
@@ -255,7 +260,7 @@ def check_dupstate(pm: ProtoModel, md, cand_s, mode):
         sys.exit()
 
 
-def update_sm(pm: ProtoModel, sm: GraphMachine, cand_s, md):
+def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData) -> None:
     # Mergable
     if md.src_s is not None and md.dst_s is not None:
         if len(sm.get_transitions(trigger=md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name)) > 0:
@@ -276,7 +281,7 @@ def update_sm(pm: ProtoModel, sm: GraphMachine, cand_s, md):
             sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest=cand_s.name)
 
 
-def expand_sm(pm: ProtoModel, sm: GraphMachine, leaf_states):
+def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) -> None:
     # Find candidate states in the next level from leaf states found in the current level.
     leafstate_num = 1
     for leaf_state in leaf_states:
@@ -309,7 +314,7 @@ def expand_sm(pm: ProtoModel, sm: GraphMachine, leaf_states):
             print("│    - Test MSG  : %s                                            " % 
                 util.h3msg_to_str(msg_sent))
             print("└────────────────────────────────────────────────────────────────────────────────────")
-
+            #print(msg_sent)
             msg_rcvd_str = send_receive_http3(pm, h3client, state_moving_msgs_list, msg_sent)
 
 
@@ -321,7 +326,7 @@ def expand_sm(pm: ProtoModel, sm: GraphMachine, leaf_states):
         leafstate_num += 1
         pm.current_state.child_sr_dict = sr_dict
 
-def minimize_sm(pm, sm):
+def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
     # Among candidate states in the next level, unique states in current level are determined via pruning.
     cand_s_list = pm.candidate_state_list.state_list
     if len(cand_s_list) == 0:

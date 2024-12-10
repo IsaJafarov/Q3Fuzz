@@ -1,0 +1,85 @@
+{
+  "initial": "Init",
+  "transitions": [
+    {
+      "source": "Init",
+      "dest": "Init",
+      "trigger": "STREAM(2)[SETTINGS,RESERVED] => ACK\n"
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "STREAM(2)[SETTINGS,RESERVED] => ACK\n"
+    },
+    {
+      "source": "Init",
+      "dest": "2",
+      "trigger": "STREAM(2)[PRIORITY_UPDATE],STREAM(0)[HEADERS] => ACK,STREAM(0)[HEADERS,DATA],STREAM(0)[END]\n"
+    },
+    {
+      "source": "Init",
+      "dest": "Finish",
+      "trigger": "ACK,PADDING => CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "Finish",
+      "trigger": "ACK,PADDING => CC\n"
+    },
+    {
+      "source": "Init",
+      "dest": "Finish",
+      "trigger": "STREAM(2)[PRIORITY_UPDATE],STREAM(10)[NULL],STREAM(4)[HEADERS] => ACK,SS|CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "Finish",
+      "trigger": "STREAM(2)[PRIORITY_UPDATE],STREAM(10)[NULL],STREAM(4)[HEADERS] => ACK,SS|CC\n"
+    },
+    {
+      "source": "Init",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "STREAM(2)[PRIORITY_UPDATE],STREAM(0)[HEADERS] => ACK\n"
+    }
+  ],
+  "states": [
+    {
+      "name": "Init"
+    },
+    {
+      "name": "Finish"
+    },
+    {
+      "name": "2"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "Init",
+      "name": "HTTP/3 State Machine",
+      "class-name": "statemachine.ProtoModel"
+    }
+  ]
+}

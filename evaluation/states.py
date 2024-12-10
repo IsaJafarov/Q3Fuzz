@@ -1,5 +1,8 @@
+from pyshark.packet.packet import Packet
+from typing import List
+
 class State:
-	def __init__(self, name, level, parent_state=None, msg_sent=None, msg_rcvd_str=None,
+	def __init__(self, name:str, level:int, parent_state:"State"=None, msg_sent:Packet=None, msg_rcvd_str:str=None,
 	 child_sr_dict=None, is_abnormal=False):
 		self.name = name
 		self.level = level
@@ -9,35 +12,35 @@ class State:
 		self.child_sr_dict = child_sr_dict
 
 class StateList:
-	def __init__(self, state_list=[]):
+	def __init__(self, state_list:List[State]=[]):
 		self.state_list = state_list
 
-	def add_state(self, state):
+	def add_state(self, state:State) -> None:
 		self.state_list.append(state)
 
-	def remove_state(self, state):
+	def remove_state(self, state:State) -> None:
 		self.state_list.remove(state)
 
-	def get_state_by_name(self, name):
+	def get_state_by_name(self, name:str) -> State:
 		for state in self.state_list:
 			if state.name == name:
 				return state
 
-	def get_states_by_level(self, level):
+	def get_states_by_level(self, level:int) -> List[State]:
 		states_list = []
 		for state in self.state_list:
 			if state.level == level:
 				states_list.append(state)
 		return states_list
 
-	def print_state_list(self):
+	def print_state_list(self) -> None:
 		tmplist = []
 		print("state list length : " + str(len(self.state_list)))
 		for s in self.state_list:
 			tmplist.append(s.name)
 		print(tmplist)
 
-	def print_payloadPair(self):
+	def print_payloadPair(self) -> None:
 		print("State list length : " + str(len(self.state_list)))
 		for state in self.state_list:
 			print("State name : %s" % state.name)

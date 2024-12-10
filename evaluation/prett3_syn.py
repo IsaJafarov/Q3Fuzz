@@ -535,7 +535,7 @@ class HttpClient():
             res = res.rstrip('|')
             return res
 
-    def receive_datagram(self, data: bytes, now: float) -> str:
+    def receive_datagram(self, data:bytes, now:float) -> str:
         """
         Process a received QUIC datagram, decrypt and return any decrypted packet data.
         
@@ -688,8 +688,30 @@ class HttpClient():
 
         return res_per_packet
     
+    def close_connection(self) -> None:
 
-    def replay_sample_msg(self, h3msg: Packet, is_moving: bool):
+        # Send CONNECTION_CLOSE frame using send_quic_packet
+        # Define the payload to include error_code and reason_phrase according to the QUIC specification.
+        builder = self.get_builder(Epoch.ONE_RTT)
+
+
+        reason = "closed by prett3".encode("utf8")
+
+        buf = builder.start_frame(
+            QuicFrameType.TRANSPORT_CLOSE,
+            capacity=TRANSPORT_CLOSE_FRAME_CAPACITY + len(reason),
+        )
+        buf.push_uint_var(QuicErrorCode.APPLICATION_ERROR)
+        buf.push_uint_var(QuicFrameType.PADDING)
+        buf.push_uint_var(len(reason))
+        buf.push_bytes(reason)
+
+        self.send_quic_frames_from_builder(builder=builder)
+
+        self.sock.close()
+
+
+    def replay_sample_msg(self, h3msg:Packet, is_moving:bool) -> str:
         """
         Replay QUIC and HTTP/3 packets from h3msg and capture responses.
         """
@@ -743,6 +765,7 @@ class HttpClient():
                         
         
         # check if there is HTTP/3 layer data in the packet
+        
         if h3_frames: 
             # Send HTTP/3 frames on respective streams
             for quic_stream, h3_frame in zip(quic_streams, h3_frames) :
@@ -757,39 +780,10 @@ class HttpClient():
 
         else:
             # Explicitly close the QUIC connection using CONNECTION_CLOSE frame
-            self._quic.close(
-                error_code=QuicErrorCode.NO_ERROR,
-                frame_type=QuicFrameType.APPLICATION_CLOSE,
-                reason_phrase="Normal connection closure after message replay",
-            )
-
-            # Send CONNECTION_CLOSE frame using send_quic_packet
-            # Define the payload to include error_code and reason_phrase according to the QUIC specification.
-            connection_close_payload = Buffer(capacity=256)
-            connection_close_payload.push_uint_var(QuicErrorCode.NO_ERROR)  # Error code (NO_ERROR)
-            connection_close_payload.push_uint_var(0)  # Frame type (0 since no specific frame is indicated)
-            reason_phrase = "Normal connection closure after message replay"
-            connection_close_payload.push_uint16(len(reason_phrase))
-            connection_close_payload.push_bytes(reason_phrase.encode('utf-8'))
-
-            self.send_quic_packet(
-                quic_frame_type=QuicFrameType.APPLICATION_CLOSE,  # Use APPLICATION_CLOSE for QUIC-level closure
-                quic_payload=connection_close_payload.data  # Include the correctly formatted payload
-            )
-
-            self.sock.close()
+            self.close_connection()
 
         return response_packets
 
-def main(
-    configuration: QuicConfiguration,
-    url: str,
-    outdir: str,
-    sample_msg: pyshark.FileCapture,
-    keylog_file: str
-) -> None:
-
-    stma.modeller_h3(configuration, keylog_file, url, sample_msg, outdir)
 
 def init(args):
     print("\n[STEP 1] Initializing...")
@@ -906,12 +900,8 @@ if __name__ == "__main__":
     ### Extract initial state machine ###
     http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
 
-    main(
-            configuration=configuration,
-            url=args.url,
-            outdir="./result",
-            sample_msg = http3_basic_messages,
-            keylog_file = keylog_file
-        )
-    
-    
+    stma.modeller_h3(conf=configuration, 
+                     keylog=keylog_file, 
+                     url=args.url, 
+                     sample_msgs=http3_basic_messages, 
+                     outdir="./result")
