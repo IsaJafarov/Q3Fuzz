@@ -194,7 +194,7 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
 
     print("\033[92m  [SUMMARY] (%s) => %s => %s\033[0m" % (
     util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd))
-    time.sleep(1)
+    #time.sleep(1)
     # print("  ==================================")
 
     return h3msg_rcvd
