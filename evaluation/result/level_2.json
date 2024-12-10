@@ -1,0 +1,147 @@
+{
+  "initial": "Init",
+  "transitions": [
+    {
+      "source": "Init",
+      "dest": "1",
+      "trigger": "STREAM(2)[SETTINGS,RESERVED],STREAM(6)[Enc],STREAM(10)[Dec] => ACK|ACK\n"
+    },
+    {
+      "source": "1",
+      "dest": "1",
+      "trigger": "STREAM(2)[SETTINGS,RESERVED],STREAM(6)[Enc],STREAM(10)[Dec] => ACK|ACK\n"
+    },
+    {
+      "source": "2",
+      "dest": "12",
+      "trigger": "STREAM(2)[SETTINGS,RESERVED],STREAM(6)[Enc],STREAM(10)[Dec] => ACK|ACK\n"
+    },
+    {
+      "source": "Init",
+      "dest": "2",
+      "trigger": "STREAM(0)[HEADERS] => ACK,STREAM(0)[HEADERS,DATA],STREAM(0)[END]\n"
+    },
+    {
+      "source": "1",
+      "dest": "12",
+      "trigger": "STREAM(0)[HEADERS] => ACK,STREAM(0)[HEADERS,DATA],STREAM(0)[END]\n"
+    },
+    {
+      "source": "3",
+      "dest": "23",
+      "trigger": "STREAM(0)[HEADERS] => ACK,STREAM(0)[HEADERS,DATA],STREAM(0)[END]\n"
+    },
+    {
+      "source": "Init",
+      "dest": "3",
+      "trigger": "STREAM(6)[Enc] => ACK\n"
+    },
+    {
+      "source": "2",
+      "dest": "23",
+      "trigger": "STREAM(6)[Enc] => ACK\n"
+    },
+    {
+      "source": "3",
+      "dest": "3",
+      "trigger": "STREAM(6)[Enc] => ACK\n"
+    },
+    {
+      "source": "Init",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "1",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "3",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "Init",
+      "dest": "Init",
+      "trigger": "STREAM(4)[HEADERS],STREAM(6)[Enc] => ACK\n"
+    },
+    {
+      "source": "1",
+      "dest": "1",
+      "trigger": "STREAM(4)[HEADERS],STREAM(6)[Enc] => ACK\n"
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "STREAM(4)[HEADERS],STREAM(6)[Enc] => ACK\n"
+    },
+    {
+      "source": "3",
+      "dest": "3",
+      "trigger": "STREAM(4)[HEADERS],STREAM(6)[Enc] => ACK\n"
+    },
+    {
+      "source": "1",
+      "dest": "Finish",
+      "trigger": "STREAM(6)[Enc] => ACK,SS|CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "STREAM(0)[HEADERS] => ACK\n"
+    },
+    {
+      "source": "3",
+      "dest": "Finish",
+      "trigger": "STREAM(2)[SETTINGS,RESERVED],STREAM(6)[Enc],STREAM(10)[Dec] => ACK,SS|CC\n"
+    }
+  ],
+  "states": [
+    {
+      "name": "Init"
+    },
+    {
+      "name": "Finish"
+    },
+    {
+      "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "3"
+    },
+    {
+      "name": "12"
+    },
+    {
+      "name": "23"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "Init",
+      "name": "HTTP/3 State Machine",
+      "class-name": "statemachine.ProtoModel"
+    }
+  ]
+}

@@ -752,7 +752,9 @@ class HttpClient():
                         quic_payload = layer.payload.raw_value
 
             elif layer.layer_name == 'http3':
+                
                 h3_field_type_hex = layer.get_field_value("http3.frame_type", raw=True)
+                # the layer has HTTP3 frames
                 if h3_field_type_hex is not None:
                     h3_field_type = int(h3_field_type_hex, 16)
 
@@ -762,6 +764,16 @@ class HttpClient():
                         h3_frames.append(self.build_h3_priority_update_frame(layer)) 
                     elif h3_field_type == FrameType.HEADERS:
                         h3_frames.append(self.build_h3_headers_frame(layer))
+                # the layer has non-HTTP3 data (QPACK)
+                else: 
+                    if 'QPACK Encoder' in layer.stream_uni or 'qpack_encoder' in layer.field_names: 
+                        h3_frames.append( aioquic.buffer.encode_uint_var(StreamType.QPACK_ENCODER) ) 
+                    elif 'QPACK Decoder' in layer.stream_uni: 
+                        h3_frames.append( aioquic.buffer.encode_uint_var(StreamType.QPACK_DECODER) ) 
+                    else:
+                        print(layer)
+                        raise "Unknown Application Layer Data"
+
                         
         
         # check if there is HTTP/3 layer data in the packet

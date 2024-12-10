@@ -171,10 +171,26 @@ def h3msg_to_str(h3msg:Packet) -> str:
                 for frame_name in get_frames_of_layer(layer):
                     tmp_frames += frame_name.upper() + ","
 
-                # TODO: NULL can be QPACK Encoder Stream. Now we treat such stream containing NULL frame.
-                frame_info = tmp_frames[:-1] if len(tmp_frames) > 0 else 'NULL'
+               
+
+
+                ###
+                frame_info = None
+                # the layer has HTTP3 frames
+                if tmp_frames: 
+                    frame_info = tmp_frames[:-1]
+                # the layer has non-HTTP3 data (QPACK)
+                else:
+                    if 'QPACK Encoder' in layer.stream_uni or 'qpack_encoder' in layer.field_names: 
+                        frame_info = "Enc" 
+                    elif 'QPACK Decoder' in layer.stream_uni: 
+                        frame_info = "Dec" 
+                    else:
+                        print(layer)
+                        raise "Unknown Application Layer Data"
                 if msginfo:
                     msginfo += ','
                 msginfo += 'STREAM(%s)[%s]' % (stream_id, frame_info)
+                ###
     
     return msginfo
