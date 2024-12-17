@@ -173,8 +173,6 @@ def h3msg_to_str(h3msg:Packet) -> str:
 
                
 
-
-                ###
                 frame_info = None
                 # the layer has HTTP3 frames
                 if tmp_frames: 

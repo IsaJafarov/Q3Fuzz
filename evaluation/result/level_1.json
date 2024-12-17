@@ -3,28 +3,23 @@
   "transitions": [
     {
       "source": "Init",
-      "dest": "1",
-      "trigger": "STREAM(2)[SETTINGS,RESERVED],STREAM(6)[Enc],STREAM(10)[Dec] => ACK|ACK\n"
+      "dest": "Init",
+      "trigger": "STREAM(2)[SETTINGS,RESERVED] => ACK\n"
     },
     {
       "source": "Init",
       "dest": "2",
-      "trigger": "STREAM(0)[HEADERS] => ACK,STREAM(0)[HEADERS,DATA],STREAM(0)[END]\n"
-    },
-    {
-      "source": "Init",
-      "dest": "3",
-      "trigger": "STREAM(6)[Enc] => ACK\n"
-    },
-    {
-      "source": "Init",
-      "dest": "Finish",
-      "trigger": "ACK => CC\n"
+      "trigger": "STREAM(2)[PRIORITY_UPDATE],STREAM(0)[HEADERS] => ACK,STREAM(0)[HEADERS,DATA],STREAM(0)[END]\n"
     },
     {
       "source": "Init",
       "dest": "Init",
-      "trigger": "STREAM(4)[HEADERS],STREAM(6)[Enc] => ACK\n"
+      "trigger": "ACK => \n"
+    },
+    {
+      "source": "Init",
+      "dest": "Init",
+      "trigger": "STREAM(2)[PRIORITY_UPDATE],STREAM(10)[Enc],STREAM(4)[HEADERS] => ACK\n"
     }
   ],
   "states": [
@@ -35,13 +30,7 @@
       "name": "Finish"
     },
     {
-      "name": "1"
-    },
-    {
       "name": "2"
-    },
-    {
-      "name": "3"
     }
   ],
   "before_state_change": [],

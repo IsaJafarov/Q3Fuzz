@@ -160,37 +160,34 @@ def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Pa
 def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Packet], h3msg_sent:Packet) -> str:
     h3msg_rcvd = ''
     
-    try:
-        is_already_closed = False
-        
-        ### INITIAL CONNECTION ###
-        # Establish initial connection by sending handshake messages
-        h3client.connect()
-        h3client.read_from_buffer()  # Receive any response from the server
+  
+    is_already_closed = False
+    
+    ### INITIAL CONNECTION ###
+    # Establish initial connection by sending handshake messages
+    h3client.connect()
+    h3client.read_from_buffer()  # Receive any response from the server
 
-        # Complete the connection by sending handshake completion messages
-        h3client.complete_connection()
-        h3client.read_from_buffer()  # Receive any response from the server
+    # Complete the connection by sending handshake completion messages
+    h3client.complete_connection()
+    h3client.read_from_buffer()  # Receive any response from the server
 
-        ### SENDING STATE MOVING MESSAGES ###
-        for mov_msg in mov_msg_list:
-            print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg)}")
-            state_msg = h3client.replay_sample_msg(mov_msg, is_moving=True)  # Send HTTP/3 state-moving message
-            if state_msg:
-                print(f"  [+] Received state-moving response: {state_msg}")
-                # h3msg_rcvd.append(state_msg)
-                
-        ### SENDING TARGET MSG ###
-        if is_already_closed is False: # check for goaway in state moving (TODO)
-            print("  [+] Sending testing message...")
-            print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
-            # h3msg_sent.show()
-            h3msg_rcvd = h3client.replay_sample_msg(h3msg_sent, is_moving=False)  # Send HTTP/3 target message
+    ### SENDING STATE MOVING MESSAGES ###
+    for mov_msg in mov_msg_list:
+        print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg)}")
+        state_msg = h3client.replay_sample_msg(mov_msg, is_moving=True)  # Send HTTP/3 state-moving message
+        if state_msg:
+            print(f"  [+] Received state-moving response: {state_msg}")
+            # h3msg_rcvd.append(state_msg)
             
-    except Exception as e:
-        print("Exception message: {}".format(e))
-        print(traceback.format_exc())
-        sys.exit()
+    ### SENDING TARGET MSG ###
+    if is_already_closed is False: # check for goaway in state moving (TODO)
+        print("  [+] Sending testing message...")
+        print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
+        # h3msg_sent.show()
+        h3msg_rcvd = h3client.replay_sample_msg(h3msg_sent, is_moving=False)  # Send HTTP/3 target message
+            
+ 
 
     print("\033[92m  [SUMMARY] (%s) => %s => %s\033[0m" % (
     util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd))
