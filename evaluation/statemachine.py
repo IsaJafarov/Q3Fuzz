@@ -283,13 +283,10 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
     leafstate_num = 1
     for leaf_state in leaf_states:
         sr_dict = OrderedDict()
-        try:
-            print("    [LV %d | EXP | LEAF %d/%d] Expanding leaf state \'%s\'..." % (pm.current_level, leafstate_num, len(leaf_states),
+
+        print("    [LV %d | EXP | LEAF %d/%d] Expanding leaf state \'%s\'..." % (pm.current_level, leafstate_num, len(leaf_states),
                 leaf_state.name))
-        except Exception as e:
-            print(e)
-            print(leaf_state)
-            
+
         state_moving_msgs_list = []
 
         message_num = 1

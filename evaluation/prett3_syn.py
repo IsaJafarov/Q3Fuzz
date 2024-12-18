@@ -22,13 +22,13 @@ from aioquic.tls import CipherSuite, Epoch
 # pyshark module
 import pyshark
 from pyshark.packet.packet import Packet
+from pyshark.packet.layers.xml_layer import XmlLayer
 
 # PRETT3 module
 from handler import MSGHandler
 import util
 import statemachine as stma
 
-PRIORITY_UPDATE_FRAME_TYPE = 0x800f0700
 
 class HttpClient():
     def __init__(self, quic_conf: QuicConfiguration, hostname: str, keylog_file: str) -> None:
@@ -384,40 +384,28 @@ class HttpClient():
         self.send_quic_frames_from_builder(builder)
 
     #### FOR SENDING PACKETS ####
-    def build_h3_settings_frame(self, h3_layer) -> bytes:
+    def build_h3_settings_frame(self, h3_layer: XmlLayer) -> bytes:
         """
         Builds and returns a SETTINGS frame for the H3 layer.
         SETTINGS frame is sent over the control stream (Uni Stream Type 0x00).
         """
-        settings = {
-            # Define HTTP/3 settings here (example settings)
-            aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: 1024,
-            aioquic.h3.connection.Setting.QPACK_BLOCKED_STREAMS: 16,
-            aioquic.h3.connection.Setting.ENABLE_CONNECT_PROTOCOL: 1
-        }
 
-        try:
-            # Create SETTINGS frame payload
-            if hasattr(h3_layer, 'frame_payload') and hasattr(h3_layer.frame_payload, 'raw_value'):
-                settings_data = bytes.fromhex(h3_layer.frame_payload.raw_value)
-            else:
-                print("No valid payload found for SETTINGS frame, using default payload.")
-                settings_data = encode_settings(settings)
+        # Create SETTINGS frame payload
+        if hasattr(h3_layer, 'frame_payload') and hasattr(h3_layer.frame_payload, 'raw_value'):
+            settings_data = bytes.fromhex(h3_layer.frame_payload.raw_value)
+        else: 
+            raise "No valid payload found for SETTINGS frame"
 
-            # Encode the SETTINGS frame
-            frame_data = aioquic.h3.connection.encode_frame(FrameType.SETTINGS, settings_data)
+        # Encode the SETTINGS frame
+        frame_data = aioquic.h3.connection.encode_frame(FrameType.SETTINGS, settings_data)
 
-            # Prepend Uni Stream Type (0x00) to the SETTINGS frame data for control stream
-            stream_type = aioquic.buffer.encode_uint_var(0x00)  # Uni Stream Type for control stream
-            final_frame_data = stream_type + frame_data  # Combine stream type and frame data
-            
-            return final_frame_data  # Return the combined frame data with stream type
+        # Prepend Uni Stream Type (0x00) to the SETTINGS frame data for control stream
+        stream_type = aioquic.buffer.encode_uint_var(0x00)  # Uni Stream Type for control stream
+        final_frame_data = stream_type + frame_data  # Combine stream type and frame data
+        
+        return final_frame_data  # Return the combined frame data with stream type
 
-        except Exception as e:
-            print(f"Error encoding SETTINGS frame: {e}")
-            return b''  # Return empty payload in case of error
-
-    def build_h3_priority_update_frame(self, h3_layer) -> bytes:
+    def build_h3_priority_update_frame(self, h3_layer: XmlLayer) -> bytes:
         """
         Builds and returns a PRIORITY_UPDATE frame for the H3 layer.
         """
@@ -425,12 +413,11 @@ class HttpClient():
         if hasattr(h3_layer, 'frame_payload') and hasattr(h3_layer.frame_payload, 'raw_value'):
             priority_data = bytes.fromhex(h3_layer.frame_payload.raw_value)
         else:
-            print("No valid payload found for PRIORITY_UPDATE frame, using default payload.")
-            priority_data = b'\x00\x01\x02'  # Example priority payload
+            raise "No valid payload found for PRIORITY_UPDATE frame, using default payload."
 
-        return aioquic.h3.connection.encode_frame(0x000f0700, priority_data)
+        return aioquic.h3.connection.encode_frame(FrameType.PRIORITY, priority_data)
 
-    def build_h3_headers_frame(self, h3_layer) -> bytes:
+    def build_h3_headers_frame(self, h3_layer:XmlLayer) -> bytes:
         """
         Builds and returns a HEADERS frame for the H3 layer
         """
@@ -438,12 +425,11 @@ class HttpClient():
         if hasattr(h3_layer, 'frame_payload') and hasattr(h3_layer.frame_payload, 'raw_value'):
             headers_data = bytes.fromhex(h3_layer.frame_payload.raw_value)
         else:
-            print("No valid payload found for HEADERS frame, using default payload.")
-            headers_data = b'\x82\x84\x41\x85\x86'  # Example headers (this should be replaced with real headers)
+            raise "No valid payload found for HEADERS frame, using default payload."
 
         return aioquic.h3.connection.encode_frame(FrameType.HEADERS, headers_data)
 
-    def add_quic_stream(self, fin_bit:bool, stream_id:int, offset:int, h3_frame_data:bytes, builder:QuicPacketBuilder):
+    def add_quic_stream_to_builder(self, fin_bit:bool, stream_id:int, offset:int, app_layer_data:bytes, builder:QuicPacketBuilder) -> None:
         """
         Send multiple HTTP/3 frames over the QUIC stream. Each frame is written into its own 
         QUIC stream frame within the same QUIC packet.
@@ -466,51 +452,31 @@ class HttpClient():
             buf.push_uint_var(offset)
 
         # Push frame length (encoded as varint)
-        frame_length = len(h3_frame_data)
+        frame_length = len(app_layer_data)
         buf.push_uint_var(frame_length)
 
         # Push frame data (actual HTTP/3 frame bytes)
-        buf.push_bytes(h3_frame_data)
+        buf.push_bytes(app_layer_data)
 
-        # print(f"Prepared QUIC frame for stream ID {stream_id} with length {frame_length}")
+    def add_quic_ack_to_builder(self, builder:QuicPacketBuilder) -> None:
 
-        # Send the combined frames in one QUIC stream message
-        #self.send_quic_frames_from_builder(builder)
+        buf = builder.start_frame(
+            QuicFrameType.ACK,
+            capacity=ACK_FRAME_CAPACITY
+        )
+        buf.push_uint_var(1) # largest
+        buf.push_uint_var(9) # delay
+        buf.push_uint_var(0) # range count
+        buf.push_uint_var(1) # first ack range
 
-        # print(f"\tsend_quic_stream(): Sending combined HTTP/3 frames over stream ID {stream_id}...")
-
-    def send_quic_packet(self, quic_frame_type, quic_payload):
-        """
-        Send pure QUIC-level packets, such as ACK or PADDING frames.
-        """
-        # Ensure quic_frame_type is an integer
-        if isinstance(quic_frame_type, str):
-            quic_frame_type = int(quic_frame_type, 16)  # Convert hex string to int if needed
-        
-        # Start building a QUIC packet with the appropriate epoch (1-RTT)
-        builder = self.get_builder(Epoch.ONE_RTT)
-
-        # Handle None payload
-        if quic_payload is None:
-            quic_payload = b''
-
-        # Start the frame
-        buf = builder.start_frame(quic_frame_type, capacity=len(quic_payload))
-        
-        # Add the QUIC payload (for example, ACK payload)
-        buf.push_bytes(quic_payload)
-
-        # Send the packet
-        self.send_quic_frames_from_builder(builder)
-
-    def send_quic_frames_from_builder(self, builder:QuicPacketBuilder):
+    def send_quic_frames_from_builder(self, builder:QuicPacketBuilder) -> None:
         datagrams, packets = builder.flush()
 
         for data in datagrams:
             # print("\tsend_quic_frames_from_builder(): Sending message: len={}".format( len(data) ))
             self.sock.sendto(data, (self.hostname, 443))
 
-    def read_from_buffer(self):
+    def read_from_buffer(self) -> str:
         """
         Read QUIC/HTTP3 messages from the buffer, directly parsing decrypted payloads and saving into human-readable format.
 
@@ -532,7 +498,10 @@ class HttpClient():
 
         except socket.timeout:
             # Return parsed packets after timeout
-            res = res.rstrip('|')
+            if res:
+                res = res.rstrip('|')
+            else:
+                res="\u2298"
             return res
 
     def receive_datagram(self, data:bytes, now:float) -> str:
@@ -690,8 +659,6 @@ class HttpClient():
     
     def close_connection(self) -> None:
 
-        # Send CONNECTION_CLOSE frame using send_quic_packet
-        # Define the payload to include error_code and reason_phrase according to the QUIC specification.
         builder = self.get_builder(Epoch.ONE_RTT)
 
 
@@ -711,20 +678,6 @@ class HttpClient():
         self.sock.close()
 
 
-    def add_quic_ack_frame(self, builder:QuicPacketBuilder) -> None:
-
-        buf = builder.start_frame(
-            QuicFrameType.ACK,
-            capacity=ACK_FRAME_CAPACITY
-        )
-        buf.push_uint_var(1) # largest
-        buf.push_uint_var(9) # delay
-        buf.push_uint_var(0) # range count
-        buf.push_uint_var(1) # first ack range
-
-        #self.send_quic_frames_from_builder(builder=builder)
-
-
     def replay_sample_msg(self, h3msg:Packet, is_moving:bool) -> str:
         """
         Replay QUIC and HTTP/3 packets from h3msg and capture responses.
@@ -742,22 +695,10 @@ class HttpClient():
 
         ### Send the test message (QUIC or HTTP/3) ###
         for layer in h3msg.layers:
-            print("layer_name = {}".format(layer.layer_name))
+            
             if layer.layer_name == 'quic':
                 
                 for field in layer.frame.fields:
-                    '''
-                    print()
-                    print(field)
-                    print("name = {}".format(field.name))
-                    print("showname = {}".format(field.showname))
-                    print("raw_value = {}".format(field.raw_value))
-                    print("show = {}".format(field.show))
-                    print("pos = {}".format(field.pos))
-                    print("size = {}".format(field.size))
-                    print("unmaskedvalue = {}".format(field.unmaskedvalue))
-                    print("str(field) = {}".format(str(field)))
-                    '''
 
                     if 'STREAM' in field.showname:  
 
@@ -772,30 +713,37 @@ class HttpClient():
                             quic_streams[-1].offset = int(stream_info.split('off=')[1].split()[0])
 
                     elif 'ACK' in field.showname:
-                        self.add_quic_ack_frame(builder)
+                        self.add_quic_ack_to_builder(builder)
+                    
+                    elif 'NEW_CONNECTION_ID' in field.showname:
+                        pass
+                    elif 'PADDING' in field.showname:
+                        pass
+
+                    else:
+                        print(field)
+                        raise "Unknown QUIC Frame"
 
 
             elif layer.layer_name == 'http3':
                 
-                h3_field_type_hex = layer.get_field_value("http3.frame_type", raw=True)
+                h3_field_type_hex = layer.get_field_value("http3.frame_type")
                 app_data = None # Application layer data. Either HTTP/3 frame or QPACK Enc/Dec
 
                 # the layer has HTTP3 frames
                 if h3_field_type_hex is not None:
-                    h3_field_type = int(h3_field_type_hex, 16)
-
+                    h3_field_type = int(h3_field_type_hex)
+                    
                     if h3_field_type == FrameType.SETTINGS:
                         app_data = self.build_h3_settings_frame(layer)
-                    elif h3_field_type == PRIORITY_UPDATE_FRAME_TYPE:
+                    elif h3_field_type in [0xf0700, 0xf0701]: # aioquic does not support this frame
                         app_data = self.build_h3_priority_update_frame(layer)
                     elif h3_field_type == FrameType.HEADERS:
                         app_data = self.build_h3_headers_frame(layer)
                     else:
                         print(layer)
-                        print(h3_field_type)
                         raise "Unknown Application Layer Data"
                     
-                
                 # the layer has non-HTTP3 data (QPACK)
                 else: 
                     if 'QPACK Encoder' in layer.stream_uni or 'qpack_encoder' in layer.field_names: 
@@ -806,8 +754,9 @@ class HttpClient():
                         print(layer)
                         raise "Unknown Application Layer Data"
                 
+                # put application layer data into the corresponding quic stream frame
                 quic_stream = quic_streams.pop(0)
-                self.add_quic_stream(quic_stream.fin_bit, quic_stream.stream_id, quic_stream.offset, app_data, builder)                
+                self.add_quic_stream_to_builder(quic_stream.fin_bit, quic_stream.stream_id, quic_stream.offset, app_data, builder)                
         
         
         self.send_quic_frames_from_builder(builder)
@@ -815,10 +764,8 @@ class HttpClient():
 
         response_packets = self.read_from_buffer()
 
-        if is_moving:
-            pass
-        else:
-            # Explicitly close the QUIC connection using CONNECTION_CLOSE frame
+        # Explicitly close the QUIC connection
+        if not is_moving:
             self.close_connection()
 
         return response_packets
