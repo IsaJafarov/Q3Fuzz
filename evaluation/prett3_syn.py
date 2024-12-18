@@ -415,7 +415,7 @@ class HttpClient():
         else:
             raise "No valid payload found for PRIORITY_UPDATE frame, using default payload."
 
-        return aioquic.h3.connection.encode_frame(FrameType.PRIORITY, priority_data)
+        return aioquic.h3.connection.encode_frame(0xf0700, priority_data)
 
     def build_h3_headers_frame(self, h3_layer:XmlLayer) -> bytes:
         """
