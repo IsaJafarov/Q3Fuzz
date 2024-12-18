@@ -29,6 +29,7 @@ from handler import MSGHandler
 import util
 import statemachine as stma
 
+PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
 class HttpClient():
     def __init__(self, quic_conf: QuicConfiguration, hostname: str, keylog_file: str) -> None:
@@ -397,7 +398,7 @@ class HttpClient():
             raise "No valid payload found for SETTINGS frame"
 
         # Encode the SETTINGS frame
-        frame_data = aioquic.h3.connection.encode_frame(FrameType.SETTINGS, settings_data)
+        frame_data = encode_frame(FrameType.SETTINGS, settings_data)
 
         # Prepend Uni Stream Type (0x00) to the SETTINGS frame data for control stream
         stream_type = aioquic.buffer.encode_uint_var(0x00)  # Uni Stream Type for control stream
@@ -413,9 +414,9 @@ class HttpClient():
         if hasattr(h3_layer, 'frame_payload') and hasattr(h3_layer.frame_payload, 'raw_value'):
             priority_data = bytes.fromhex(h3_layer.frame_payload.raw_value)
         else:
-            raise "No valid payload found for PRIORITY_UPDATE frame, using default payload."
+            raise "No valid payload found for PRIORITY_UPDATE frame"
 
-        return aioquic.h3.connection.encode_frame(0xf0700, priority_data)
+        return encode_frame(PRIORITY_UPDATE_FRAME_IDS[0], priority_data)
 
     def build_h3_headers_frame(self, h3_layer:XmlLayer) -> bytes:
         """
@@ -425,9 +426,10 @@ class HttpClient():
         if hasattr(h3_layer, 'frame_payload') and hasattr(h3_layer.frame_payload, 'raw_value'):
             headers_data = bytes.fromhex(h3_layer.frame_payload.raw_value)
         else:
-            raise "No valid payload found for HEADERS frame, using default payload."
+            raise "No valid payload found for HEADERS frame"
 
-        return aioquic.h3.connection.encode_frame(FrameType.HEADERS, headers_data)
+        return encode_frame(FrameType.HEADERS, headers_data)
+    
 
     def add_quic_stream_to_builder(self, fin_bit:bool, stream_id:int, offset:int, app_layer_data:bytes, builder:QuicPacketBuilder) -> None:
         """
@@ -468,6 +470,18 @@ class HttpClient():
         buf.push_uint_var(9) # delay
         buf.push_uint_var(0) # range count
         buf.push_uint_var(1) # first ack range
+
+    def add_quic_newconnectionid_to_builder(self, builder:QuicPacketBuilder) -> None:
+        
+        buf = builder.start_frame(
+            QuicFrameType.NEW_CONNECTION_ID,
+            capacity=NEW_CONNECTION_ID_FRAME_CAPACITY
+        )
+        buf.push_uint_var(1) # Sequence Number
+        buf.push_uint_var(0) # Retire Prior To
+        buf.push_uint8(3) # Length
+        buf.push_bytes(os.urandom(3)) # Connection ID
+        buf.push_bytes(os.urandom(16)) # Stateless Reset Token
 
     def send_quic_frames_from_builder(self, builder:QuicPacketBuilder) -> None:
         datagrams, packets = builder.flush()
@@ -716,7 +730,8 @@ class HttpClient():
                         self.add_quic_ack_to_builder(builder)
                     
                     elif 'NEW_CONNECTION_ID' in field.showname:
-                        pass
+                        self.add_quic_newconnectionid_to_builder(builder)
+                        
                     elif 'PADDING' in field.showname:
                         pass
 
@@ -736,7 +751,7 @@ class HttpClient():
                     
                     if h3_field_type == FrameType.SETTINGS:
                         app_data = self.build_h3_settings_frame(layer)
-                    elif h3_field_type in [0xf0700, 0xf0701]: # aioquic does not support this frame
+                    elif h3_field_type in PRIORITY_UPDATE_FRAME_IDS: # aioquic does not support this frame
                         app_data = self.build_h3_priority_update_frame(layer)
                     elif h3_field_type == FrameType.HEADERS:
                         app_data = self.build_h3_headers_frame(layer)
