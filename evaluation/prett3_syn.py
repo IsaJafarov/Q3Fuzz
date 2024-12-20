@@ -23,6 +23,7 @@ from pyshark.packet.packet import Packet
 
 # PRETT3 module
 from handler import MSGHandler
+from crafter import MSGCrafter
 import util
 import statemachine as stma
 
@@ -35,10 +36,11 @@ class HttpClient():
         self.hostname = hostname
         self.quic_conf.server_name = hostname # OLS requires. normally set in async module's connect()
         self.network_path = QuicNetworkPath(hostname)
-        self._quic = QuicConnection(configuration=self.quic_conf)
-        self._http = H3Connection(self._quic)
+        self.connection = QuicConnection(configuration=self.quic_conf)
+        self._http = H3Connection(self.connection)
         self.sock = None
-        self.handler = MSGHandler(qc = self._quic)
+        self.handler = MSGHandler(qc = self.connection)
+        self.crafter = MSGCrafter(qc = self.connection, client = self)
         os.environ['SSLKEYLOGFILE'] = keylog_file
         
     def get_builder(self, epoch: Epoch):
@@ -55,7 +57,7 @@ class HttpClient():
             spin_bit=self._http._quic._spin_bit,
         )
 
-        crypto_pair = self._quic._cryptos[epoch] 
+        crypto_pair = self.connection._cryptos[epoch] 
 
         quic_packet_type = None
         if epoch==Epoch.INITIAL: quic_packet_type = QuicPacketType.INITIAL
@@ -79,7 +81,7 @@ class HttpClient():
             initial_max_stream_data_uni=self.quic_conf.max_stream_data,
             initial_max_streams_bidi=128,
             initial_max_streams_uni=128,
-            initial_source_connection_id=self._quic._host_cids[0].cid,
+            initial_source_connection_id=self.connection._host_cids[0].cid,
             max_ack_delay=25,
             max_datagram_frame_size=self.quic_conf.max_datagram_frame_size,
             quantum_readiness=(
@@ -87,7 +89,7 @@ class HttpClient():
                 if self.quic_conf.quantum_readiness_test
                 else None
             ),
-            stateless_reset_token=self._quic._host_cids[0].stateless_reset_token,
+            stateless_reset_token=self.connection._host_cids[0].stateless_reset_token,
             version_information=QuicVersionInformation(
                 chosen_version=self.quic_conf.original_version,
                 available_versions=self.quic_conf.supported_versions,
@@ -95,12 +97,12 @@ class HttpClient():
         )
         # print(">>> prett3.serialize_transport_parameters. quic_transport_parameters={}".format(quic_transport_parameters))
 
-        buf = Buffer(capacity=3 * self._quic._max_datagram_size)
+        buf = Buffer(capacity=3 * self.connection._max_datagram_size)
         push_quic_transport_parameters(buf, quic_transport_parameters)
         return buf.data
 
     def get_tls(self) -> None:
-        self._quic.tls = tls.Context(
+        self.connection.tls = tls.Context(
             alpn_protocols=self.quic_conf.alpn_protocols,
             cadata=self.quic_conf.cadata,
             cafile=self.quic_conf.cafile,
@@ -111,10 +113,10 @@ class HttpClient():
             server_name=self.quic_conf.server_name,
             verify_mode=self.quic_conf.verify_mode,
         )
-        self._quic.tls.certificate = self.quic_conf.certificate
-        self._quic.tls.certificate_chain = self.quic_conf.certificate_chain
-        self._quic.tls.certificate_private_key = self.quic_conf.private_key
-        self._quic.tls.handshake_extensions = [
+        self.connection.tls.certificate = self.quic_conf.certificate
+        self.connection.tls.certificate_chain = self.quic_conf.certificate_chain
+        self.connection.tls.certificate_private_key = self.quic_conf.private_key
+        self.connection.tls.handshake_extensions = [
             (
                 tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS,
                 self.serialize_transport_parameters(),
@@ -129,7 +131,7 @@ class HttpClient():
             and session_ticket.is_valid
             and session_ticket.server_name == self.quic_conf.server_name
         ):
-            self._quic.tls.session_ticket = self.quic_conf.session_ticket
+            self.connection.tls.session_ticket = self.quic_conf.session_ticket
             
             # parse saved QUIC transport parameters - for 0-RTT
             if session_ticket.max_early_data_size == MAX_EARLY_DATA:
@@ -142,12 +144,12 @@ class HttpClient():
         '''
         
         # TLS callbacks
-        self._quic.tls.alpn_cb = self._quic._alpn_handler 
-        if self._quic._session_ticket_fetcher is not None:
-            self._quic.tls.get_session_ticket_cb = self._quic._session_ticket_fetcher
-        if self._quic._session_ticket_handler is not None:
-            self._quic.tls.new_session_ticket_cb = self._quic._handle_session_ticket
-        self._quic.tls.update_traffic_key_cb = self._quic._update_traffic_key# update_traffic_key
+        self.connection.tls.alpn_cb = self.connection._alpn_handler 
+        if self.connection._session_ticket_fetcher is not None:
+            self.connection.tls.get_session_ticket_cb = self.connection._session_ticket_fetcher
+        if self.connection._session_ticket_handler is not None:
+            self.connection.tls.new_session_ticket_cb = self.connection._handle_session_ticket
+        self.connection.tls.update_traffic_key_cb = self.connection._update_traffic_key# update_traffic_key
         
         # packet spaces
         def create_crypto_pair(epoch: tls.Epoch) -> CryptoPair:
@@ -157,21 +159,21 @@ class HttpClient():
             recv_secret_name = "server_%s_secret" % epoch_name
             send_secret_name = "client_%s_secret" % epoch_name
             return CryptoPair(
-                recv_setup_cb=partial(self._quic._log_key_updated, recv_secret_name),
-                recv_teardown_cb=partial(self._quic._log_key_retired, recv_secret_name),
-                send_setup_cb=partial(self._quic._log_key_updated, send_secret_name),
-                send_teardown_cb=partial(self._quic._log_key_retired, send_secret_name),
+                recv_setup_cb=partial(self.connection._log_key_updated, recv_secret_name),
+                recv_teardown_cb=partial(self.connection._log_key_retired, recv_secret_name),
+                send_setup_cb=partial(self.connection._log_key_updated, send_secret_name),
+                send_teardown_cb=partial(self.connection._log_key_retired, send_secret_name),
             )
 
         # To enable version negotiation, setup encryption keys for all
         # our supported versions.
-        self._quic._cryptos_initial = {}
+        self.connection._cryptos_initial = {}
         for version in self.quic_conf.supported_versions:
             pair = CryptoPair()
-            pair.setup_initial(cid=self._quic._peer_cid.cid, is_client=True, version=version)
-            self._quic._cryptos_initial[version] = pair
+            pair.setup_initial(cid=self.connection._peer_cid.cid, is_client=True, version=version)
+            self.connection._cryptos_initial[version] = pair
 
-        self._quic._cryptos = dict(
+        self.connection._cryptos = dict(
             (epoch, create_crypto_pair(epoch))
             for epoch in (
                 tls.Epoch.ZERO_RTT,
@@ -179,25 +181,25 @@ class HttpClient():
                 tls.Epoch.ONE_RTT,
             )
         )
-        self._quic._cryptos[tls.Epoch.INITIAL] = self._quic._cryptos_initial[self.quic_conf.original_version]
+        self.connection._cryptos[tls.Epoch.INITIAL] = self.connection._cryptos_initial[self.quic_conf.original_version]
 
-        self._quic._crypto_buffers = {
+        self.connection._crypto_buffers = {
             tls.Epoch.INITIAL: Buffer(capacity=CRYPTO_BUFFER_SIZE),
             tls.Epoch.HANDSHAKE: Buffer(capacity=CRYPTO_BUFFER_SIZE),
             tls.Epoch.ONE_RTT: Buffer(capacity=CRYPTO_BUFFER_SIZE),
         }
-        self._quic._crypto_streams = {
+        self.connection._crypto_streams = {
             tls.Epoch.INITIAL: QuicStream(),
             tls.Epoch.HANDSHAKE: QuicStream(),
             tls.Epoch.ONE_RTT: QuicStream(),
         }
-        self._quic._spaces = {
+        self.connection._spaces = {
             tls.Epoch.INITIAL: QuicPacketSpace(),
             tls.Epoch.HANDSHAKE: QuicPacketSpace(),
             tls.Epoch.ONE_RTT: QuicPacketSpace(),
         }
 
-        self._quic._loss.spaces = list(self._quic._spaces.values())
+        self.connection._loss.spaces = list(self.connection._spaces.values())
     
     def connect(self):
         """
@@ -215,7 +217,7 @@ class HttpClient():
 
         self.get_tls() # better to build tls myself to construct transport params myself
         
-        self._quic.tls._client_send_hello(crypto_buf)
+        self.connection.tls._client_send_hello(crypto_buf)
         
         builder = self.get_builder(Epoch.INITIAL)
         
@@ -245,7 +247,7 @@ class HttpClient():
         # print("\n>>> prett3.complete_connection: start")
         epoch = Epoch.HANDSHAKE
 
-        crypto_pair = self._quic._cryptos[epoch]
+        crypto_pair = self.connection._cryptos[epoch]
         if not crypto_pair.send.is_valid():
             print("The Encoding crypto is not valid to send data")
             return
@@ -266,7 +268,7 @@ class HttpClient():
 
         # CRYPTO
         # print(">>> prett3.complete_connection: Adding CRYPTO frame to the builder")
-        strm_data = self._quic._crypto_streams[Epoch.HANDSHAKE].sender.get_frame(1135).data # TODO: calculate max_size dynamically instead of giving static number
+        strm_data = self.connection._crypto_streams[Epoch.HANDSHAKE].sender.get_frame(1135).data # TODO: calculate max_size dynamically instead of giving static number
         buf = builder.start_frame(
                 QuicFrameType.CRYPTO,
                 capacity=4, 
@@ -276,6 +278,32 @@ class HttpClient():
         buf.push_bytes(strm_data) # data
 
         self.send_quic_frames_from_builder(builder)
+
+    def disconnect(self):
+        # Send CONNECTION_CLOSE frame
+        # Define the payload to include error_code and reason_phrase according to the QUIC specification.
+        connection_close_payload = Buffer(capacity=256)
+        connection_close_payload.push_uint_var(QuicErrorCode.NO_ERROR)  # Error code (NO_ERROR)
+        connection_close_payload.push_uint_var(0)  # Frame type (0 since no specific frame is indicated)
+        reason_phrase = "Normal connection closure after message replay"
+        connection_close_payload.push_uint16(len(reason_phrase))
+        connection_close_payload.push_bytes(reason_phrase.encode('utf-8'))
+        
+        # Send QUIC CC packet
+        quic_payload = connection_close_payload.data
+        builder = self.get_builder(Epoch.ONE_RTT)
+        buf = builder.start_frame(QuicFrameType.APPLICATION_CLOSE, capacity=len(quic_payload))
+        buf.push_bytes(quic_payload)
+        self.send_quic_frames_from_builder(builder)
+
+        # Explicitly close the QUIC connection using CONNECTION_CLOSE frame
+        self.connection.close(
+            error_code=QuicErrorCode.NO_ERROR,
+            frame_type=QuicFrameType.APPLICATION_CLOSE,
+            reason_phrase="Normal connection closure after message replay",
+        )
+
+        self.sock.close()
 
     def open_qpack_streams(self):
         """
@@ -380,66 +408,6 @@ class HttpClient():
         buf3.push_bytes(stream10_frame.data)        
         #'''
         self.send_quic_frames_from_builder(builder)
-
-    #### FOR SENDING PACKETS ####
-    def build_h3_settings_frame(self, h3_layer):
-        """
-        Builds and returns a SETTINGS frame for the H3 layer.
-        SETTINGS frame is sent over the control stream (Uni Stream Type 0x00).
-        """
-        settings = {
-            # Define HTTP/3 settings here (example settings)
-            aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: 1024,
-            aioquic.h3.connection.Setting.QPACK_BLOCKED_STREAMS: 16,
-            aioquic.h3.connection.Setting.ENABLE_CONNECT_PROTOCOL: 1
-        }
-
-        try:
-            # Create SETTINGS frame payload
-            if hasattr(h3_layer, 'frame_payload') and hasattr(h3_layer.frame_payload, 'raw_value'):
-                settings_data = bytes.fromhex(h3_layer.frame_payload.raw_value)
-            else:
-                print("No valid payload found for SETTINGS frame, using default payload.")
-                settings_data = encode_settings(settings)
-
-            # Encode the SETTINGS frame
-            frame_data = aioquic.h3.connection.encode_frame(FrameType.SETTINGS, settings_data)
-
-            # Prepend Uni Stream Type (0x00) to the SETTINGS frame data for control stream
-            stream_type = aioquic.buffer.encode_uint_var(0x00)  # Uni Stream Type for control stream
-            final_frame_data = stream_type + frame_data  # Combine stream type and frame data
-
-            return final_frame_data  # Return the combined frame data with stream type
-
-        except Exception as e:
-            print(f"Error encoding SETTINGS frame: {e}")
-            return b''  # Return empty payload in case of error
-
-    def build_h3_priority_update_frame(self, h3_layer):
-        """
-        Builds and returns a PRIORITY_UPDATE frame for the H3 layer.
-        """
-        # If the PRIORITY_UPDATE frame payload is not available, create a default one
-        if hasattr(h3_layer, 'frame_payload') and hasattr(h3_layer.frame_payload, 'raw_value'):
-            priority_data = bytes.fromhex(h3_layer.frame_payload.raw_value)
-        else:
-            print("No valid payload found for PRIORITY_UPDATE frame, using default payload.")
-            priority_data = b'\x00\x01\x02'  # Example priority payload
-
-        return aioquic.h3.connection.encode_frame(0x000f0700, priority_data)
-
-    def build_h3_headers_frame(self, h3_layer):
-        """
-        Builds and returns a HEADERS frame for the H3 layer
-        """
-        # Extract the HEADERS payload
-        if hasattr(h3_layer, 'frame_payload') and hasattr(h3_layer.frame_payload, 'raw_value'):
-            headers_data = bytes.fromhex(h3_layer.frame_payload.raw_value)
-        else:
-            print("No valid payload found for HEADERS frame, using default payload.")
-            headers_data = b'\x82\x84\x41\x85\x86'  # Example headers (this should be replaced with real headers)
-
-        return aioquic.h3.connection.encode_frame(FrameType.HEADERS, headers_data)
 
     def send_quic_stream(self, fin_bit:bool, stream_id:int, offset:int, h3_frame_data:bytes):
         """
@@ -565,7 +533,7 @@ class HttpClient():
 
             # Check destination CID matches.
             destination_cid_seq: Optional[int] = None
-            for connection_id in self._quic._host_cids:
+            for connection_id in self.connection._host_cids:
                 if header.destination_cid == connection_id.cid:
                     destination_cid_seq = connection_id.sequence_number
                     break
@@ -574,7 +542,7 @@ class HttpClient():
 
             # Handle version negotiation packet.
             if header.packet_type == QuicPacketType.VERSION_NEGOTIATION:
-                self._quic._receive_version_negotiation_packet(header=header, now=now)
+                self.connection._receive_version_negotiation_packet(header=header, now=now)
                 return
 
             # Check long header packet protocol version.
@@ -598,13 +566,13 @@ class HttpClient():
             # Determine crypto and packet space.
             epoch = get_epoch(header.packet_type)
             if epoch == tls.Epoch.INITIAL:
-                crypto = self._quic._cryptos_initial[header.version]
+                crypto = self.connection._cryptos_initial[header.version]
             else:
-                crypto = self._quic._cryptos[epoch]
+                crypto = self.connection._cryptos[epoch]
             if epoch == tls.Epoch.ZERO_RTT:
-                space = self._quic._spaces[tls.Epoch.ONE_RTT]
+                space = self.connection._spaces[tls.Epoch.ONE_RTT]
             else:
-                space = self._quic._spaces[epoch]
+                space = self.connection._spaces[epoch]
 
             
             # decrypt packet
@@ -620,10 +588,10 @@ class HttpClient():
                 # handshake keys, it can assume that the server's INITIAL was lost.
                 if (
                     epoch in (tls.Epoch.HANDSHAKE, tls.Epoch.ONE_RTT)
-                    and not self._quic._crypto_retransmitted
+                    and not self.connection._crypto_retransmitted
                 ):
-                    self._quic._loss.reschedule_data(now=now)
-                    self._quic._crypto_retransmitted = True
+                    self.connection._loss.reschedule_data(now=now)
+                    self.connection._crypto_retransmitted = True
                 continue
             except CryptoError as exc:
                 continue
@@ -636,7 +604,7 @@ class HttpClient():
             else:
                 reserved_mask = 0x0C
             if plain_header[0] & reserved_mask:
-                self._quic.close(
+                self.connection.close(
                     error_code=QuicErrorCode.PROTOCOL_VIOLATION,
                     frame_type=QuicFrameType.PADDING,
                     reason_phrase="Reserved bits must be zero",)
@@ -648,17 +616,17 @@ class HttpClient():
                 space.expected_packet_number = packet_number + 1
 
             # update state
-            if self._quic._peer_cid.sequence_number is None:
-                self._quic._peer_cid.cid = header.source_cid
-                self._quic._peer_cid.sequence_number = 0
+            if self.connection._peer_cid.sequence_number is None:
+                self.connection._peer_cid.cid = header.source_cid
+                self.connection._peer_cid.sequence_number = 0
 
-            if self._quic._state == QuicConnectionState.FIRSTFLIGHT:
-                self._quic._remote_initial_source_connection_id = header.source_cid
-                self._quic._set_state(QuicConnectionState.CONNECTED)
+            if self.connection._state == QuicConnectionState.FIRSTFLIGHT:
+                self.connection._remote_initial_source_connection_id = header.source_cid
+                self.connection._set_state(QuicConnectionState.CONNECTED)
 
             # update spin bit
             if (header.packet_type == QuicPacketType.ONE_RTT
-                and packet_number > self._quic._spin_highest_pn):
+                and packet_number > self.connection._spin_highest_pn):
                 
                 spin_bit = get_spin_bit(plain_header[0])
                 self._spin_bit = not spin_bit # for clients
@@ -680,104 +648,28 @@ class HttpClient():
             except QuicConnectionError:
                 pass
 
-            if self._quic._state in END_STATES or self._quic._close_pending:
+            if self.connection._state in END_STATES or self.connection._close_pending:
                 return
 
             # update idle timeout
-            self._quic._close_at = now + self._quic._idle_timeout()
+            self.connection._close_at = now + self.connection._idle_timeout()
 
         return res_per_packet
     
 
-    def replay_sample_msg(self, h3msg: Packet, is_moving: bool):
+    def replay_msg(self, h3msg: Packet, is_moving: bool):
         """
-        Replay QUIC and HTTP/3 packets from h3msg and capture responses.
+        Replay QUIC and HTTP/3 packets by copying h3msg and capture responses.
+        After capturing message, close 
         """
-        h3_frames = []
-        quic_frame_type_hex = None
-        quic_payload = None
 
-        @dataclass
-        class QuicStreamInfo:
-            fin_bit:bool = False
-            stream_id:int = 0
-            offset:int = 0        
-        quic_streams = []
+        builder = None
 
-        ### Send the test message (QUIC or HTTP/3) ###
-        for layer in h3msg.layers:
-            if layer.layer_name == 'quic':
-                quic_frame_type_hex = layer.get_field_value("quic.frame_type", raw=True)
-                # Extract stream ID and payload from QUIC layer
-                for field in layer.frame.fields:
-                    if 'STREAM' in str(field):  
-                        stream_info = field.showname
-
-                        quic_stream_info = QuicStreamInfo()
-                        if 'id=' in stream_info:
-                            stream_id = int(stream_info.split('id=')[1].split()[0])
-                            quic_stream_info.stream_id = stream_id
-                        if 'fin=' in stream_info:
-                            fin_bit = int(stream_info.split('fin=')[1].split()[0])
-                            quic_stream_info.fin_bit = fin_bit
-                        if 'off=' in stream_info:
-                            offset = int(stream_info.split('off=')[1].split()[0])
-                            quic_stream_info.offset = offset
-                        quic_streams.append(quic_stream_info)
-                        
-                    # Extract QUIC payload
-                    if hasattr(layer, 'payload'):
-                        quic_payload = layer.payload.raw_value
-
-            elif layer.layer_name == 'http3':
-                h3_field_type_hex = layer.get_field_value("http3.frame_type", raw=True)
-                if h3_field_type_hex is not None:
-                    h3_field_type = int(h3_field_type_hex, 16)
-
-                    if h3_field_type == FrameType.SETTINGS:
-                        h3_frames.append(self.build_h3_settings_frame(layer)) 
-                    elif h3_field_type == PRIORITY_UPDATE_FRAME_TYPE:
-                        h3_frames.append(self.build_h3_priority_update_frame(layer)) 
-                    elif h3_field_type == FrameType.HEADERS:
-                        h3_frames.append(self.build_h3_headers_frame(layer))
-                        
-        
-        # check if there is HTTP/3 layer data in the packet
-        if h3_frames: 
-            # Send HTTP/3 frames on respective streams
-            for quic_stream, h3_frame in zip(quic_streams, h3_frames) :
-                self.send_quic_stream(quic_stream.fin_bit, quic_stream.stream_id, quic_stream.offset, h3_frame)
-        else:
-            self.send_quic_packet(quic_frame_type_hex, quic_payload)
+        # Build message by parsing h3msg
+        builder = self.crafter.copy_msg(h3msg)
+        self.send_quic_frames_from_builder(builder)
 
         response_packets = self.read_from_buffer()
-
-        if is_moving:
-            pass
-
-        else:
-            # Explicitly close the QUIC connection using CONNECTION_CLOSE frame
-            self._quic.close(
-                error_code=QuicErrorCode.NO_ERROR,
-                frame_type=QuicFrameType.APPLICATION_CLOSE,
-                reason_phrase="Normal connection closure after message replay",
-            )
-
-            # Send CONNECTION_CLOSE frame using send_quic_packet
-            # Define the payload to include error_code and reason_phrase according to the QUIC specification.
-            connection_close_payload = Buffer(capacity=256)
-            connection_close_payload.push_uint_var(QuicErrorCode.NO_ERROR)  # Error code (NO_ERROR)
-            connection_close_payload.push_uint_var(0)  # Frame type (0 since no specific frame is indicated)
-            reason_phrase = "Normal connection closure after message replay"
-            connection_close_payload.push_uint16(len(reason_phrase))
-            connection_close_payload.push_bytes(reason_phrase.encode('utf-8'))
-
-            self.send_quic_packet(
-                quic_frame_type=QuicFrameType.APPLICATION_CLOSE,  # Use APPLICATION_CLOSE for QUIC-level closure
-                quic_payload=connection_close_payload.data  # Include the correctly formatted payload
-            )
-
-            self.sock.close()
 
         return response_packets
 

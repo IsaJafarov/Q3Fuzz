@@ -171,7 +171,7 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
         ### SENDING STATE MOVING MESSAGES ###
         for mov_msg in mov_msg_list:
             print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg)}")
-            state_msg = h3client.replay_sample_msg(mov_msg, is_moving=True)  # Send HTTP/3 state-moving message
+            state_msg = h3client.replay_msg(mov_msg, is_moving=True)  # Send HTTP/3 state-moving message
             if state_msg:
                 print(f"  [+] Received state-moving response: {state_msg}")
                 # h3msg_rcvd.append(state_msg)
@@ -181,8 +181,10 @@ def send_receive_http3(pm: ProtoModel, h3client: HttpClient, mov_msg_list, h3msg
             print("  [+] Sending testing message...")
             print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
             # h3msg_sent.show()
-            h3msg_rcvd = h3client.replay_sample_msg(h3msg_sent, is_moving=False)  # Send HTTP/3 target message
-            
+            h3msg_rcvd = h3client.replay_msg(h3msg_sent, is_moving=False)  # Send HTTP/3 target message
+        
+        h3client.disconnect()
+        
     except Exception as e:
         print("Exception message: {}".format(e))
         print(traceback.format_exc())
