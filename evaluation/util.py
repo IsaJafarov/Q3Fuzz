@@ -3,8 +3,13 @@
 import pyshark
 import re
 import traceback
+from typing import List
 from aioquic.buffer import Buffer
 from aioquic.quic.packet import QuicFrameType, QuicPacketType
+import pyshark.packet
+import pyshark.packet.layers
+from pyshark.packet.packet import Packet
+from pyshark.packet.layers.xml_layer import XmlLayer
 
 # IETF specification
 QUIC_LONGPACKETTYPE = ['INIT', '0-RTT', 'HANDSHAKE', 'RETRY']
@@ -39,7 +44,7 @@ def cmp(a, b):
     return (a > b) - (a < b)
 
 
-def compare_ordered_dict(dict1, dict2):
+def compare_ordered_dict(dict1:dict, dict2:dict) -> bool:
     for i, j in zip(dict1.items(), dict2.items()):
         if cmp(i, j) != 0:
             return False
@@ -49,7 +54,7 @@ def compare_ordered_dict(dict1, dict2):
     # print(dict2)
     return True
 
-def get_frames_of_layer(layer):
+def get_frames_of_layer(layer:XmlLayer) -> List[str]:
     frame_names = []
     for field_line in layer._get_all_field_lines():
         if ':' in field_line:
@@ -59,7 +64,7 @@ def get_frames_of_layer(layer):
                 frame_names.append( field_value.split()[0] )
     return frame_names
 
-def h3msg_from_pcap(f, client_only=False): # for HTTP3
+def h3msg_from_pcap(file_path:str, client_only:bool=False) -> List[Packet]: # for HTTP3
     """
     Extract all QUIC messages from pcapfile and return an array of http3 messages
     Now we only consider EXPORTED_PDU layer exported by wireshark instead of preserving data of UDP layer.
@@ -71,8 +76,8 @@ def h3msg_from_pcap(f, client_only=False): # for HTTP3
         quic_packet_list (FileCapture): QUIC or HTTP/3 messages that are seen in the pcap file.
     """
     client_ip = None   # Get ip to gather client message 
-    raw_cap = pyshark.FileCapture(f)
-    quic_cap = pyshark.FileCapture(f, display_filter='quic')
+    raw_cap = pyshark.FileCapture(file_path)
+    quic_cap = pyshark.FileCapture(file_path, display_filter='quic')
     quic_packet_list = []
     quic_cap_cnt = 0
 
@@ -92,7 +97,7 @@ def h3msg_from_pcap(f, client_only=False): # for HTTP3
 
     return quic_packet_list
 
-def extract_quic_stream_frames(layer):
+def extract_quic_stream_frames(layer:XmlLayer) -> List[str]:
     """
     Extract all STREAM frame IDs from a QUIC layer.
     args:
@@ -112,10 +117,9 @@ def extract_quic_stream_frames(layer):
                     stream_id = part.split("=")[1]
                     stream_ids.append(stream_id)
                     break  # Only need the id, stop further parsing for this frame
-
     return stream_ids
 
-def h3msg_to_str(h3msg):
+def h3msg_to_str(h3msg:Packet) -> str:
     """
     Convert a QUIC or HTTP3 message in a human-readable format.
     args:
@@ -167,10 +171,24 @@ def h3msg_to_str(h3msg):
                 for frame_name in get_frames_of_layer(layer):
                     tmp_frames += frame_name.upper() + ","
 
-                # TODO: NULL can be QPACK Encoder Stream. Now we treat such stream containing NULL frame.
-                frame_info = tmp_frames[:-1] if len(tmp_frames) > 0 else 'NULL'
+               
+
+                frame_info = None
+                # the layer has HTTP3 frames
+                if tmp_frames: 
+                    frame_info = tmp_frames[:-1]
+                # the layer has non-HTTP3 data (QPACK)
+                else:
+                    if 'QPACK Encoder' in layer.stream_uni or 'qpack_encoder' in layer.field_names: 
+                        frame_info = "Enc" 
+                    elif 'QPACK Decoder' in layer.stream_uni: 
+                        frame_info = "Dec" 
+                    else:
+                        print(layer)
+                        raise "Unknown Application Layer Data"
                 if msginfo:
                     msginfo += ','
                 msginfo += 'STREAM(%s)[%s]' % (stream_id, frame_info)
-
+                ###
+    
     return msginfo
