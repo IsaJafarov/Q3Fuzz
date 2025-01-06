@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 import os
+import sys
 import time
 import socket
 import argparse
@@ -30,7 +31,7 @@ from crafter import MSGCrafter
 import util
 import statemachine as stma
 
-PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
+
 
 class HttpClient():
     def __init__(self, quic_conf: QuicConfiguration, hostname: str, keylog_file: str) -> None:
@@ -432,9 +433,11 @@ class HttpClient():
             while True:
                 # Receive raw data from UDP socket
                 data, addr = self.sock.recvfrom(2048)  # Adjust buffer size as needed
+                #print(">>> read_from_buffer data = {}".format( data ))
                 # print("\tread_from_buffer(): Received message: len={}".format(len(data)))
 
                 res_per_packet = self.receive_datagram(data, now=time.process_time())
+
                 if res_per_packet != '':
                     res += res_per_packet
                     res += '|'
@@ -461,9 +464,8 @@ class HttpClient():
         res_per_packet = ''
 
         buf = Buffer(data=data)
-        i=0
+        
         while not buf.eof():
-            i+=1
   
             # print("\tQUIC layer #{}".format(i),end=" ")
 
@@ -475,6 +477,10 @@ class HttpClient():
                 return
             #print("(Type: {})".format(header.packet_type.name))
 
+            ''' 
+            This check causes a problem, when we send NEW_CONNECTIONS_ID frame in the test message 
+            and the server responds to that new destination ID
+
             # Check destination CID matches.
             destination_cid_seq: Optional[int] = None
             for connection_id in self.connection._host_cids:
@@ -482,13 +488,15 @@ class HttpClient():
                     destination_cid_seq = connection_id.sequence_number
                     break
             if destination_cid_seq is None:
-                return
+                print("asas")
+                return 
+            '''
 
             # Handle version negotiation packet.
             if header.packet_type == QuicPacketType.VERSION_NEGOTIATION:
                 self.connection._receive_version_negotiation_packet(header=header, now=now)
                 return
-
+            
             # Check long header packet protocol version.
             if (
                 header.version is not None
@@ -504,7 +512,7 @@ class HttpClient():
                     ))
                 return
 
-
+            
             crypto_frame_required = False
 
             # Determine crypto and packet space.
@@ -527,6 +535,7 @@ class HttpClient():
             try:
                 plain_header, plain_payload, packet_number = crypto.decrypt_packet(
                         data[start_off:end_off], encrypted_off, space.expected_packet_number)
+
             except KeyUnavailableError as exc:
                 # If a client receives HANDSHAKE or 1-RTT packets before it has
                 # handshake keys, it can assume that the server's INITIAL was lost.
@@ -588,7 +597,7 @@ class HttpClient():
             
             try:
                 #is_ack_eliciting, is_probing = \
-                res_per_packet += self.handler.process_payload( context, plain_payload, crypto_frame_required=crypto_frame_required )
+                res_per_packet += self.handler.process_payload( context, plain_payload, crypto_frame_required=crypto_frame_required )+","
             except QuicConnectionError:
                 pass
 
@@ -598,7 +607,7 @@ class HttpClient():
             # update idle timeout
             self.connection._close_at = now + self.connection._idle_timeout()
 
-        return res_per_packet
+        return util.beautify_message_string(res_per_packet)
 
     def replay_msg(self, h3msg:Packet, is_moving:bool) -> str:
         """
@@ -639,6 +648,8 @@ class HttpClient():
 def init(args):
     print("\n[STEP 1] Initializing...")
     os.system("sudo rm -r __pycache__")
+    # Create result directory, if it doesn't already exist
+    os.system("mkdir -p result")
 
     SERVER_ADDR = args.url
     pcapfile = args.pcap
@@ -751,8 +762,38 @@ if __name__ == "__main__":
     ### Extract initial state machine ###
     http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
 
+    #'''
     stma.modeller_h3(conf=configuration, 
                      keylog=keylog_file, 
                      url=args.url, 
                      sample_msgs=http3_basic_messages, 
                      outdir="./result")
+    sys.exit()
+    #'''
+
+    
+    st2st4 = None
+    st2 = None
+    st2st0 = None
+    ack1 = None # la 5
+    ack2 = None # la 7
+    for msg in http3_basic_messages:
+        msg_str = util.h3msg_to_str(msg)
+        print( msg_str )
+        
+        if msg_str == "STREAM(2)[PU],STREAM(4)[HE]":
+            st2st4 = msg
+        elif msg_str == "ACK" and ack1 is None:
+            ack1 = msg
+        elif msg_str == "ACK" and ack1 is not None:
+            ack2 = msg
+        elif msg_str == "STREAM(2)[SE]":
+            st2 = msg
+        elif msg_str == "STREAM(2)[PU],STREAM(0)[HE]":
+            st2st0 = msg
+
+    #stma.send_receive_http3(None, HttpClient(configuration, "prett3.com", "keylog_file"), [st2st4, st2st0], ack1)
+    #stma.send_receive_http3(None, HttpClient(configuration, "prett3.com", "keylog_file"), [st2st4, st2st0], st2st4)
+    #stma.send_receive_http3(None, HttpClient(configuration, "prett3.com", "keylog_file"), [st2st4, st2], ack2)
+    for i in range(20):
+        stma.send_receive_http3(None, HttpClient(configuration, "prett3.com", "keylog_file"), [st2st4, ack1], st2)

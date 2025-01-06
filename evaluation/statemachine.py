@@ -112,8 +112,10 @@ def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Pa
         print("[LEVEL %d] Elapsed time for this level: %s" % (pm.current_level, elapsed_time))
 
         ### Graph drawing ###
-        graphname = "%s/level_" % outdir + str(pm.current_level) + ".png"
+        graphname = "%s/level_" % outdir + str(pm.current_level)
+
         graph = sm.get_graph()
+        
         # Style setting on the entire graph
         graph.graph_attr.update(
             {
@@ -124,7 +126,7 @@ def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Pa
             node.attr.update({
                 'shape': 'ellipse',
                 'fontname': 'DejaVu Sans',
-                'fontsize': '12',
+                'fontsize': '14',
                 'label': node.name
             })
         # Style setting on edges
@@ -133,10 +135,23 @@ def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Pa
             # del edge.attr['label']
             edge.attr.update({
                 'fontname': 'DejaVu Sans',
-                'fontsize': '10'
+                'fontsize': '12'
             })
-        graph.draw(graphname, prog='dot')
-        with open(graphname.replace(".png", ".json"), "w") as jsonfile:
+
+        # draw with default resolutions
+        graph.draw(graphname+".png", format="png", prog='dot') # format can be "svg" for clear visualization when zoomed in
+
+        # draw with 16x9 resolution
+        graph.graph_attr.update({
+            "ratio": "fill",   # Adjust graph to fill aspect ratio
+            "size": "16,9!",   # Force 16:9 aspect ratio
+            "dpi": "300"       # Set resolution to 300 DPI
+        })
+        graph.draw(graphname+"_16x9_fill.png", format="png", prog='dot')
+        
+
+
+        with open(graphname+".json", "w") as jsonfile:
             json.dump(sm.markup, jsonfile, indent=2)
 
         print("\033[31m[+] STATE MACHINE until Level %d saved to {%s.png, %s.json}\033[0m" % 
@@ -158,10 +173,15 @@ def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Pa
     #     json.dump(sm.markup, jsonfile, indent=2)
     sys.exit()
 
+def isa():
+    h3client = HttpClient()
+    #mov_msg_list = 
+    #h3msg_sent = 
+    #send_receive_http3(None, h3client, mov_msg_list, h3msg_sent)
+
 def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Packet], h3msg_sent:Packet) -> str:
     h3msg_rcvd = ''
     
-  
     is_already_closed = False
     
     ### INITIAL CONNECTION ###
@@ -192,8 +212,7 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
 
     print("\033[92m  [SUMMARY] (%s) => %s => %s\033[0m" % (
     util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd))
-    #time.sleep(1)
-    # print("  ==================================")
+    
 
     return h3msg_rcvd
 

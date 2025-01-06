@@ -6,13 +6,16 @@ from aioquic.h3.connection import FrameType, StreamType, encode_settings, encode
 from aioquic.buffer import encode_uint_var
 from aioquic.tls import Epoch
 from pyshark.packet.packet import Packet
+from pyshark.packet.layers.xml_layer import XmlLayer
+
+PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
 class MSGCrafter():
     def __init__(self, qc: QuicConnection, client):
         self.connection = qc
         self.client = client
 
-    def copy_msg(self, h3msg: Packet):
+    def copy_msg(self, h3msg: Packet) -> QuicPacketBuilder:
         """
         Build a QuicPacketBuilder with multiple frames in one QUIC packet.
 
@@ -49,24 +52,27 @@ class MSGCrafter():
                         self.add_ack_frame(builder, layer)
                     elif 'NEW_CONNECTION_ID' in field.showname:
                         self.add_nci_frame(builder, layer)
+                    elif 'PADDING' in field.showname:
+                        pass
                     else:
                         print(field)
                         raise "[-] Unsupported QUIC Frame"
                     
             elif layer.layer_name == 'http3':
-                h3_field_type_hex = layer.get_field_value("http3.frame_type", raw=True)
-
+                
                 # This HTTP/3 layer has HTTP/3 frames
-                if h3_field_type_hex is not None:
-                    h3_field_type = int(h3_field_type_hex, 16)
+                if layer.has_field("frame_type"):
+                    
+                    h3_field_type = int(layer.frame_type)
+
                     if h3_field_type == FrameType.SETTINGS:
-                        frame_data = self.add_h3_settings_frame(layer)
+                        frame_data = self.generate_h3_settings_frame(layer)
                     elif h3_field_type == FrameType.HEADERS:
-                        frame_data = self.add_h3_headers_frame(layer) 
+                        frame_data = self.generate_h3_headers_frame(layer) 
                     elif h3_field_type == FrameType.DATA:
-                        frame_data = self.add_h3_data_frame(layer)
-                    elif h3_field_type >= 0x800F0000 and h3_field_type <= 0X800FFFFF:  # PRIORITY_UPDATE_FRAME_TYPE
-                        frame_data = self.add_h3_priority_update_frame(layer)
+                        frame_data = self.generate_h3_data_frame(layer)
+                    elif h3_field_type in PRIORITY_UPDATE_FRAME_IDS:  # PRIORITY_UPDATE_FRAME_TYPE
+                        frame_data = self.generate_h3_priority_update_frame(layer)
                     else:
                         print(layer)
                         raise "[-] Unsupported Application Layer Data"
@@ -87,7 +93,7 @@ class MSGCrafter():
 
         return builder
 
-    def add_ack_frame(self, builder, layer):
+    def add_ack_frame(self, builder: QuicPacketBuilder, layer: XmlLayer):
         """
         Add an ACK frame to the builder.
 
@@ -95,19 +101,20 @@ class MSGCrafter():
             builder: The QuicPacketBuilder instance.
             layer: The QUIC layer from Pyshark.
         """
+
         # Extract ACK frame details from the layer
-        largest_acknowledged = int(layer.get_field_value("ack_largest_acknowledged", raw=True), 16)
-        ack_delay = int(layer.get_field_value("ack_ack_delay", raw=True), 16)
-        ack_range_count = int(layer.get_field_value("ack_ack_range_count", raw=True), 16)
+        largest_acknowledged = int(layer.ack_largest_acknowledged)
+        ack_delay = int(layer.ack_ack_delay)
+        ack_range_count = int(layer.ack_ack_range_count)
+        ack_first_ack_range = int(layer.ack_first_ack_range)
         ack_ranges = []
 
         # Extract ACK ranges if present
         for i in range(ack_range_count):
-            range_start = layer.get_field_value(f"ack_range_start[{i}]", raw=True)
-            range_end = layer.get_field_value(f"ack_range_end[{i}]", raw=True)
-            if range_start is None or range_end is None:
-                continue  # Skip invalid ranges
-            ack_ranges.append((int(range_start, 16), int(range_end, 16)))
+            # if there are more than one ranges, pyshark gives only the first range
+            gap = layer.ack_gap
+            ack_range = layer.ack_ack_range
+            ack_ranges.append((int(gap), int(ack_range)))
 
         # Start the ACK frame in the builder
         buf = builder.start_frame(frame_type=QuicFrameType.ACK, capacity=16)
@@ -115,26 +122,27 @@ class MSGCrafter():
         # Add largest acknowledged and ACK delay
         buf.push_uint_var(largest_acknowledged)
         buf.push_uint_var(ack_delay)
+        buf.push_uint_var(ack_range_count)
+        buf.push_uint_var(ack_first_ack_range)
+        
 
-        # Add ACK ranges
-        buf.push_uint_var(len(ack_ranges))
-        for start, end in ack_ranges:
-            buf.push_uint_var(start)
-            buf.push_uint_var(end - start)
+        for gap, ack_range in ack_ranges:
+            buf.push_uint_var(gap)
+            buf.push_uint_var(ack_range)
 
-    def add_nci_frame(self, builder:QuicPacketBuilder, layer) -> None:
+    def add_nci_frame(self, builder:QuicPacketBuilder, layer:XmlLayer) -> None:
         
         buf = builder.start_frame(
             QuicFrameType.NEW_CONNECTION_ID,
             capacity=NEW_CONNECTION_ID_FRAME_CAPACITY
         )
-        buf.push_uint_var(1) # Sequence Number
-        buf.push_uint_var(0) # Retire Prior To
-        buf.push_uint8(3) # Length
-        buf.push_bytes(os.urandom(3)) # Connection ID
-        buf.push_bytes(os.urandom(16)) # Stateless Reset Token
-
-    def add_stream_frame(self, builder, stream_info, h3_frame_payload):
+        buf.push_uint_var( int(layer.nci_sequence) ) # Sequence Number
+        buf.push_uint_var( int(layer.nci_retire_prior_to) ) # Retire Prior To
+        buf.push_uint8( int(layer.nci_connection_id_length) ) # Length
+        buf.push_bytes( bytes(int(part, 16) for part in layer.nci_connection_id.split(":")) ) # Connection ID
+        buf.push_bytes( bytes(int(part, 16) for part in layer.nci_stateless_reset_token.split(":"))  ) # Stateless Reset Token
+    
+    def add_stream_frame(self, builder:QuicPacketBuilder, stream_info, h3_frame_payload):
         """
         Add multiple HTTP/3 frames to a single STREAM frame in the builder.
 
@@ -143,6 +151,7 @@ class MSGCrafter():
             stream_info: Metadata about the QUIC stream (stream_id, offset, fin_bit).
             h3_frame_payload: HTTP/3 frame data to include in the STREAM frame.
         """
+        
         stream_type = QuicFrameType.STREAM_BASE | 2  # Include LEN bit
         if stream_info.offset != 0:
             stream_type |= 4  # Include OFF bit
@@ -158,7 +167,7 @@ class MSGCrafter():
         buf.push_uint_var(len(h3_frame_payload))  # Push total length
         buf.push_bytes(h3_frame_payload)  # Push combined payload
 
-    def add_h3_settings_frame(self, layer):
+    def generate_h3_settings_frame(self, layer:XmlLayer) -> bytes:
         """
         Generate an HTTP/3 SETTINGS frame.
 
@@ -171,18 +180,35 @@ class MSGCrafter():
         settings = {}
 
         # Extract SETTINGS fields from the HTTP/3 layer
-        if hasattr(layer, "_all_fields"):
-            fields = layer._all_fields
-            for key, value in fields.items():
-                if key.startswith("http3.settings.") and key not in ["http3.settings"]:
-                    try:
-                        # Parse setting ID and value
-                        setting_id = int(key.split(".")[-1], 16) if "id" in key else None
-                        setting_value = int(value) if setting_id is not None else None
-                        if setting_id is not None and setting_value is not None:
-                            settings[setting_id] = setting_value
-                    except ValueError:
-                        continue
+        fields = layer._all_fields
+        for key, value in fields.items():
+            #print("{}: {}".format(key, value))
+            # ignore layer fields that are not setting identifiers
+            if not key.startswith("http3.settings."):
+                continue
+            
+            # ignore unnecessary fields
+            if key in ["http3.settings.id", "http3.settings.value"]:
+                continue
+            
+            # read settings fields
+            if key == "http3.settings.qpack.max_table_capacity":
+                settings[0x01] = int(value)
+
+            elif key == "http3.settings.max_field_section_size":
+                settings[0x06] = int(value)
+
+            elif key == "http3.settings.qpack.blocked_streams":
+                settings[0x07] = int(value)
+
+            elif key == "http3.settings.h3_datagram":
+                settings[0x33] = int(value)
+
+            elif key == "http3.settings.webtransport":
+                settings[0x2B603742] = int(value)
+
+            else:
+                raise "Unexpected SETTINGS Identifier: {}. Add it here...".format(key)
 
         # Encode the settings into SETTINGS frame payload
         settings_data = encode_settings(settings)
@@ -196,7 +222,7 @@ class MSGCrafter():
 
         return h3_frame_data
 
-    def add_h3_headers_frame(self, layer):
+    def generate_h3_headers_frame(self, layer:XmlLayer) -> bytes:
         """
         Generate an HTTP/3 HEADERS frame.
 
@@ -206,24 +232,19 @@ class MSGCrafter():
         Returns:
             Encoded HTTP/3 HEADERS frame data.
         """
-        headers_data = b""
-
-        # Attempt to extract headers payload from the layer
-        if hasattr(layer, "_all_fields") and "http3.frame_payload" in layer._all_fields:
-            # Extract payload as hexadecimal string and convert to bytes
-            raw_payload = layer._all_fields["http3.frame_payload"]
-            headers_data = bytes.fromhex(raw_payload.replace(":", ""))
-        elif hasattr(layer, "payload") and hasattr(layer.payload, "raw_value"):
-            # Fallback: use raw payload if available
-            headers_data = layer.payload.raw_value
+        
+        headers_data = None
+        if hasattr(layer, "frame_payload"):
+            headers_data = layer.frame_payload.raw_value
         else:
             raise ValueError("HEADERS frame payload not found or is empty")
 
         # Encode the HEADERS frame
-        frame_data = encode_frame(FrameType.HEADERS, headers_data)
+        frame_data = encode_frame(FrameType.HEADERS, bytes.fromhex(headers_data))
+
         return frame_data
 
-    def add_h3_data_frame(self, layer):
+    def generate_h3_data_frame(self, layer:XmlLayer) -> bytes:
         """
         Generate an HTTP/3 DATA frame.
 
@@ -233,6 +254,7 @@ class MSGCrafter():
         Returns:
             Encoded HTTP/3 DATA frame data.
         """
+
         # Extract raw payload for data
         if hasattr(layer, "payload") and layer.payload.raw_value:
             data_payload = layer.payload.raw_value
@@ -243,7 +265,7 @@ class MSGCrafter():
         frame_data = encode_frame(FrameType.DATA, data_payload)
         return frame_data
 
-    def add_h3_priority_update_frame(self, layer):
+    def generate_h3_priority_update_frame(self, layer:XmlLayer) -> bytes:
         """
         Generate an HTTP/3 PRIORITY_UPDATE frame.
 
@@ -253,19 +275,15 @@ class MSGCrafter():
         Returns:
             Encoded HTTP/3 PRIORITY_UPDATE frame data.
         """
-        # Extract priority update details
-        if hasattr(layer, "_all_fields"):
-            fields = layer._all_fields
-            stream_id = int(fields.get("http3.priority_update.stream_id", "0"), 16)
-            priority_value = int(fields.get("http3.priority_update.priority", "0"), 16)
-        else:
-            raise ValueError("PRIORITY_UPDATE frame details not found")
 
-        # Build priority update payload
-        priority_update_payload = (
-            encode_uint_var(stream_id) + encode_uint_var(priority_value)
-        )
+        data_payload = ""
+        data_payload += layer.priority_update_element_id.raw_value
+        data_payload += layer.priority_update_field_value.raw_value
+
+        #print("data_payload: {}".format( data_payload ))
+        #print("data_payload: {}".format( bytes.fromhex(data_payload) ))
 
         # Encode the PRIORITY_UPDATE frame
-        frame_data = encode_frame(0x800f0700, priority_update_payload)
+        frame_data = encode_frame(PRIORITY_UPDATE_FRAME_IDS[0], bytes.fromhex(data_payload))
+        
         return frame_data

@@ -25,6 +25,104 @@ QUIC_LONGPACKETTYPE = ['INIT', '0-RTT', 'HANDSHAKE', 'RETRY']
 #                 'RESERVED', 'RESERVED', 'UNASSIGNED', 'UNASSIGNED', 'ORIGIN', 'MAX_PUSH_ID'] # ~0x0d frames so far
 
 
+QUIC_FRAME_ABBREVIATIONS = {
+    # by frame byte
+    0x00: "PAD", # Padding
+    0x01: "PING",
+    0x02: "ACK",
+    0x03: "ACK",
+    0x04: "RS", # Reset Stream
+    0x05: "SS", # Stop Sending
+    0x06: "CRY", # Crypto
+    0x07: "NT", # New Tokwn
+    0x08: "STREAM",
+    0x09: "STREAM",
+    0x0A: "STREAM",
+    0x0B: "STREAM",
+    0x0C: "STREAM",
+    0x0D: "STREAM",
+    0x0E: "STREAM",
+    0x0F: "STREAM",
+    0x10: "MD", # Max Data
+    0x11: "MSD", # Max Stream Data
+    0x12: "MS", # Max Streams
+    0x13: "MS", # Max Streams
+    0x14: "DB", # Data Blocked
+    0x15: "SDB", # STREAM_DATA_BLOCKED
+    0x16: "SB", # STREAMS_BLOCKED
+    0x17: "SB", # STREAMS_BLOCKED
+    0x18: "NCI", # NEW_CONNECTION_ID
+    0x19: "RCI", # RETIRE_CONNECTION_ID
+    0x1A: "PC", # PATH_CHALLENGE    
+    0x1B: "PR", # PATH_RESPONSE
+    0x1C: "CC", # CONNECTION_CLOSE
+    0x1D: "CC", # CONNECTION_CLOSE
+    0x1E: "HD", # HANDSHAKE_DONE
+    0x1F: "IA", # IMMEDIATE_ACK
+    0x30: "DT", # DATAGRAM
+    0x31: "DT", # DATAGRAM
+    
+
+    "PADDING": "PAD",
+    "PING": "PING",
+    "ACK": "ACK",
+    "RESET_STREAM": "RS",
+    "STOP_SENDING": "SS",
+    "CRYPTO": "CRY",
+    "NEW_TOKEN": "NT",
+    "STREAM": "STREAM",
+    "MAX_DATA": "MD",
+    "MAX_STREAM_DATA": "MSD",
+    "MAX_STREAMS": "MS",
+    "DATA_BLOCKED": "DB",
+    "STREAM_DATA_BLOCKED": "SDB",
+    "STREAMS_BLOCKED": "SB",
+    "NEW_CONNECTION_ID": "NCI",
+    "RETIRE_CONNECTION_ID": "RCI",
+    "PATH_CHALLENGE": "PC",
+    "PATH_RESPONSE": "PR",
+    "CONNECTION_CLOSE": "CC",
+    "HANDSHAKE_DONE": "HD",
+    "IMMEDIATE_ACK": "IA",
+    "DATAGRAM": "DT", # DATAGRAM
+}
+
+
+H3_FRAME_ABBREVIATIONS = {
+    # by frame bytes
+    0x00: "DA", # Data
+    0x01: "HE", # Headers
+    0x02: "RE", # Reserved
+    0x03: "CP", # Cancel Push
+    0x04: "SE", # Settings
+    0x05: "PP", # Push Promise
+    0x06: "RE", # Reserved
+    0x07: "GO", # Goaway
+    0x08: "RE", # Reserved
+    0x09: "RE", # Reserved
+    0x0a: "UN", # Unassigned
+    0x0b: "UN", # Unassigned
+    0x0c: "OR", # Origin
+    0x0d: "MPI", # Max Push Id
+    0x0e: "UN", # Unassigned
+    0x4d: "MD", # Metadata
+    0xf0700: "PU", # Priority Update
+    0xf0701: "PU", # Priority Update
+
+    # by frame name
+    "DATA": "DA",
+    "HEADERS": "HE",
+    "CANCEL_PUSH": "CP",
+    "SETTINGS": "SE",
+    "PUSH_PROMISE": "PP",
+    "GOAWAY": "GO",
+    "MAX_PUSH_ID": "MPI",
+    "RESERVED": "RE",
+    "PRIORITY_UPDATE": "PU"
+}
+
+
+
 ############# GENERAL #############
 class Tee(object):
     def __init__(self, *files):
@@ -59,10 +157,18 @@ def get_frames_of_layer(layer:XmlLayer) -> List[str]:
     for field_line in layer._get_all_field_lines():
         if ':' in field_line:
             field_name, field_value = field_line.split(':', 1)
-            if (layer.layer_name == 'quic' and field_name.strip() == 'Frame Type') \
-                or (layer.layer_name == 'http3' and field_name.strip() == 'Type') :
-                frame_names.append( field_value.split()[0] )
+
+            if (layer.layer_name == 'quic' and field_name.strip() == 'Frame Type') :
+                field_value = field_value.split()[0]
+                frame_names.append( QUIC_FRAME_ABBREVIATIONS[ field_value.upper() ] )
+                
+
+            if (layer.layer_name == 'http3' and field_name.strip() == 'Type') :
+                field_value = field_value.split()[0]
+                frame_names.append( H3_FRAME_ABBREVIATIONS[ field_value.upper() ] )
+    
     return frame_names
+
 
 def h3msg_from_pcap(file_path:str, client_only:bool=False) -> List[Packet]: # for HTTP3
     """
@@ -131,7 +237,7 @@ def h3msg_to_str(h3msg:Packet) -> str:
     msginfo = ''
     stream_frames = []  # A list to store stream IDs from QUIC STREAM frames
 
-    if type(h3msg) is list:
+    if type(h3msg) is list: # for moving messages
         for h3msg_sub in h3msg:
             msginfo += h3msg_to_str(h3msg_sub) + " | "
         if msginfo != '':
@@ -154,9 +260,8 @@ def h3msg_to_str(h3msg:Packet) -> str:
                     if len(stream_frames) == 0:
                         # Include non-STREAM frames directly in msginfo
                         for frame_name in get_frames_of_layer(layer):
-                            if msginfo:
-                                msginfo += ','
-                            msginfo += frame_name.upper()
+                            msginfo += frame_name+","
+                        
 
             elif layer.layer_name == "http3":
                 # Match HTTP/3 layer to the corresponding QUIC STREAM frame
@@ -169,14 +274,13 @@ def h3msg_to_str(h3msg:Packet) -> str:
                 # Extract HTTP/3 frames
                 tmp_frames = ''
                 for frame_name in get_frames_of_layer(layer):
-                    tmp_frames += frame_name.upper() + ","
+                    tmp_frames += frame_name + ","
 
-               
 
                 frame_info = None
                 # the layer has HTTP3 frames
                 if tmp_frames: 
-                    frame_info = tmp_frames[:-1]
+                    frame_info = beautify_message_string(tmp_frames)
                 # the layer has non-HTTP3 data (QPACK)
                 else:
                     if 'QPACK Encoder' in layer.stream_uni or 'qpack_encoder' in layer.field_names: 
@@ -189,6 +293,15 @@ def h3msg_to_str(h3msg:Packet) -> str:
                 if msginfo:
                     msginfo += ','
                 msginfo += 'STREAM(%s)[%s]' % (stream_id, frame_info)
-                ###
-    
-    return msginfo
+
+    return beautify_message_string(msginfo)
+
+
+def beautify_message_string(message:str) -> str:
+
+    return message\
+        .replace("RE,", "")\
+        .replace("PAD,", "")\
+        .replace("NT,", "")\
+        .rstrip(",")
+

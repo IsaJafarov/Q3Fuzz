@@ -1,8 +1,11 @@
 #! /usr/bin/env python
+import sys
 from aioquic.quic.connection import *
-from aioquic.h3.connection import FrameType
+from aioquic.h3.connection import FrameType, StreamType
 from aioquic.quic.rangeset import RangeSet
 from aioquic.buffer import Buffer
+import util
+from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 
 class MSGHandler():
     def __init__(self, qc: QuicConnection):
@@ -10,6 +13,7 @@ class MSGHandler():
 
     def process_payload(self, context: QuicReceiveContext, plain: bytes, crypto_frame_required: bool = False) -> Tuple[bool, bool]:
         buf = Buffer(data=plain)
+        
         msg_per_layer = ''
 
         crypto_frame_found = False
@@ -24,110 +28,90 @@ class MSGHandler():
             # get frame type
             try:
                 frame_type = buf.pull_uint_var()
+                #print("\nframe_type: {}".format(frame_type))
             except BufferReadError:
                 raise QuicConnectionError( error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=None, reason_phrase="Malformed frame type")
 
-            # handle the frame
-            try:
-                # a condition for each frame type can be added
-                if frame_type==0x00: # PADDING frame
-                    continue
-                elif frame_type==0x01:
-                    self.handle_ping_frame(context, frame_type, buf)
 
-                elif frame_type in [0x02, 0x03]:
-                    self.handle_ack_frame(context, frame_type, buf)
-                    msg_per_layer += 'ACK,'
-
-                elif frame_type==0x04:
-                    self.handle_reset_stream_frame(context, frame_type, buf)
-                    msg_per_layer += 'RS,'
+            if frame_type < 0x08 or frame_type > 0x0F: # not STREAM frame
+                msg_per_layer += QUIC_FRAME_ABBREVIATIONS[frame_type]+","
+           
+            # a condition for each frame type can be added
+            if frame_type==0x00: # PADDING frame
+                self.handle_padding_frame(context, frame_type, buf)
                 
-                elif frame_type==0x05:
-                    self.handle_stop_sending_frame(context, frame_type, buf)
-                    msg_per_layer += 'SS,'
+            elif frame_type==0x01:
+                self.handle_ping_frame(context, frame_type, buf)
 
-                elif frame_type==0x06: # CRYPTO frame
-                    self.handle_crypto(context, frame_type, buf)
-                    msg_per_layer += 'CRYPTO,'
-
-                elif frame_type==0x07:
-                    self.handle_new_token_frame(context, frame_type, buf)
-                    msg_per_layer += 'NT,'
+            elif frame_type in [0x02, 0x03]:
+                self.handle_ack_frame(context, frame_type, buf)
                 
-                elif frame_type >= 0x08 and frame_type <= 0x0F: # STREAM frame
-                    stream_id, stream_data = self.handle_stream_frame(context, frame_type, buf)
-                    # Special frame indicating the end of stream
-                    if frame_type == 0x0F:
-                        msg_per_layer += f'STREAM({stream_id})[END]'
-                    else:
-                        msg_per_layer += f'STREAM({stream_id})'
-                        if self.is_http3_stream(stream_id):
-                            http3_stream_msg = self.process_http3_payload(stream_data)
-                            if http3_stream_msg != '':
-                                msg_per_layer += f'[{self.process_http3_payload(stream_data)}],'
-                            else:
-                                msg_per_layer += ','
-                    
-                elif frame_type==0x10:
-                    self.handle_max_data_frame(context, frame_type, buf)
+            elif frame_type==0x04:
+                self.handle_reset_stream_frame(context, frame_type, buf)
                 
-                elif frame_type==0x11:
-                    self.handle_max_stream_data_frame(context, frame_type, buf)
-
-                elif frame_type==0x12:
-                    self.handle_max_streams_bidi_frame(context, frame_type, buf)
-
-                elif frame_type==0x13:
-                    self.handle_max_streams_uni_frame(context, frame_type, buf)
-
-                elif frame_type==0x14:
-                    self.handle_data_blocked_frame(context, frame_type, buf)
-
-                elif frame_type==0x15:
-                    self.handle_stream_data_blocked_frame(context, frame_type, buf)
-
-                elif frame_type in [0x16, 0x17]:
-                    self.handle_streams_blocked_frame(context, frame_type, buf)
-
-                elif frame_type==0x18:
-                    self.handle_new_connection_id_frame(context, frame_type, buf)
-                    msg_per_layer += 'NCI,'
+            elif frame_type==0x05:
+                self.handle_stop_sending_frame(context, frame_type, buf)
                 
-                elif frame_type==0x19:
-                    self.handle_retire_connection_id_frame(context, frame_type, buf)
-
-                elif frame_type==0x1A:
-                    self.handle_path_challenge_frame(context, frame_type, buf)
-
-                elif frame_type==0x1B:
-                    self.handle_path_response_frame(context, frame_type, buf)
-
-                elif frame_type==0x1C or frame_type==0x1D:
-                    self.handle_connection_close_frame(context, frame_type, buf)
-                    msg_per_layer += 'CC,'
-
-                elif frame_type==0x1E:
-                    self.handle_handshake_done_frame(context, frame_type, buf)
-                    msg_per_layer += 'DONE,'
-
-                elif frame_type in [0x30, 0x31]:
-                    self.handle_datagram_frame(context, frame_type, buf)
-                    msg_per_layer += 'DATA,'
-
-                elif frame_type>0x31:
-                    raise QuicConnectionError(error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="Unknown frame type")
-            except BufferReadError:
-                raise QuicConnectionError(
-                    error_code=QuicErrorCode.FRAME_ENCODING_ERROR,
-                    frame_type=frame_type,
-                    reason_phrase="Failed to parse frame",
-                )
-            except StreamFinishedError:
-                # we lack the state for the stream, ignore the frame
-                pass
+            elif frame_type==0x06: # CRYPTO frame
+                self.handle_crypto(context, frame_type, buf)
+                
+            elif frame_type==0x07:
+                self.handle_new_token_frame(context, frame_type, buf)
+                
+            elif frame_type >= 0x08 and frame_type <= 0x0F: # STREAM frame
+                stream_id, stream_data = self.handle_stream_frame(context, frame_type, buf)
+                
+                msg_per_layer += f'{QUIC_FRAME_ABBREVIATIONS[frame_type]}({stream_id})'
+                
+                http3_stream_msg = self.process_http3_payload(stream_id, stream_data)    
+                msg_per_layer += "[{}],".format(http3_stream_msg)
+                #print(">>> {}".format(http3_stream_msg))
+                
+            elif frame_type==0x10:
+                self.handle_max_data_frame(context, frame_type, buf)
+                     
+            elif frame_type==0x11:
+                self.handle_max_stream_data_frame(context, frame_type, buf)
+                
+            elif frame_type==0x12:
+                self.handle_max_streams_bidi_frame(context, frame_type, buf)
+               
+            elif frame_type==0x13:
+                self.handle_max_streams_uni_frame(context, frame_type, buf)
+                
+            elif frame_type==0x14:
+                self.handle_data_blocked_frame(context, frame_type, buf)
+                
+            elif frame_type==0x15:
+                self.handle_stream_data_blocked_frame(context, frame_type, buf)
+                
+            elif frame_type in [0x16, 0x17]:
+                self.handle_streams_blocked_frame(context, frame_type, buf)
+                
+            elif frame_type==0x18:
+                self.handle_new_connection_id_frame(context, frame_type, buf)
+                
+            elif frame_type==0x19:
+                self.handle_retire_connection_id_frame(context, frame_type, buf)
             
-
+            elif frame_type==0x1A:
+                self.handle_path_challenge_frame(context, frame_type, buf)
+                
+            elif frame_type==0x1B:
+                self.handle_path_response_frame(context, frame_type, buf)
+                
+            elif frame_type==0x1C or frame_type==0x1D:
+                self.handle_connection_close_frame(context, frame_type, buf)
+               
+            elif frame_type==0x1E:
+                self.handle_handshake_done_frame(context, frame_type, buf)
+                
+            elif frame_type in [0x30, 0x31]:
+                self.handle_datagram_frame(context, frame_type, buf)
+                
+            elif frame_type>0x31:
+                raise QuicConnectionError(error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="Unknown frame type")
+            
             # update ACK only / probing flags
             frame_found = True
 
@@ -142,103 +126,59 @@ class MSGHandler():
             elif is_probing is None:
                 is_probing = True
         
-        return msg_per_layer.rstrip(",")
-        # return is_ack_eliciting, bool(is_probing)
+        return util.beautify_message_string(msg_per_layer)
     
-    def process_http3_payload(self, stream_data: bytes) -> str:
-        """
-        Process HTTP/3 frames within a stream's data and return a human-readable summary.
 
-        Args:
-            stream_data: The data contained within the stream.
-
-        Returns:
-            msg_http3: A string summarizing the processed HTTP/3 frames.
-        """
-        buf_http3 = Buffer(data=stream_data)
+    def process_http3_payload( self, stream_id:int, data:bytes ) -> str:
+        buf = Buffer(data=data)
         msg_http3 = ''
-
-        # Determine stream type by inspecting the first bytes of the stream data
-        try:
-            stream_type = buf_http3.pull_uint_var()
-            # print("[DEBUG] stream_type : 0x%02x" % stream_type)
-        except BufferReadError:
-            print("Invalid stream data: unable to determine stream type.")
-            return 'NULL'
-
-        # Process each frame in the stream data based on the identified stream type
-        while not buf_http3.eof():
-            try:
-                if stream_type in [0x01, 0x04]:
-                    #0x01 : Request stream.
-                    if stream_type == 0x01:
-                        msg_http3 += ',HEADERS'
-                        data_length = buf_http3.pull_uint_var()
-                        buf_http3.pull_bytes(data_length) 
-                    #0x04 : Usually conveys SETTINGS.
-                    elif stream_type == 0x04:
-                        msg_http3 += ',SETTINGS'
-                        break
-
-                frame_type = buf_http3.pull_uint_var()
-                # print("[DEBUG] stream_type : 0x%02x | frame type : 0x%02x" % (stream_type, frame_type))
-
-                # Control Stream frames
-                if stream_type == 0x00:
-                    if frame_type == FrameType.SETTINGS:
-                        msg_http3 += ',SETTINGS'
-                        break
-                    elif frame_type == FrameType.PRIORITY_UPDATE:
-                        msg_http3 += ',PRIORITY_UPDATE'
-                        break
-                    else:
-                        msg_http3 += f',UNKNOWN_CONTROL_FRAME(type={frame_type})'
-                        break
-                
-                # QPACK Streams frames (both Encoder and Decoder)
-                elif stream_type in [0x02, 0x03]:
-                    msg_http3 += f',QPACK_FRAME(type={frame_type})'
-
-                # Uni Stream frames
-                else:
-                    if frame_type == FrameType.HEADERS:
-                        msg_http3 += ',HEADERS'
-                        break
-                    elif frame_type == FrameType.DATA:
-                        data_length = buf_http3.pull_uint_var()
-                        buf_http3.pull_bytes(data_length) 
-                        msg_http3 += f',DATA'
-                        break
-                    if frame_type == 0x0f0700:
-                        length = buf_http3.pull_uint_var()
-                        buf_http3.pull_bytes(length)
-                        msg_http3 += f',PRIORITY_UPDATE'
-                        break
-                    else:
-                        msg_http3 += f',UNKNOWN_REQUEST_RESPONSE_FRAME(type={frame_type})'
-                        break
-
-            except BufferReadError:
-                print("Buffer read error while processing HTTP/3 stream. Skipping rest of stream.")
-                break
-
-        # Remove any leading/trailing whitespace if necessary
-        msg_http3 = msg_http3.strip(',')
-
-        return msg_http3
-
-    def is_http3_stream(self, stream_id: int) -> bool:
-        """
-        Determine if the given stream ID corresponds to an HTTP/3 stream.
         
-        Args:
-            stream_id: The stream ID to check.
+        #print("stream_id: {}".format( stream_id ))
+        #print("data len: {}".format( len(data) ))
+        #print("stream_data = {}".format( data ))
+
+        # Check if the stream is server-initiated unidirectional stream
+        # In unidirectional streams have, the first byte indicated stream type (control, push, QPACK... )
+        if stream_id % 4 == 3:
+            stream_type = buf.pull_uint_var()
+            #print("stream_type = {}".format( stream_type ))
+            if stream_type == StreamType.QPACK_ENCODER:
+                msg_http3 += "Enc,"
+                return util.beautify_message_string(msg_http3)
+            elif stream_type == StreamType.QPACK_DECODER:
+                msg_http3 += "Dec,"
+                return util.beautify_message_string(msg_http3)
             
-        Returns:
-            bool: True if the stream is an HTTP/3 stream, otherwise False.
+
+        # read HTTP3 frames
+        while ( not buf.eof() ):
+            frame_type = buf.pull_uint_var()
+            #print("frame_type: {}".format( frame_type ))
+            frame_len = buf.pull_uint_var()
+            #print("frame_len: {}".format( frame_len ))
+            frame_data = buf.pull_bytes(frame_len)
+            #print("frame_type = {}".format( frame_type ))
+            #print("frame_len = {}".format( frame_len ))
+            #print("frame_data = {}".format( frame_data ))
+            msg_http3 += H3_FRAME_ABBREVIATIONS[frame_type]+","
+
+        return util.beautify_message_string(msg_http3)
+      
+  
+
+    def handle_padding_frame(
+        self, context: QuicReceiveContext, frame_type: int, buf: Buffer
+    ) -> None:
         """
-        # In HTTP/3, client-initiated bidirectional streams are typically used.
-        return stream_id % 4 == 0 or stream_id % 4 == 3
+        Handle a PADDING frame.
+        """
+        # consume padding
+        pos = buf.tell()
+        for byte in buf.data_slice(pos, buf.capacity):
+            if byte:
+                break
+            pos += 1
+        buf.seek(pos)
 
     def handle_datagram_frame(
         self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -500,8 +440,8 @@ class MSGHandler():
         length = buf.pull_uint_var()
         token = buf.pull_bytes(length)
 
-        print("\033[31m\nRESET_STREAM frame received. Length={}, Token={}\033[0m"
-              .format(length, token))
+        #print("\033[31m\nRESET_STREAM frame received. Length={}, Token={}\033[0m"
+        #      .format(length, token))
 
         """
         if not self._quic._is_client:
@@ -521,6 +461,7 @@ class MSGHandler():
         """
         Handle a STREAM frame.
         """
+
         stream_id = buf.pull_uint_var()
         if frame_type & 4:
             offset = buf.pull_uint_var()
@@ -540,17 +481,22 @@ class MSGHandler():
         # Pull the stream data from the buffer
 
         stream_data = buf.pull_bytes(length)
+        frame = QuicStreamFrame(
+            offset=offset, data=stream_data, fin=bool(frame_type & 1)
+        )
         # print("\033[31m\nSTREAM frame received. Stream ID={}, Offset={}, Length={}, Stream Data={}\033[0m"
         #       .format(stream_id, offset, length, stream_data))
+
+        #stream = self._quic._get_or_create_stream(frame_type, stream_id)
+        #event = stream.receiver.handle_frame(frame)
+
 
         return stream_id, stream_data
 
 
         """
-        data=buf.pull_bytes(length)
-        frame = QuicStreamFrame(
-            offset=offset, data=data, fin=bool(frame_type & 1)
-        )
+        
+        
         
         print("\033[31m\nSTREAM frame received. Stream ID={}, Offset={}, Length={}, Stream Data={}\033[0m"
               .format(stream_id, offset, length, data))
