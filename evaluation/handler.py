@@ -15,9 +15,10 @@ class Stream():
         self.length:int = None
         self.data:int = None
         self.uni_stream_type:StreamType = None # types of server-initiated unidirectional streams
-        self.unfinished_frame_type:FrameType = None
-        self.unfinished_frame_len_to_read:int = None
-
+        # if data that the server sends is too long to fit in a singe frame, some of its contents is sent in the subsequent stream frames
+        self.unfinished_frame_type:FrameType = None # type of the H3 frame, which has been received partially
+        self.unfinished_frame_len_to_read:int = None # length of the rest of the H3 frame, which is expected to be received in the subsequent frame
+        
 
 class MSGHandler():
     def __init__(self, qc: QuicConnection):

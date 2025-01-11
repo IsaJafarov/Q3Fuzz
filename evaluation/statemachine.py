@@ -147,7 +147,7 @@ def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Pa
             "size": "16,9!",   # Force 16:9 aspect ratio
             "dpi": "300"       # Set resolution to 300 DPI
         })
-        graph.draw(graphname+"_16x9_fill.png", format="png", prog='dot')
+        graph.draw(graphname+"_16x9.png", format="png", prog='dot')
         
 
 

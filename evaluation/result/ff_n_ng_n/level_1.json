@@ -1,0 +1,77 @@
+{
+  "initial": "Init",
+  "transitions": [
+    {
+      "source": "Init",
+      "dest": "1",
+      "trigger": "STREAM(2)[SE],STREAM(6)[Enc],STREAM(10)[Dec] => ACK\n"
+    },
+    {
+      "source": "Init",
+      "dest": "2",
+      "trigger": "STREAM(0)[HE] => ACK,STREAM(0)[HE,DA],STREAM(0)[]\n"
+    },
+    {
+      "source": "Init",
+      "dest": "3",
+      "trigger": "STREAM(6)[Enc] => ACK\n"
+    },
+    {
+      "source": "Init",
+      "dest": "4",
+      "trigger": "ACK => \u2298\n"
+    },
+    {
+      "source": "Init",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "Init",
+      "dest": "8",
+      "trigger": "STREAM(4)[HE],STREAM(6)[Enc] => ACK\n"
+    }
+  ],
+  "states": [
+    {
+      "name": "Init"
+    },
+    {
+      "name": "Finish"
+    },
+    {
+      "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "3"
+    },
+    {
+      "name": "4"
+    },
+    {
+      "name": "8"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "Init",
+      "name": "HTTP/3 State Machine",
+      "class-name": "statemachine.ProtoModel"
+    }
+  ]
+}

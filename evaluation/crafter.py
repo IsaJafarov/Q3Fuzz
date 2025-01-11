@@ -83,6 +83,9 @@ class MSGCrafter():
                         frame_data = aioquic.buffer.encode_uint_var(StreamType.QPACK_ENCODER)
                     elif 'QPACK Decoder' in layer.stream_uni: 
                         frame_data = aioquic.buffer.encode_uint_var(StreamType.QPACK_DECODER)
+                    elif len(layer.field_names)==1 and layer.field_names[0]=='stream_uni':
+                        # this is an empty unidirectional stream
+                        frame_data = b''
                     else:
                         print(layer)
                         raise "[-] Unsupported Application Layer Data"

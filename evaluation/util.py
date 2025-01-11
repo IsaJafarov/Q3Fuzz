@@ -61,6 +61,7 @@ QUIC_FRAME_ABBREVIATIONS = {
     0x1F: "IA", # IMMEDIATE_ACK
     0x30: "DT", # DATAGRAM
     0x31: "DT", # DATAGRAM
+    0xaf: "ACKF", # ACK_FREQUENCY  QUIC Acknowledgment Frequency RFC
     
 
     "PADDING": "PAD",
@@ -85,6 +86,7 @@ QUIC_FRAME_ABBREVIATIONS = {
     "HANDSHAKE_DONE": "HD",
     "IMMEDIATE_ACK": "IA",
     "DATAGRAM": "DT", # DATAGRAM
+    "ACK_FREQUENCY": "ACKF"
 }
 
 
@@ -287,6 +289,10 @@ def h3msg_to_str(h3msg:Union[list, str]) -> str:
                         frame_info = "Enc" 
                     elif 'QPACK Decoder' in layer.stream_uni: 
                         frame_info = "Dec" 
+                    elif len(layer.field_names)==1 and layer.field_names[0]=='stream_uni':
+                        # this is an empty unidirectional stream
+                        frame_info = "\u2298"
+                        #pass
                     else:
                         print(layer)
                         raise "Unknown Application Layer Data"
