@@ -42,10 +42,12 @@ class HttpClient():
         self.network_path = QuicNetworkPath(hostname)
         self.connection = QuicConnection(configuration=self.quic_conf)
         self._http = H3Connection(self.connection)
-        self.sock = None
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+        self.sock.settimeout(0.2)
         self.handler = MSGHandler(qc = self.connection)
         self.crafter = MSGCrafter(qc = self.connection, client = self)
         os.environ['SSLKEYLOGFILE'] = keylog_file
+        
         
     def get_builder(self, epoch: Epoch):
         builder = QuicPacketBuilder(
@@ -213,9 +215,8 @@ class HttpClient():
         _push_crypto_data() writes data from the buffer to INITIAL's crypto stream in _crypto_streams
         datagrams_to_send() when called passes the builder to _write_handshake(), which adds the CRYPTO frame to it
         """
-
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
-        self.sock.settimeout(0.2)
+        
+        self.handler = MSGHandler(qc = self.connection)
         
         crypto_buf = Buffer(capacity=CRYPTO_BUFFER_SIZE)
 
@@ -282,32 +283,6 @@ class HttpClient():
         buf.push_bytes(strm_data) # data
 
         self.send_quic_frames_from_builder(builder)
-
-    # def disconnect(self):
-    #     # Send CONNECTION_CLOSE frame
-    #     # Define the payload to include error_code and reason_phrase according to the QUIC specification.
-    #     connection_close_payload = Buffer(capacity=256)
-    #     connection_close_payload.push_uint_var(QuicErrorCode.NO_ERROR)  # Error code (NO_ERROR)
-    #     connection_close_payload.push_uint_var(0)  # Frame type (0 since no specific frame is indicated)
-    #     reason_phrase = "Normal connection closure after message replay"
-    #     connection_close_payload.push_uint16(len(reason_phrase))
-    #     connection_close_payload.push_bytes(reason_phrase.encode('utf-8'))
-        
-    #     # Send QUIC CC packet
-    #     quic_payload = connection_close_payload.data
-    #     builder = self.get_builder(Epoch.ONE_RTT)
-    #     buf = builder.start_frame(QuicFrameType.APPLICATION_CLOSE, capacity=len(quic_payload))
-    #     buf.push_bytes(quic_payload)
-    #     self.send_quic_frames_from_builder(builder)
-
-    #     # Explicitly close the QUIC connection using CONNECTION_CLOSE frame
-    #     self.connection.close(
-    #         error_code=QuicErrorCode.NO_ERROR,
-    #         frame_type=QuicFrameType.APPLICATION_CLOSE,
-    #         reason_phrase="Normal connection closure after message replay",
-    #     )
-
-    #     self.sock.close()
 
     def open_qpack_streams(self):
         """
@@ -596,8 +571,7 @@ class HttpClient():
             )
             
             try:
-                #is_ack_eliciting, is_probing = \
-                res_per_packet += self.handler.process_payload( context, plain_payload, crypto_frame_required=crypto_frame_required )+","
+                res_per_packet += self.handler.process_quic_payload( context, plain_payload, crypto_frame_required=crypto_frame_required )+","
             except QuicConnectionError:
                 pass
 
@@ -628,7 +602,6 @@ class HttpClient():
     def close_connection(self) -> None:
 
         builder = self.get_builder(Epoch.ONE_RTT)
-
 
         reason = "closed by prett3".encode("utf8")
 
@@ -762,38 +735,10 @@ if __name__ == "__main__":
     ### Extract initial state machine ###
     http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
 
-    #'''
     stma.modeller_h3(conf=configuration, 
                      keylog=keylog_file, 
                      url=args.url, 
                      sample_msgs=http3_basic_messages, 
                      outdir="./result")
     sys.exit()
-    #'''
-
     
-    st2st4 = None
-    st2 = None
-    st2st0 = None
-    ack1 = None # la 5
-    ack2 = None # la 7
-    for msg in http3_basic_messages:
-        msg_str = util.h3msg_to_str(msg)
-        print( msg_str )
-        
-        if msg_str == "STREAM(2)[PU],STREAM(4)[HE]":
-            st2st4 = msg
-        elif msg_str == "ACK" and ack1 is None:
-            ack1 = msg
-        elif msg_str == "ACK" and ack1 is not None:
-            ack2 = msg
-        elif msg_str == "STREAM(2)[SE]":
-            st2 = msg
-        elif msg_str == "STREAM(2)[PU],STREAM(0)[HE]":
-            st2st0 = msg
-
-    #stma.send_receive_http3(None, HttpClient(configuration, "prett3.com", "keylog_file"), [st2st4, st2st0], ack1)
-    #stma.send_receive_http3(None, HttpClient(configuration, "prett3.com", "keylog_file"), [st2st4, st2st0], st2st4)
-    #stma.send_receive_http3(None, HttpClient(configuration, "prett3.com", "keylog_file"), [st2st4, st2], ack2)
-    for i in range(20):
-        stma.send_receive_http3(None, HttpClient(configuration, "prett3.com", "keylog_file"), [st2st4, ack1], st2)

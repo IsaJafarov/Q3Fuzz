@@ -173,11 +173,6 @@ def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Pa
     #     json.dump(sm.markup, jsonfile, indent=2)
     sys.exit()
 
-def isa():
-    h3client = HttpClient()
-    #mov_msg_list = 
-    #h3msg_sent = 
-    #send_receive_http3(None, h3client, mov_msg_list, h3msg_sent)
 
 def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Packet], h3msg_sent:Packet) -> str:
     h3msg_rcvd = ''
@@ -210,8 +205,10 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
     
     h3client.close_connection()
 
+
     print("\033[92m  [SUMMARY] (%s) => %s => %s\033[0m" % (
     util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd))
+    
     
 
     return h3msg_rcvd

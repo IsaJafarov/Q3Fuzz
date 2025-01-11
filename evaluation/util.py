@@ -3,7 +3,7 @@
 import pyshark
 import re
 import traceback
-from typing import List
+from typing import List, Union
 from aioquic.buffer import Buffer
 from aioquic.quic.packet import QuicFrameType, QuicPacketType
 import pyshark.packet
@@ -225,7 +225,7 @@ def extract_quic_stream_frames(layer:XmlLayer) -> List[str]:
                     break  # Only need the id, stop further parsing for this frame
     return stream_ids
 
-def h3msg_to_str(h3msg:Packet) -> str:
+def h3msg_to_str(h3msg:Union[list, str]) -> str:
     """
     Convert a QUIC or HTTP3 message in a human-readable format.
     args:
@@ -239,9 +239,9 @@ def h3msg_to_str(h3msg:Packet) -> str:
 
     if type(h3msg) is list: # for moving messages
         for h3msg_sub in h3msg:
-            msginfo += h3msg_to_str(h3msg_sub) + " | "
+            msginfo += h3msg_to_str(h3msg_sub) + " => "
         if msginfo != '':
-            msginfo = msginfo.rstrip(" | ")
+            msginfo = msginfo.rstrip(" => ")
     else:
         http3_layer_idx = 0  # Index to track HTTP/3 layer processing
         for layer in h3msg.layers:

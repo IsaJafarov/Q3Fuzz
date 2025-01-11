@@ -7,23 +7,30 @@ from aioquic.buffer import Buffer
 import util
 from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 
+class Stream():
+    def __init__(self):
+        self.stream_id:int = None
+        self.finish:bool = False
+        self.offset:int = None
+        self.length:int = None
+        self.data:int = None
+        self.uni_stream_type:StreamType = None # types of server-initiated unidirectional streams
+        self.unfinished_frame_type:FrameType = None
+        self.unfinished_frame_len_to_read:int = None
+
+
 class MSGHandler():
     def __init__(self, qc: QuicConnection):
         self._quic = qc
+        self.streams = {int:Stream}
 
-    def process_payload(self, context: QuicReceiveContext, plain: bytes, crypto_frame_required: bool = False) -> Tuple[bool, bool]:
+
+    def process_quic_payload(self, context: QuicReceiveContext, plain: bytes, crypto_frame_required: bool = False) -> Tuple[bool, bool]:
         buf = Buffer(data=plain)
         
         msg_per_layer = ''
 
-        crypto_frame_found = False
-        frame_found = False
-        is_ack_eliciting = False
-        is_probing = None
-        i=0
         while not buf.eof():
-            i+=1
-            #print("\t\tFrame #{}".format(i))
 
             # get frame type
             try:
@@ -59,11 +66,11 @@ class MSGHandler():
                 self.handle_new_token_frame(context, frame_type, buf)
                 
             elif frame_type >= 0x08 and frame_type <= 0x0F: # STREAM frame
-                stream_id, stream_data = self.handle_stream_frame(context, frame_type, buf)
+                stream = self.handle_stream_frame(context, frame_type, buf)
                 
-                msg_per_layer += f'{QUIC_FRAME_ABBREVIATIONS[frame_type]}({stream_id})'
+                msg_per_layer += f'{QUIC_FRAME_ABBREVIATIONS[frame_type]}({stream.stream_id})'
                 
-                http3_stream_msg = self.process_http3_payload(stream_id, stream_data)    
+                http3_stream_msg = self.process_http3_payload(stream)    
                 msg_per_layer += "[{}],".format(http3_stream_msg)
                 #print(">>> {}".format(http3_stream_msg))
                 
@@ -112,55 +119,72 @@ class MSGHandler():
             elif frame_type>0x31:
                 raise QuicConnectionError(error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="Unknown frame type")
             
-            # update ACK only / probing flags
-            frame_found = True
-
-            if frame_type == QuicFrameType.CRYPTO:
-                crypto_frame_found = True
-
-            if frame_type not in NON_ACK_ELICITING_FRAME_TYPES:
-                is_ack_eliciting = True
-
-            if frame_type not in PROBING_FRAME_TYPES:
-                is_probing = False
-            elif is_probing is None:
-                is_probing = True
         
+        for stream_id in self.streams:
+            self.streams[stream_id].uni_stream_type = None
+
         return util.beautify_message_string(msg_per_layer)
     
 
-    def process_http3_payload( self, stream_id:int, data:bytes ) -> str:
-        buf = Buffer(data=data)
+    def process_http3_payload( self, stream:Stream ) -> str:
+        buf = Buffer(data=stream.data)
         msg_http3 = ''
         
-        #print("stream_id: {}".format( stream_id ))
-        #print("data len: {}".format( len(data) ))
-        #print("stream_data = {}".format( data ))
+        #print("\nstream_id: {}".format( stream.stream_id ))
+        #print("stream_fin: {}".format( stream.finish ))
+        #print("stream_off: {}".format( stream.offset ))
+        #print("stream_len: {}".format( stream.length )) # same as len(stream.data) and buf.capacity()
+        #print("stream_data = {}".format( stream.data ))
 
         # Check if the stream is server-initiated unidirectional stream
-        # In unidirectional streams have, the first byte indicated stream type (control, push, QPACK... )
-        if stream_id % 4 == 3:
-            stream_type = buf.pull_uint_var()
-            #print("stream_type = {}".format( stream_type ))
-            if stream_type == StreamType.QPACK_ENCODER:
+        # In unidirectional streams, the first byte indicates stream type (control, push, QPACK... )
+        # if stream has already been initiated, when the server sends STREAM, it does not send the stream type as the first byte
+        # Therefore, check if the strem has previously been initiated. If so, do not read the first byte.
+        if stream.stream_id % 4 == 3:
+
+            if stream.uni_stream_type is None:
+                stream.uni_stream_type = buf.pull_uint_var()
+            
+            #print("uni_stream_type = {}".format( stream.uni_stream_type ))
+
+            if stream.uni_stream_type == StreamType.QPACK_ENCODER:
                 msg_http3 += "Enc,"
                 return util.beautify_message_string(msg_http3)
-            elif stream_type == StreamType.QPACK_DECODER:
+            elif stream.uni_stream_type == StreamType.QPACK_DECODER:
                 msg_http3 += "Dec,"
                 return util.beautify_message_string(msg_http3)
             
 
         # read HTTP3 frames
         while ( not buf.eof() ):
-            frame_type = buf.pull_uint_var()
+            
+            if stream.unfinished_frame_type is None:
+                frame_type = buf.pull_uint_var()
+                frame_len = buf.pull_uint_var()    
+            else:
+                frame_type = stream.unfinished_frame_type
+                frame_len = stream.unfinished_frame_len_to_read
+            
             #print("frame_type: {}".format( frame_type ))
-            frame_len = buf.pull_uint_var()
             #print("frame_len: {}".format( frame_len ))
-            frame_data = buf.pull_bytes(frame_len)
-            #print("frame_type = {}".format( frame_type ))
-            #print("frame_len = {}".format( frame_len ))
-            #print("frame_data = {}".format( frame_data ))
+
             msg_http3 += H3_FRAME_ABBREVIATIONS[frame_type]+","
+
+            
+            
+            if len(buf.data) + frame_len <= stream.length:
+                frame_data = buf.pull_bytes(frame_len)
+            else:
+                left_data = len(stream.data) - len(buf.data)
+                #print("oops we can only read {} byte frame data".format( left_data ))
+                frame_data = buf.pull_bytes( left_data )
+                stream.unfinished_frame_type = frame_type
+                stream.unfinished_frame_len_to_read = frame_len - left_data
+                #print("Frame data length to read in the next stream {}".format( stream.unfinished_frame_len_to_read ))
+                
+            #print("frame_data = {}".format( frame_data ))
+            #print("buf data len: {}".format( len(buf.data) ))
+            
 
         return util.beautify_message_string(msg_http3)
       
@@ -457,11 +481,11 @@ class MSGHandler():
 
     def handle_stream_frame(
         self, context: QuicReceiveContext, frame_type: int, buf: Buffer
-    ) -> None:
+    ) -> Stream:
         """
         Handle a STREAM frame.
         """
-
+        
         stream_id = buf.pull_uint_var()
         if frame_type & 4:
             offset = buf.pull_uint_var()
@@ -490,8 +514,19 @@ class MSGHandler():
         #stream = self._quic._get_or_create_stream(frame_type, stream_id)
         #event = stream.receiver.handle_frame(frame)
 
+        if stream_id in self.streams:
+            stream = self.streams[stream_id]
+        else:
+            stream = Stream()
+            self.streams[stream_id] = stream
+            stream.stream_id = stream_id
+        
+        stream.finish = bool(frame_type & 1)
+        stream.offset = offset
+        stream.length = length
+        stream.data = stream_data
 
-        return stream_id, stream_data
+        return stream
 
 
         """
