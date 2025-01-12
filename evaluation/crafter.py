@@ -63,7 +63,7 @@ class MSGCrafter():
                 # This HTTP/3 layer has HTTP/3 frames
                 if layer.has_field("frame_type"):
                     
-                    h3_field_type = int(layer.frame_type)
+                    h3_field_type = int(layer.frame_type, 16)
 
                     if h3_field_type == FrameType.SETTINGS:
                         frame_data = self.generate_h3_settings_frame(layer)
