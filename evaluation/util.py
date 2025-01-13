@@ -309,5 +309,6 @@ def beautify_message_string(message:str) -> str:
         .replace("RE,", "")\
         .replace("PAD,", "")\
         .replace("NT,", "")\
+        .replace("PING,", "")\
         .rstrip(",")
 
