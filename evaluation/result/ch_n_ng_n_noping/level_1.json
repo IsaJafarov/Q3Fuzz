@@ -3,7 +3,7 @@
   "transitions": [
     {
       "source": "Init",
-      "dest": "1",
+      "dest": "Init",
       "trigger": "STREAM(2)[SE] => ACK\n"
     },
     {
@@ -18,12 +18,12 @@
     },
     {
       "source": "Init",
-      "dest": "5",
+      "dest": "Init",
       "trigger": "STREAM(2)[PU],STREAM(10)[Enc],STREAM(4)[HE] => ACK\n"
     },
     {
       "source": "Init",
-      "dest": "6",
+      "dest": "Init",
       "trigger": "ACK => CRY,CRY,HD,NCI,NCI,NCI,NCI,NCI,NCI,NCI,STREAM(3)[],STREAM(3)[SE],STREAM(7)[Dec]\n"
     },
     {
@@ -40,28 +40,15 @@
       "name": "Finish"
     },
     {
-      "name": "1"
-    },
-    {
       "name": "2"
-    },
-    {
-      "name": "5"
-    },
-    {
-      "name": "6"
     }
   ],
   "before_state_change": [],
   "after_state_change": [],
   "prepare_event": [],
   "finalize_event": [],
-  "on_exception": [],
-  "on_final": [],
   "send_event": false,
   "auto_transitions": false,
-  "model_attribute": "state",
-  "model_override": false,
   "ignore_invalid_triggers": null,
   "queued": false,
   "models": [

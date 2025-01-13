@@ -4,32 +4,27 @@
     {
       "source": "Init",
       "dest": "1",
-      "trigger": "STREAM(2)[SE],STREAM(6)[Enc],STREAM(10)[Dec] => CRY|ACK,STREAM(11)[Enc]|ACK|STREAM(11)[Enc]\n"
+      "trigger": "STREAM(2)[SE] => ACK\n"
     },
     {
       "source": "Init",
-      "dest": "2",
-      "trigger": "STREAM(0)[HE] => CRY|ACK,STREAM(0)[HE,DA]|ACK|STREAM(0)[HE,DA]\n"
+      "dest": "Init",
+      "trigger": "ACK => \u2298\n"
     },
     {
       "source": "Init",
       "dest": "3",
-      "trigger": "STREAM(6)[Enc] => CRY|ACK|NCI,STREAM(7)[Dec],STREAM(3)[SE]\n"
+      "trigger": "STREAM(2)[PU],STREAM(0)[HE] => ACK|STREAM(0)[HE]\n"
     },
     {
       "source": "Init",
       "dest": "Finish",
-      "trigger": "ACK => CRY|CC\n"
-    },
-    {
-      "source": "Init",
-      "dest": "6",
-      "trigger": "STREAM(4)[HE],STREAM(6)[Enc] => CRY|ACK|NCI,STREAM(7)[Dec],STREAM(3)[SE]\n"
+      "trigger": "ACK => CC\n"
     },
     {
       "source": "Init",
       "dest": "Finish",
-      "trigger": "STREAM(10)[\u2298] => CRY|CC\n"
+      "trigger": "STREAM(2)[PU],STREAM(4)[HE] => CC\n"
     }
   ],
   "states": [
@@ -43,25 +38,15 @@
       "name": "1"
     },
     {
-      "name": "2"
-    },
-    {
       "name": "3"
-    },
-    {
-      "name": "6"
     }
   ],
   "before_state_change": [],
   "after_state_change": [],
   "prepare_event": [],
   "finalize_event": [],
-  "on_exception": [],
-  "on_final": [],
   "send_event": false,
   "auto_transitions": false,
-  "model_attribute": "state",
-  "model_override": false,
   "ignore_invalid_triggers": null,
   "queued": false,
   "models": [
