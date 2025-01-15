@@ -7,8 +7,23 @@
       "trigger": "ST(2)[SE] => ACK\n"
     },
     {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(2)[SE] => ACK\n"
+    },
+    {
+      "source": "5",
+      "dest": "5",
+      "trigger": "ST(2)[SE] => ACK\n"
+    },
+    {
       "source": "Init",
       "dest": "2",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
+    },
+    {
+      "source": "5",
+      "dest": "14",
       "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
     },
     {
@@ -17,8 +32,23 @@
       "trigger": "ACK => \u2298\n"
     },
     {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ACK => \u2298\n"
+    },
+    {
+      "source": "5",
+      "dest": "5",
+      "trigger": "ACK => \u2298\n"
+    },
+    {
       "source": "Init",
       "dest": "5",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n"
+    },
+    {
+      "source": "2",
+      "dest": "14",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n"
     },
     {
@@ -27,9 +57,39 @@
       "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
     },
     {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
+    },
+    {
+      "source": "5",
+      "dest": "5",
+      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
+    },
+    {
       "source": "Init",
       "dest": "Finish",
       "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "5",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n"
+    },
+    {
+      "source": "5",
+      "dest": "5",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n"
     }
   ],
   "states": [
@@ -44,6 +104,9 @@
     },
     {
       "name": "5"
+    },
+    {
+      "name": "14"
     }
   ],
   "before_state_change": [],

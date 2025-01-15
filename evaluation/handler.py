@@ -7,23 +7,49 @@ from aioquic.buffer import Buffer
 import util
 from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 
+
 class Stream():
+    """
+    Stream management throughtout a connection
+    """
+    def __init__(self):
+        self.stream_id:int = None
+        self.data:int = None
+        
+        # type of the server-initiated unidirectional streams
+        self.uni_stream_type:StreamType = None
+
+        # if HTTP/3 frame that the server sends is too long to fit in a singe stream frame, some of its contents is sent in the subsequent stream frames
+        self.unfinished_h3_frame_type:FrameType = None # type of the H3 frame, which has been received partially
+        self.unfinished_h3_frame_len_to_read:int = None # length of the rest of the H3 frame, which is expected to be received in the subsequent frames
+
+
+class ReceivedStreamFrame():
+    """
+    Stream frame in the received packet
+    """
     def __init__(self):
         self.stream_id:int = None
         self.finish:bool = False
-        self.offset:int = None
-        self.length:int = None
-        self.data:int = None
-        self.uni_stream_type:StreamType = None # types of server-initiated unidirectional streams
-        # if data that the server sends is too long to fit in a singe frame, some of its contents is sent in the subsequent stream frames
-        self.unfinished_frame_type:FrameType = None # type of the H3 frame, which has been received partially
-        self.unfinished_frame_len_to_read:int = None # length of the rest of the H3 frame, which is expected to be received in the subsequent frame
+        self.offset:int = 0
+        self.length:int = 0
+        self.data:int = b''
+                
         
 
 class MSGHandler():
     def __init__(self, qc: QuicConnection):
         self._quic = qc
-        self.streams = {int:Stream}
+        self.streams:list[Stream] =[] # all streams throughout the connection
+
+    def get_stream_by_id(self, stream_id:int):
+        for stream in self.streams:
+            if stream.stream_id == stream_id:
+                return stream
+        stream = Stream()
+        stream.stream_id=stream_id
+        self.streams.append(stream)
+        return stream
 
 
     def process_quic_payload(self, context: QuicReceiveContext, plain: bytes, crypto_frame_required: bool = False) -> Tuple[bool, bool]:
@@ -120,74 +146,82 @@ class MSGHandler():
             elif frame_type>0x31:
                 raise QuicConnectionError(error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="Unknown frame type")
             
-        
-        for stream_id in self.streams:
-            self.streams[stream_id].uni_stream_type = None
 
-        return util.beautify_message_string(msg_per_layer)
+        return util.beautify_message_string(msg_per_layer, False)
     
 
-    def process_http3_payload( self, stream:Stream ) -> str:
-        buf = Buffer(data=stream.data)
+    def process_http3_payload( self, received_stream:ReceivedStreamFrame ) -> str:
+        buf = Buffer(data=received_stream.data)
         msg_http3 = ''
+
+        '''
+        print("\nstream_id: {}".format( received_stream.stream_id ))
+        print("stream_fin: {}".format( received_stream.finish ))
+        print("stream_off: {}".format( received_stream.offset ))
+        print("stream_len: {}".format( received_stream.length )) # same as len(stream.data) and buf.capacity()
+        print("stream_data = {}".format( received_stream.data ))
+        print("buf.capacity = {}".format( buf.capacity ))
+        '''
+
+        # If the stream has already been created during the connection, retrieve its data
+        # Otherwise, create a new ctream
+        stream = self.get_stream_by_id(received_stream.stream_id)
         
-        #print("\nstream_id: {}".format( stream.stream_id ))
-        #print("stream_fin: {}".format( stream.finish ))
-        #print("stream_off: {}".format( stream.offset ))
-        #print("stream_len: {}".format( stream.length )) # same as len(stream.data) and buf.capacity()
-        #print("stream_data = {}".format( stream.data ))
 
         # Check if the stream is server-initiated unidirectional stream
         # In unidirectional streams, the first byte indicates stream type (control, push, QPACK... )
-        # if stream has already been initiated, when the server sends STREAM, it does not send the stream type as the first byte
-        # Therefore, check if the strem has previously been initiated. If so, do not read the first byte.
-        if stream.stream_id % 4 == 3:
+        
+        if received_stream.stream_id % 4 == 3:
 
-            if stream.uni_stream_type is None:
+            # if stream offset is not 0, the stream has already been initiated, and therefore the first byte does not indicate the stream type
+            if received_stream.offset == 0:
                 stream.uni_stream_type = buf.pull_uint_var()
-            
-            #print("uni_stream_type = {}".format( stream.uni_stream_type ))
+            else:
+                pass
 
+            # Check if the streams are QPACK Encoder/Decoder streams
             if stream.uni_stream_type == StreamType.QPACK_ENCODER:
                 msg_http3 += "Enc,"
-                return util.beautify_message_string(msg_http3)
+                return util.beautify_message_string(msg_http3, False)
             elif stream.uni_stream_type == StreamType.QPACK_DECODER:
                 msg_http3 += "Dec,"
-                return util.beautify_message_string(msg_http3)
+                return util.beautify_message_string(msg_http3, False)
             
+
 
         # read HTTP3 frames
         while ( not buf.eof() ):
             
-            if stream.unfinished_frame_type is None:
+            # If an HTTP/3 frame is too long, the data might be received in multiple stream frames.
+            # Check if this stream has unfinished HTTP/3 data.
+            # If a certain section of the HTTP/3 frames was received in previously received packets, in this stream the initial bytes do not indicate frame type or length
+            if stream.unfinished_h3_frame_type is None:
                 frame_type = buf.pull_uint_var()
-                frame_len = buf.pull_uint_var()    
+                frame_len = buf.pull_uint_var()
+                msg_http3 += H3_FRAME_ABBREVIATIONS[frame_type]+","
             else:
-                frame_type = stream.unfinished_frame_type
-                frame_len = stream.unfinished_frame_len_to_read
+                frame_type = stream.unfinished_h3_frame_type
+                frame_len = stream.unfinished_h3_frame_len_to_read
+                msg_http3 += H3_FRAME_ABBREVIATIONS[frame_type]+"+,"
             
-            #print("frame_type: {}".format( frame_type ))
-            #print("frame_len: {}".format( frame_len ))
 
-            msg_http3 += H3_FRAME_ABBREVIATIONS[frame_type]+","
+            #print("h3 frame_type: {}".format( frame_type ))
+            #print("h3 frame_len: {}".format( frame_len ))
 
-            
-            
-            if len(buf.data) + frame_len <= stream.length:
-                frame_data = buf.pull_bytes(frame_len)
+            # Check if the HTTP/3 frame is small enough to fit in this stream.
+            # If not, the rest of the HTTP/3 frame will be received in the upcoming stream frames.
+            if len(buf.data) + frame_len <= received_stream.length:
+                h3_frame_data = buf.pull_bytes(frame_len)
             else:
-                left_data = len(stream.data) - len(buf.data)
-                #print("oops we can only read {} byte frame data".format( left_data ))
-                frame_data = buf.pull_bytes( left_data )
-                stream.unfinished_frame_type = frame_type
-                stream.unfinished_frame_len_to_read = frame_len - left_data
-                #print("Frame data length to read in the next stream {}".format( stream.unfinished_frame_len_to_read ))
+                left_data = len(received_stream.data) - len(buf.data)
+                #print("OOPS we can only read {} byte frame data".format( left_data ))
+                h3_frame_data = buf.pull_bytes( left_data )
+                stream.unfinished_h3_frame_type = frame_type
+                stream.unfinished_h3_frame_len_to_read = frame_len - left_data
+                #print("Frame data length to read in the next stream {}".format( stream.unfinished_h3_frame_len_to_read ))
                 
-            #print("frame_data = {}".format( frame_data ))
-            #print("buf data len: {}".format( len(buf.data) ))
             
-
-        return util.beautify_message_string(msg_http3)
+        return util.beautify_message_string(msg_http3, False) if msg_http3 != '' else "\u2298"
       
   
 
@@ -482,7 +516,7 @@ class MSGHandler():
 
     def handle_stream_frame(
         self, context: QuicReceiveContext, frame_type: int, buf: Buffer
-    ) -> Stream:
+    ) -> ReceivedStreamFrame:
         """
         Handle a STREAM frame.
         """
@@ -515,13 +549,9 @@ class MSGHandler():
         #stream = self._quic._get_or_create_stream(frame_type, stream_id)
         #event = stream.receiver.handle_frame(frame)
 
-        if stream_id in self.streams:
-            stream = self.streams[stream_id]
-        else:
-            stream = Stream()
-            self.streams[stream_id] = stream
-            stream.stream_id = stream_id
-        
+
+        stream = ReceivedStreamFrame()    
+        stream.stream_id = stream_id
         stream.finish = bool(frame_type & 1)
         stream.offset = offset
         stream.length = length

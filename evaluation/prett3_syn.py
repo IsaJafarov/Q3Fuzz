@@ -581,7 +581,7 @@ class HttpClient():
             # update idle timeout
             self.connection._close_at = now + self.connection._idle_timeout()
 
-        return util.beautify_message_string(res_per_packet)
+        return util.beautify_message_string(res_per_packet, False)
 
     def replay_msg(self, h3msg:Packet, is_moving:bool) -> str:
         """

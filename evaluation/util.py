@@ -35,14 +35,14 @@ QUIC_FRAME_ABBREVIATIONS = {
     0x05: "SS", # Stop Sending
     0x06: "CRY", # Crypto
     0x07: "NT", # New Tokwn
-    0x08: "STREAM",
-    0x09: "STREAM",
-    0x0A: "STREAM",
-    0x0B: "STREAM",
-    0x0C: "STREAM",
-    0x0D: "STREAM",
-    0x0E: "STREAM",
-    0x0F: "STREAM",
+    0x08: "ST",
+    0x09: "ST",
+    0x0A: "ST",
+    0x0B: "ST",
+    0x0C: "ST",
+    0x0D: "ST",
+    0x0E: "ST",
+    0x0F: "ST",
     0x10: "MD", # Max Data
     0x11: "MSD", # Max Stream Data
     0x12: "MS", # Max Streams
@@ -61,7 +61,7 @@ QUIC_FRAME_ABBREVIATIONS = {
     0x1F: "IA", # IMMEDIATE_ACK
     0x30: "DT", # DATAGRAM
     0x31: "DT", # DATAGRAM
-    0xaf: "ACKF", # ACK_FREQUENCY  QUIC Acknowledgment Frequency RFC
+    0xaf: "ACKF", # ACK_FREQUENCY -  draft-ietf-quic-ack-frequency-10
     
 
     "PADDING": "PAD",
@@ -71,7 +71,7 @@ QUIC_FRAME_ABBREVIATIONS = {
     "STOP_SENDING": "SS",
     "CRYPTO": "CRY",
     "NEW_TOKEN": "NT",
-    "STREAM": "STREAM",
+    "STREAM": "ST",
     "MAX_DATA": "MD",
     "MAX_STREAM_DATA": "MSD",
     "MAX_STREAMS": "MS",
@@ -108,7 +108,7 @@ H3_FRAME_ABBREVIATIONS = {
     0x0d: "MPI", # Max Push Id
     0x0e: "UN", # Unassigned
     0x4d: "MD", # Metadata
-    0xf0700: "PU", # Priority Update
+    0xf0700: "PU", # Priority Update - RFC 9218
     0xf0701: "PU", # Priority Update
 
     # by frame name
@@ -282,7 +282,7 @@ def h3msg_to_str(h3msg:Union[list, str]) -> str:
                 frame_info = None
                 # the layer has HTTP3 frames
                 if tmp_frames: 
-                    frame_info = beautify_message_string(tmp_frames)
+                    frame_info = beautify_message_string(tmp_frames, True)
                 # the layer has non-HTTP3 data (QPACK)
                 else:
                     if 'QPACK Encoder' in layer.stream_uni or 'qpack_encoder' in layer.field_names: 
@@ -292,23 +292,35 @@ def h3msg_to_str(h3msg:Union[list, str]) -> str:
                     elif len(layer.field_names)==1 and layer.field_names[0]=='stream_uni':
                         # this is an empty unidirectional stream
                         frame_info = "\u2298"
-                        #pass
                     else:
                         print(layer)
                         raise "Unknown Application Layer Data"
                 if msginfo:
                     msginfo += ','
-                msginfo += 'STREAM(%s)[%s]' % (stream_id, frame_info)
+                msginfo += '%s(%s)[%s]' % (QUIC_FRAME_ABBREVIATIONS['STREAM'], stream_id, frame_info)
 
-    return beautify_message_string(msginfo)
+    return beautify_message_string(msginfo, True)
 
 
-def beautify_message_string(message:str) -> str:
+def beautify_message_string(message:str, sent_by_client:bool) -> str:
+    
+    message = message\
+        .replace(H3_FRAME_ABBREVIATIONS["RESERVED"]+",", "")\
+        .replace(QUIC_FRAME_ABBREVIATIONS["PADDING"]+",", "")\
+        .replace(QUIC_FRAME_ABBREVIATIONS["NEW_TOKEN"]+",", "")\
+        .replace(QUIC_FRAME_ABBREVIATIONS["PING"]+",", "")
 
-    return message\
-        .replace("RE,", "")\
-        .replace("PAD,", "")\
-        .replace("NT,", "")\
-        .replace("PING,", "")\
-        .rstrip(",")
+    if not sent_by_client:
+        message = message\
+        .replace(QUIC_FRAME_ABBREVIATIONS["NEW_CONNECTION_ID"]+",", "")\
+        .replace(QUIC_FRAME_ABBREVIATIONS["MAX_STREAMS"]+",", "")\
+        .replace(QUIC_FRAME_ABBREVIATIONS["MAX_STREAM_DATA"]+",", "")\
 
+    message = message\
+        .rstrip(",")    
+    
+
+    return message
+
+    # RESERVED, PADDING, NEW_TOKEN, PING ff_n_ols_n-> asas_level
+    # 

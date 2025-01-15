@@ -1,0 +1,177 @@
+{
+  "initial": "Init",
+  "transitions": [
+    {
+      "source": "Init",
+      "dest": "Init",
+      "trigger": "ST(2)[SE] => ACK\n"
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(2)[SE] => ACK\n"
+    },
+    {
+      "source": "5",
+      "dest": "5",
+      "trigger": "ST(2)[SE] => ACK\n"
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ST(2)[SE] => ACK\n"
+    },
+    {
+      "source": "Init",
+      "dest": "2",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
+    },
+    {
+      "source": "5",
+      "dest": "14",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
+    },
+    {
+      "source": "Init",
+      "dest": "Init",
+      "trigger": "ACK => \u2298\n"
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ACK => \u2298\n"
+    },
+    {
+      "source": "5",
+      "dest": "5",
+      "trigger": "ACK => \u2298\n"
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ACK => \u2298\n"
+    },
+    {
+      "source": "Init",
+      "dest": "5",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n"
+    },
+    {
+      "source": "2",
+      "dest": "14",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n"
+    },
+    {
+      "source": "Init",
+      "dest": "Init",
+      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
+    },
+    {
+      "source": "5",
+      "dest": "5",
+      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
+    },
+    {
+      "source": "Init",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "5",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "14",
+      "dest": "Finish",
+      "trigger": "ACK => CC\n"
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n"
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n"
+    },
+    {
+      "source": "5",
+      "dest": "5",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n"
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n"
+    },
+    {
+      "source": "14",
+      "dest": "34",
+      "trigger": "ACK => ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+],ST(0)[\u2298]\n"
+    },
+    {
+      "source": "14",
+      "dest": "35",
+      "trigger": "ACK => ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+],ST(0)[\u2298]|ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[DA+,DA+]|ST(0)[DA+]\n"
+    }
+  ],
+  "states": [
+    {
+      "name": "Init"
+    },
+    {
+      "name": "Finish"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "5"
+    },
+    {
+      "name": "14"
+    },
+    {
+      "name": "34"
+    },
+    {
+      "name": "35"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "Init",
+      "name": "HTTP/3 State Machine",
+      "class-name": "statemachine.ProtoModel"
+    }
+  ]
+}

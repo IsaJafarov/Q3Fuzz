@@ -62,8 +62,19 @@ class MSGCrafter():
                 
                 # This HTTP/3 layer has HTTP/3 frames
                 if layer.has_field("frame_type"):
-                    
-                    h3_field_type = int(layer.frame_type, 16)
+                    '''
+                    print("field_values = {}".format( layer.field_names ))
+                    print("layer.frame = {}".format( layer.frame ))
+                    print("layer.frame_type = {}".format( layer.frame_type ))
+                    print("int(layer.frame_type) = {}".format(int(layer.frame_type)) )
+                    print("int(layer.frame_type, 16) = {}".format(int(layer.frame_type, 16)) )
+                    print("0xf0700 = {}".format(0xf0700))
+                    print("int(0xf0700) = {}".format(0xf0700))
+                    print("int(0xf0700, 16) = {}".format(0xf0700,16))
+                    '''
+
+                    h3_field_type = int(layer.frame_type)
+
 
                     if h3_field_type == FrameType.SETTINGS:
                         frame_data = self.generate_h3_settings_frame(layer)
@@ -80,9 +91,9 @@ class MSGCrafter():
                 # This HTTP/3 layer has non-HTTP/3 frames (QPACK)
                 else: 
                     if 'QPACK Encoder' in layer.stream_uni or 'qpack_encoder' in layer.field_names: 
-                        frame_data = aioquic.buffer.encode_uint_var(StreamType.QPACK_ENCODER)
+                        frame_data = self.generate_qpack_encoder_frame(layer)
                     elif 'QPACK Decoder' in layer.stream_uni: 
-                        frame_data = aioquic.buffer.encode_uint_var(StreamType.QPACK_DECODER)
+                        frame_data = self.generate_qpack_decoder_frame(layer)
                     elif len(layer.field_names)==1 and layer.field_names[0]=='stream_uni':
                         # this is an empty unidirectional stream
                         frame_data = b''
@@ -290,3 +301,21 @@ class MSGCrafter():
         frame_data = encode_frame(PRIORITY_UPDATE_FRAME_IDS[0], bytes.fromhex(data_payload))
         
         return frame_data
+    
+    def generate_qpack_encoder_frame(self, layer:XmlLayer) -> bytes:
+       
+        encoder_data = encode_uint_var(StreamType.QPACK_ENCODER)
+
+        if 'qpack_encoder' in layer.field_names and layer.qpack_encoder.raw_value is not None:
+            encoder_data += bytes.fromhex(layer.qpack_encoder.raw_value)
+
+        return encoder_data
+
+    def generate_qpack_decoder_frame(self, layer:XmlLayer) -> bytes:
+
+        if len( layer.field_names) > 2:
+            print(layer)
+            print(layer.field_names)
+            raise "Implement!!" # TODO
+
+        return encode_uint_var(StreamType.QPACK_DECODER)
