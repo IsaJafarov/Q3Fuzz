@@ -11,21 +11,20 @@ from pyshark.packet.layers.xml_layer import XmlLayer
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
 class MSGCrafter():
-    def __init__(self, qc: QuicConnection, client):
-        self.connection = qc
-        self.client = client
+    def __init__(self):
+        pass
 
-    def copy_msg(self, h3msg: Packet) -> QuicPacketBuilder:
+    def copy_msg(self, h3msg:Packet, builder:QuicPacketBuilder) -> QuicPacketBuilder:
         """
         Build a QuicPacketBuilder with multiple frames in one QUIC packet.
 
         Args:
             h3msg: The parsed QUIC/HTTP3 packet.
+            builder: QuicPacketBuilder to add QUIC/HTTP3 frames to
 
         Returns:
             builder: A QuicPacketBuilder instance with all frames added.
         """
-        builder = self.client.get_builder(Epoch.ONE_RTT)
 
         # Containers to hold QUIC stream and HTTP/3 frame information
         quic_streams = []

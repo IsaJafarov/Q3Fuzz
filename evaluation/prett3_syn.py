@@ -45,7 +45,7 @@ class HttpClient():
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
         self.sock.settimeout(0.2)
         self.handler = MSGHandler(qc = self.connection)
-        self.crafter = MSGCrafter(qc = self.connection, client = self)
+        self.crafter = MSGCrafter()
         os.environ['SSLKEYLOGFILE'] = keylog_file
         
         
@@ -592,7 +592,8 @@ class HttpClient():
         builder = None
 
         # Build message by parsing h3msg
-        builder = self.crafter.copy_msg(h3msg)
+        
+        builder = self.crafter.copy_msg(h3msg, self.get_builder(Epoch.ONE_RTT))
         self.send_quic_frames_from_builder(builder)
 
         response_packets = self.read_from_buffer()
