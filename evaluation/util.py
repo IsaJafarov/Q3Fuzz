@@ -163,7 +163,6 @@ def get_frames_of_layer(layer:XmlLayer) -> List[str]:
             if (layer.layer_name == 'quic' and field_name.strip() == 'Frame Type') :
                 field_value = field_value.split()[0]
                 frame_names.append( QUIC_FRAME_ABBREVIATIONS[ field_value.upper() ] )
-                
 
             if (layer.layer_name == 'http3' and field_name.strip() == 'Type') :
                 field_value = field_value.split()[0]
@@ -227,7 +226,7 @@ def extract_quic_stream_frames(layer:XmlLayer) -> List[str]:
                     break  # Only need the id, stop further parsing for this frame
     return stream_ids
 
-def h3msg_to_str(h3msg:Union[list, str]) -> str:
+def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
     """
     Convert a QUIC or HTTP3 message in a human-readable format.
     args:
@@ -257,7 +256,6 @@ def h3msg_to_str(h3msg:Union[list, str]) -> str:
 
                 # Handle Short Header and frames
                 if 'header_form' in dir(layer) and layer.header_form == "0":  # Short header type
-                    # print(get_frames_of_layer(layer))
                     stream_frames = extract_quic_stream_frames(layer)
                     if len(stream_frames) == 0:
                         # Include non-STREAM frames directly in msginfo
@@ -273,18 +271,15 @@ def h3msg_to_str(h3msg:Union[list, str]) -> str:
                 else:
                     raise ValueError("HTTP/3 layer count exceeds QUIC STREAM frames.")
 
-                # Extract HTTP/3 frames
-                tmp_frames = ''
-                for frame_name in get_frames_of_layer(layer):
-                    tmp_frames += frame_name + ","
-
-
-                frame_info = None
-                # the layer has HTTP3 frames
-                if tmp_frames: 
-                    frame_info = beautify_message_string(tmp_frames, True)
-                # the layer has non-HTTP3 data (QPACK)
+                h3_frames = get_frames_of_layer(layer)
+                
+                frame_info = ""
+                if h3_frames:
+                    # the layer has HTTP3 frames
+                    for frame_name in h3_frames:
+                        frame_info += frame_name + ","
                 else:
+                    # the layer has non-HTTP3 data (QPACK)
                     if 'QPACK Encoder' in layer.stream_uni or 'qpack_encoder' in layer.field_names: 
                         frame_info = "Enc" 
                     elif 'QPACK Decoder' in layer.stream_uni: 
@@ -295,6 +290,8 @@ def h3msg_to_str(h3msg:Union[list, str]) -> str:
                     else:
                         print(layer)
                         raise "Unknown Application Layer Data"
+                frame_info = beautify_message_string(frame_info, True)
+
                 if msginfo:
                     msginfo += ','
                 msginfo += '%s(%s)[%s]' % (QUIC_FRAME_ABBREVIATIONS['STREAM'], stream_id, frame_info)
