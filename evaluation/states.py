@@ -4,13 +4,13 @@ from typing import List
 class State:
 	def __init__(self, name:str, level:int, parent_state:"State"=None, msg_sent:Packet=None, msg_rcvd_str:str=None,
 	 child_sr_dict=None, is_abnormal=False):
-		self.name = name
-		self.level = level
+		self.name:str = name
+		self.level:int = level
 		self.parent_state = parent_state
-		self.msg_sent = msg_sent # Pyshark packet: Requested QUIC and HTTP/3 message to reach this state from its parent
-		self.msg_rcvd_str = msg_rcvd_str # Str: Responsed QUIC and HTTP/3 message to reach this state from its parent
-		self.child_sr_dict = child_sr_dict
-		self.packet_number = None
+		self.msg_sent:Packet = msg_sent # Pyshark packet: Requested QUIC and HTTP/3 message to reach this state from its parent
+		self.msg_rcvd_str:str = msg_rcvd_str # Str: Responsed QUIC and HTTP/3 message to reach this state from its parent
+		self.child_sr_dict:dict = child_sr_dict
+		self.packet_number:int = None
 
 class StateList:
 	def __init__(self, state_list:List[State]=[]):

@@ -739,13 +739,6 @@ if __name__ == "__main__":
     ### Extract initial state machine ###
     http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
 
-    
-    #print("-------------")
-    #for i in http3_basic_messages:
-    #    print(i)
-    #    print(i.quic.packet_number)
-    #sys.exit()
-
     stma.modeller_h3(conf=configuration, 
                      keylog=keylog_file, 
                      url=args.url, 
