@@ -61,19 +61,16 @@ class MSGCrafter():
                 
                 # This HTTP/3 layer has HTTP/3 frames
                 if layer.has_field("frame_type"):
-                    '''
-                    print("field_values = {}".format( layer.field_names ))
-                    print("layer.frame = {}".format( layer.frame ))
-                    print("layer.frame_type = {}".format( layer.frame_type ))
-                    print("int(layer.frame_type) = {}".format(int(layer.frame_type)) )
-                    print("int(layer.frame_type, 16) = {}".format(int(layer.frame_type, 16)) )
-                    print("0xf0700 = {}".format(0xf0700))
-                    print("int(0xf0700) = {}".format(0xf0700))
-                    print("int(0xf0700, 16) = {}".format(0xf0700,16))
-                    '''
-
-                    h3_field_type = int(layer.frame_type)
-
+                    # Obtain safe value of frame type.
+                    frame_type_value = layer.frame_type.strip()  # Remove any surrounding whitespace
+                    try:
+                        # Check if the value is hexadecimal
+                        if frame_type_value.startswith("0x"):
+                            h3_field_type = int(frame_type_value, 16)
+                        else:
+                            h3_field_type = int(frame_type_value)  # Assume decimal
+                    except ValueError:
+                        raise ValueError(f"Invalid frame_type value: {frame_type_value}")
 
                     if h3_field_type == FrameType.SETTINGS:
                         frame_data = self.generate_h3_settings_frame(layer)
