@@ -321,6 +321,3 @@ def beautify_message_string(message:str, sent_by_client:bool) -> str:
     
 
     return message
-
-    # RESERVED, PADDING, NEW_TOKEN, PING ff_n_ols_n-> asas_level
-    # 

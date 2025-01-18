@@ -186,7 +186,8 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
 
     # Complete the connection by sending handshake completion messages
     h3client.complete_connection()
-    h3client.read_from_buffer()  # Receive any response from the server
+    received_after_init = h3client.read_from_buffer()  # Receive any response from the server
+    print("received_after_init = {}".format(received_after_init))
 
     ### SENDING STATE MOVING MESSAGES ###
     for mov_msg in mov_msg_list:

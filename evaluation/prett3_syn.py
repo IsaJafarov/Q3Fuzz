@@ -261,6 +261,7 @@ class HttpClient():
 
         # ACK
         # print(">>> prett3.complete_connection: start. Adding ACK frame to the builder")
+        ''' TODO can I keep it commented out or is it necessary?
         buf = builder.start_frame(
                     QuicFrameType.ACK,
                     capacity=ACK_FRAME_CAPACITY,
@@ -270,6 +271,7 @@ class HttpClient():
         buf.push_uint_var(106) # ack delay
         buf.push_uint_var(0) # ack range count
         buf.push_uint_var(1) # ack range
+        '''
 
         # CRYPTO
         # print(">>> prett3.complete_connection: Adding CRYPTO frame to the builder")
@@ -453,7 +455,7 @@ class HttpClient():
             #print("(Type: {})".format(header.packet_type.name))
 
             ''' 
-            This check causes a problem, when we send NEW_CONNECTIONS_ID frame in the test message 
+            This aioquic check causes a problem, when we send NEW_CONNECTIONS_ID frame in the test message 
             and the server responds to that new destination ID
 
             # Check destination CID matches.
@@ -501,7 +503,6 @@ class HttpClient():
             else:
                 space = self.connection._spaces[epoch]
 
-            
             # decrypt packet
             encrypted_off = buf.tell() - start_off
             end_off = start_off + header.packet_length
@@ -616,7 +617,7 @@ class HttpClient():
         buf.push_bytes(reason)
 
         self.send_quic_frames_from_builder(builder=builder)
-
+        #self.read_from_buffer()
         self.sock.close()
 
 def init(args):

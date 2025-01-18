@@ -157,11 +157,6 @@
       "trigger": "ACK => \u2298\n"
     },
     {
-      "source": "14",
-      "dest": "44",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
       "source": "23",
       "dest": "23",
       "trigger": "ACK => \u2298\n"
@@ -475,11 +470,6 @@
       "source": "23",
       "dest": "75",
       "trigger": "ACK => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
-    },
-    {
-      "source": "101",
-      "dest": "149",
-      "trigger": "ACK => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
     }
   ],
   "states": [
@@ -533,9 +523,6 @@
     },
     {
       "name": "141"
-    },
-    {
-      "name": "149"
     }
   ],
   "before_state_change": [],

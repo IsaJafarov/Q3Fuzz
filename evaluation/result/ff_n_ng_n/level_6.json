@@ -67,11 +67,6 @@
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
     },
     {
-      "source": "149",
-      "dest": "161",
-      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
-    },
-    {
       "source": "Init",
       "dest": "2",
       "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
@@ -167,11 +162,6 @@
       "trigger": "ACK => \u2298\n"
     },
     {
-      "source": "14",
-      "dest": "44",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
       "source": "23",
       "dest": "23",
       "trigger": "ACK => \u2298\n"
@@ -234,31 +224,6 @@
     {
       "source": "141",
       "dest": "55",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "149",
-      "dest": "162",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "149",
-      "dest": "165",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "149",
-      "dest": "166",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "149",
-      "dest": "55",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "149",
-      "dest": "161",
       "trigger": "ACK => \u2298\n"
     },
     {
@@ -387,11 +352,6 @@
       "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
     },
     {
-      "source": "149",
-      "dest": "168",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
-    },
-    {
       "source": "1",
       "dest": "Finish",
       "trigger": "ST(6)[Enc] => CC\n"
@@ -537,29 +497,14 @@
       "trigger": "ST(6)[Enc] => ACK,SS|CC\n"
     },
     {
-      "source": "149",
-      "dest": "Finish",
-      "trigger": "ST(6)[Enc] => ACK,SS|CC\n"
-    },
-    {
       "source": "23",
       "dest": "75",
-      "trigger": "ACK => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
-    },
-    {
-      "source": "101",
-      "dest": "149",
       "trigger": "ACK => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
     },
     {
       "source": "141",
       "dest": "55",
       "trigger": "ACK => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
-    },
-    {
-      "source": "149",
-      "dest": "162",
-      "trigger": "ST(0)[HE] => \u2298\n"
     }
   ],
   "states": [
@@ -613,24 +558,6 @@
     },
     {
       "name": "141"
-    },
-    {
-      "name": "149"
-    },
-    {
-      "name": "161"
-    },
-    {
-      "name": "162"
-    },
-    {
-      "name": "165"
-    },
-    {
-      "name": "166"
-    },
-    {
-      "name": "168"
     }
   ],
   "before_state_change": [],

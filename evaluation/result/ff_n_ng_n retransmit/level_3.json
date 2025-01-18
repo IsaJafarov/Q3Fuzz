@@ -8,17 +8,12 @@
     },
     {
       "source": "1",
-      "dest": "11",
+      "dest": "1",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
     },
     {
       "source": "2",
       "dest": "12",
-      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
-    },
-    {
-      "source": "11",
-      "dest": "11",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
     },
     {
@@ -29,26 +24,6 @@
     {
       "source": "14",
       "dest": "14",
-      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
-    },
-    {
-      "source": "42",
-      "dest": "81",
-      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
-    },
-    {
-      "source": "44",
-      "dest": "44",
-      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
-    },
-    {
-      "source": "54",
-      "dest": "101",
-      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
-    },
-    {
-      "source": "55",
-      "dest": "55",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n"
     },
     {
@@ -67,18 +42,8 @@
       "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
     },
     {
-      "source": "11",
-      "dest": "42",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
-    },
-    {
       "source": "14",
-      "dest": "54",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
-    },
-    {
-      "source": "44",
-      "dest": "55",
+      "dest": "44",
       "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
     },
     {
@@ -99,11 +64,6 @@
     {
       "source": "23",
       "dest": "23",
-      "trigger": "ST(6)[Enc] => ACK\n"
-    },
-    {
-      "source": "75",
-      "dest": "75",
       "trigger": "ST(6)[Enc] => ACK\n"
     },
     {
@@ -127,18 +87,8 @@
       "trigger": "ACK => \u2298\n"
     },
     {
-      "source": "11",
+      "source": "12",
       "dest": "44",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "12",
-      "dest": "54",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "12",
-      "dest": "55",
       "trigger": "ACK => \u2298\n"
     },
     {
@@ -149,41 +99,6 @@
     {
       "source": "23",
       "dest": "23",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "42",
-      "dest": "55",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "44",
-      "dest": "44",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "54",
-      "dest": "54",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "54",
-      "dest": "55",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "55",
-      "dest": "55",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "55",
-      "dest": "54",
-      "trigger": "ACK => \u2298\n"
-    },
-    {
-      "source": "75",
-      "dest": "75",
       "trigger": "ACK => \u2298\n"
     },
     {
@@ -222,18 +137,13 @@
       "trigger": "ACK => CC\n"
     },
     {
-      "source": "54",
-      "dest": "Finish",
-      "trigger": "ACK => CC\n"
-    },
-    {
       "source": "Init",
       "dest": "Init",
       "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
     },
     {
       "source": "1",
-      "dest": "11",
+      "dest": "1",
       "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
     },
     {
@@ -247,11 +157,6 @@
       "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
     },
     {
-      "source": "11",
-      "dest": "11",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
-    },
-    {
       "source": "12",
       "dest": "12",
       "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
@@ -267,47 +172,12 @@
       "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
     },
     {
-      "source": "42",
-      "dest": "81",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
-    },
-    {
-      "source": "44",
-      "dest": "44",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
-    },
-    {
-      "source": "54",
-      "dest": "101",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
-    },
-    {
-      "source": "55",
-      "dest": "55",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
-    },
-    {
-      "source": "75",
-      "dest": "75",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n"
-    },
-    {
       "source": "1",
       "dest": "Finish",
       "trigger": "ST(6)[Enc] => CC\n"
     },
     {
-      "source": "11",
-      "dest": "Finish",
-      "trigger": "ST(6)[Enc] => CC\n"
-    },
-    {
       "source": "12",
-      "dest": "Finish",
-      "trigger": "ST(6)[Enc] => CC\n"
-    },
-    {
-      "source": "42",
       "dest": "Finish",
       "trigger": "ST(6)[Enc] => CC\n"
     },
@@ -327,26 +197,6 @@
       "trigger": "ST(0)[HE] => ACK\n"
     },
     {
-      "source": "42",
-      "dest": "81",
-      "trigger": "ST(0)[HE] => ACK\n"
-    },
-    {
-      "source": "54",
-      "dest": "101",
-      "trigger": "ST(0)[HE] => ACK\n"
-    },
-    {
-      "source": "55",
-      "dest": "55",
-      "trigger": "ST(0)[HE] => ACK\n"
-    },
-    {
-      "source": "75",
-      "dest": "75",
-      "trigger": "ST(0)[HE] => ACK\n"
-    },
-    {
       "source": "3",
       "dest": "Finish",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,SS|CC\n"
@@ -357,53 +207,13 @@
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,SS|CC\n"
     },
     {
-      "source": "75",
-      "dest": "Finish",
-      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,SS|CC\n"
-    },
-    {
-      "source": "11",
-      "dest": "44",
-      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
-    },
-    {
-      "source": "42",
-      "dest": "55",
-      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
-    },
-    {
-      "source": "11",
-      "dest": "44",
-      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]|CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
-    },
-    {
-      "source": "42",
-      "dest": "55",
-      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]|CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
-    },
-    {
       "source": "14",
       "dest": "Finish",
       "trigger": "ST(6)[Enc] => ACK,SS|CC\n"
     },
     {
-      "source": "44",
-      "dest": "Finish",
-      "trigger": "ST(6)[Enc] => ACK,SS|CC\n"
-    },
-    {
-      "source": "54",
-      "dest": "Finish",
-      "trigger": "ST(6)[Enc] => ACK,SS|CC\n"
-    },
-    {
-      "source": "55",
-      "dest": "Finish",
-      "trigger": "ST(6)[Enc] => ACK,SS|CC\n"
-    },
-    {
       "source": "23",
-      "dest": "75",
+      "dest": "23",
       "trigger": "ACK => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
     }
   ],
@@ -424,9 +234,6 @@
       "name": "3"
     },
     {
-      "name": "11"
-    },
-    {
       "name": "12"
     },
     {
@@ -436,25 +243,7 @@
       "name": "23"
     },
     {
-      "name": "42"
-    },
-    {
       "name": "44"
-    },
-    {
-      "name": "54"
-    },
-    {
-      "name": "55"
-    },
-    {
-      "name": "75"
-    },
-    {
-      "name": "81"
-    },
-    {
-      "name": "101"
     }
   ],
   "before_state_change": [],

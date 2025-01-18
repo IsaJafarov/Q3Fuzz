@@ -20,7 +20,7 @@ class Stream():
         self.uni_stream_type:StreamType = None
 
         # if HTTP/3 frame that the server sends is too long to fit in a singe stream frame, some of its contents is sent in the subsequent stream frames
-        self.unfinished_h3_frame_type:FrameType = None # type of the H3 frame, which has been received partially
+        self.unfinished_h3_frame_type:FrameType = None # type of the H3 frame, which has partially been received 
         self.unfinished_h3_frame_len_to_read:int = None # length of the rest of the H3 frame, which is expected to be received in the subsequent frames
 
 
@@ -41,6 +41,7 @@ class MSGHandler():
     def __init__(self, qc: QuicConnection):
         self._quic = qc
         self.streams:list[Stream] =[] # all streams throughout the connection
+        self.previous_quic_payloads:list[bytes] = []
 
     def get_stream_by_id(self, stream_id:int):
         for stream in self.streams:
@@ -52,14 +53,24 @@ class MSGHandler():
         return stream
 
 
-    def process_quic_payload(self, context: QuicReceiveContext, plain: bytes, crypto_frame_required: bool = False) -> Tuple[bool, bool]:
+    def process_quic_payload(self, context: QuicReceiveContext, plain: bytes, crypto_frame_required: bool = False) -> str:
+        
+        # When the client sends an ACK frame and acknowledges an old packet,
+        # the server assumes that a recent packet that it sent was lost. So, it retransmits the packet.
+        # Check if this quic payload has previously been received.
+        if plain in self.previous_quic_payloads:           
+            # Ignore if the payload consists of only PING and PADDING frames
+            if any(byte not in (QuicFrameType.PADDING, QuicFrameType.PING) for byte in plain):
+                return "RETRANSMIT"
+                
+
         buf = Buffer(data=plain)
         
         msg_per_layer = ''
 
         while not buf.eof():
 
-            # get frame type
+            # get QUIC frame type
             try:
                 frame_type = buf.pull_uint_var()
                 #print("\nframe_type: {}".format(frame_type))
@@ -146,6 +157,7 @@ class MSGHandler():
             elif frame_type>0x31:
                 raise QuicConnectionError(error_code=QuicErrorCode.FRAME_ENCODING_ERROR, frame_type=frame_type, reason_phrase="Unknown frame type")
             
+        self.previous_quic_payloads.append( plain )
 
         return util.beautify_message_string(msg_per_layer, False)
     
@@ -164,13 +176,12 @@ class MSGHandler():
         '''
 
         # If the stream has already been created during the connection, retrieve its data
-        # Otherwise, create a new ctream
+        # Otherwise, a new ctream is created
         stream = self.get_stream_by_id(received_stream.stream_id)
         
 
         # Check if the stream is server-initiated unidirectional stream
         # In unidirectional streams, the first byte indicates stream type (control, push, QPACK... )
-        
         if received_stream.stream_id % 4 == 3:
 
             # if stream offset is not 0, the stream has already been initiated, and therefore the first byte does not indicate the stream type
@@ -179,7 +190,7 @@ class MSGHandler():
             else:
                 pass
 
-            # Check if the streams are QPACK Encoder/Decoder streams
+            # Check if the stream is a QPACK Encoder/Decoder stream
             if stream.uni_stream_type == StreamType.QPACK_ENCODER:
                 msg_http3 += "Enc,"
                 return util.beautify_message_string(msg_http3, False)
@@ -189,12 +200,12 @@ class MSGHandler():
             
 
 
-        # read HTTP3 frames
+        # read HTTP/3 frames
         while ( not buf.eof() ):
             
             # If an HTTP/3 frame is too long, the data might be received in multiple stream frames.
             # Check if this stream has unfinished HTTP/3 data.
-            # If a certain section of the HTTP/3 frames was received in previously received packets, in this stream the initial bytes do not indicate frame type or length
+            # If a certain section of the HTTP/3 frame was received in previously received packets, in this stream the initial bytes do not indicate frame type or length
             if stream.unfinished_h3_frame_type is None:
                 frame_type = buf.pull_uint_var()
                 frame_len = buf.pull_uint_var()
@@ -208,10 +219,12 @@ class MSGHandler():
             #print("h3 frame_type: {}".format( frame_type ))
             #print("h3 frame_len: {}".format( frame_len ))
 
-            # Check if the HTTP/3 frame is small enough to fit in this stream.
-            # If not, the rest of the HTTP/3 frame will be received in the upcoming stream frames.
+            # Check if the HTTP/3 frame is small enough to fit in this stream. If so, read all frame data.
+            # Otherwise, read until the end of the stream data and the rest of the HTTP/3 frame will be received in the upcoming stream frames.
             if len(buf.data) + frame_len <= received_stream.length:
                 h3_frame_data = buf.pull_bytes(frame_len)
+                stream.unfinished_h3_frame_type = None
+                stream.unfinished_h3_frame_len_to_read = None
             else:
                 left_data = len(received_stream.data) - len(buf.data)
                 #print("OOPS we can only read {} byte frame data".format( left_data ))
