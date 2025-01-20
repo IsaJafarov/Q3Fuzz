@@ -178,7 +178,7 @@ def h3msg_from_pcap(file_path:str, client_only:bool=False) -> List[Packet]: # fo
 
     Args:
         f (str): pcap file with QUIC or HTTP/3 messages
-        client_only (bool, default=False): flag for extracting messages set by client side. 
+        client_only (bool, default=False): flag for extracting messages sent by client side. 
     Returns:
         quic_packet_list (FileCapture): QUIC or HTTP/3 messages that are seen in the pcap file.
     """
@@ -289,7 +289,7 @@ def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
                         frame_info = "\u2298"
                     else:
                         print(layer)
-                        raise "Unknown Application Layer Data"
+                        raise Exception("Unknown Application Layer Data") 
                 frame_info = beautify_message_string(frame_info, True)
 
                 if msginfo:

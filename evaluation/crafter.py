@@ -55,7 +55,7 @@ class MSGCrafter():
                         pass
                     else:
                         print(field)
-                        raise "[-] Unsupported QUIC Frame"
+                        raise Exception("[-] Unsupported QUIC Frame")
                     
             elif layer.layer_name == 'http3':
                 
@@ -95,7 +95,7 @@ class MSGCrafter():
                         frame_data = b''
                     else:
                         print(layer)
-                        raise "[-] Unsupported Application Layer Data"
+                        raise Exception("[-] Unsupported Application Layer Data") 
                 
                 # Put application layer data into the corresponding quic stream frame
                 quic_stream = quic_streams.pop(0)
@@ -218,7 +218,7 @@ class MSGCrafter():
                 settings[0x2B603742] = int(value)
 
             else:
-                raise "Unexpected SETTINGS Identifier: {}. Add it here...".format(key)
+                raise Exception("Unexpected SETTINGS Identifier: {}. Add it here...".format(key))
 
         # Encode the settings into SETTINGS frame payload
         settings_data = encode_settings(settings)

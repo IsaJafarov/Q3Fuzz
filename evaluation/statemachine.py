@@ -1,6 +1,6 @@
 import states
 from transitions.extensions import GraphMachine
-from prett3_syn import HttpClient
+from http_client import HttpClient
 
 import util
 import json
@@ -21,14 +21,14 @@ class ProtoModel(object):
         self.name = name
 
         # For HTTP/3 communication
-        self.configuration = None
-        self.keylog = None
+        self.configuration:QuicConfiguration = None
+        self.keylog:str = None
 
         # overall status
-        self.is_pruning = False
-        self.current_level = 1
-        self.dst_ip = None
-        self.timeout = 10
+        self.is_pruning:bool = False
+        self.current_level:int = 1
+        self.dst_ip:str = None
+        #self.timeout:int = 10
 
         # State searching information
         self.current_state = 0
@@ -38,8 +38,8 @@ class ProtoModel(object):
 
         # Transition information
         # trigger as key (string) : [src_state (string), dest_state (string), cnt]
-        self.transition_info = {}
-        self.testmsgs = None
+        self.transition_info:dict = {}
+        self.testmsgs:List[Packet] = None
 
 
 class MergeData():
@@ -192,7 +192,7 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
     ### SENDING STATE MOVING MESSAGES ###
     for mov_msg in mov_msg_list:
         print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg)}")
-        state_msg = h3client.replay_msg(mov_msg, is_moving=True)  # Send HTTP/3 state-moving message
+        state_msg = h3client.replay_msg(mov_msg)  # Send HTTP/3 state-moving message
         if state_msg:
             print(f"  [+] Received state-moving response: {state_msg}")
             # h3msg_rcvd.append(state_msg)
@@ -202,7 +202,7 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
         print("  [+] Sending testing message...")
         print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
         # h3msg_sent.show()
-        h3msg_rcvd = h3client.replay_msg(h3msg_sent, is_moving=False)  # Send HTTP/3 target message
+        h3msg_rcvd = h3client.replay_msg(h3msg_sent)  # Send HTTP/3 target message
     
     h3client.close_connection()
 
