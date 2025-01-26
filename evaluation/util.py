@@ -10,19 +10,10 @@ import pyshark.packet
 import pyshark.packet.layers
 from pyshark.packet.packet import Packet
 from pyshark.packet.layers.xml_layer import XmlLayer
+from dissector import *
 
 # IETF specification
 QUIC_LONGPACKETTYPE = ['INIT', '0-RTT', 'HANDSHAKE', 'RETRY']
-# QUIC_SHORTPACKETTYPE = "1-RTT" # short packet does not have a type. It corresponds to 1-RTT only.
-# QUIC_FRAMETYPE = ['PADDING', 'PING', 'ACK', 'ACK', 'RESET_STREAM', 'STOP_SENDING', 'CRYPTO', 'NEW_TOKEN', \
-#              'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', 'STREAM', \
-#              'MAX_DATA', 'MAX_STREAM_DATA', 'MAX_STREAMS', 'MAX_STREAMS', 'DATA_BLOCKED', 'STREAM_DATA_BLOCKED', 'STREAMS_BLOCKED', 'STREAMS_BLOCKED',\
-#              'NEW_CONNECTION_ID', 'RETIRE_CONNECTION_ID', 'PATH_CHALLENGE', 'PATH_RESPONSE', 'CONNECTION_CLOSE', 'CONNECTION_CLOSE', 'HANDSHAKE_DONE', 'IMMEDIATE_ACK',\
-#              'DATAGRAM', 'DATAGRAM'] # ~0x21 frames so far
-
-# H3_STREAMTYPE = ['CONTROL_STREAM', 'PUSH_STREAM', 'QPACK_ENCODER_STREAM', 'QPACK_DECODER_STREAM']
-# H3_FRAMETYPE = ['DATA', 'HEADERS', 'RESERVED', 'CANCEL_PUSH', 'SETTINGS', 'PUSH_PROMISE', 'RESERVED', 'GOAWAY',\
-#                 'RESERVED', 'RESERVED', 'UNASSIGNED', 'UNASSIGNED', 'ORIGIN', 'MAX_PUSH_ID'] # ~0x0d frames so far
 
 
 QUIC_FRAME_ABBREVIATIONS = {
@@ -124,7 +115,6 @@ H3_FRAME_ABBREVIATIONS = {
 }
 
 
-
 ############# GENERAL #############
 class Tee(object):
     def __init__(self, *files):
@@ -204,27 +194,6 @@ def h3msg_from_pcap(file_path:str, client_only:bool=False) -> List[Packet]: # fo
 
     return quic_packet_list
 
-def extract_quic_stream_frames(layer:XmlLayer) -> List[str]:
-    """
-    Extract all STREAM frame IDs from a QUIC layer.
-    args:
-        layer: A QUIC layer object from pyshark.
-    return:
-        stream_ids: A list of stream IDs from STREAM frames.
-    """
-    stream_ids = []
-
-    # Iterate through all fields in the QUIC layer
-    for frame in layer.frame.all_fields:
-        if "STREAM" in frame.showname.upper():  # Check if this field represents a STREAM frame
-            # Extract the stream_id directly from the showname
-            stream_details = frame.showname
-            for part in stream_details.split():
-                if part.startswith("id="):
-                    stream_id = part.split("=")[1]
-                    stream_ids.append(stream_id)
-                    break  # Only need the id, stop further parsing for this frame
-    return stream_ids
 
 def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
     """
@@ -234,9 +203,8 @@ def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
     return:
         msginfo: a string of a Q / H3 message with multiple layers and frames
     """
-
+    
     msginfo = ''
-    stream_frames = []  # A list to store stream IDs from QUIC STREAM frames
 
     if type(h3msg) is list: # for moving messages
         for h3msg_sub in h3msg:
@@ -244,59 +212,49 @@ def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
         if msginfo != '':
             msginfo = msginfo.rstrip(" => ")
     else:
-        http3_layer_idx = 0  # Index to track HTTP/3 layer processing
-        for layer in h3msg.layers:
-            if layer.layer_name == 'quic':
-                # Handle QUIC Long Header
-                if 'header_form' in dir(layer) and layer.header_form == "1":  # Long header type
-                    if msginfo:
-                        msginfo += ','
-                    msginfo += QUIC_LONGPACKETTYPE[int(layer.long_packet_type)]
-                    continue  # Skip further processing for long headers
+        quic_layer = h3msg.quic
+        
+        if 'header_form' in quic_layer.field_names and quic_layer.header_form == "1":  # Long header type
+            if msginfo:
+                msginfo += ','
+            msginfo += QUIC_LONGPACKETTYPE[int(quic_layer.long_packet_type)]
+            return msginfo
 
-                # Handle Short Header and frames
-                if 'header_form' in dir(layer) and layer.header_form == "0":  # Short header type
-                    stream_frames = extract_quic_stream_frames(layer)
-                    if len(stream_frames) == 0:
-                        # Include non-STREAM frames directly in msginfo
-                        for frame_name in get_frames_of_layer(layer):
-                            msginfo += frame_name+","
-                        
+        msg_dissector = MSGDissector()
+        msg_dissector.dissect_msg(h3msg)    
 
-            elif layer.layer_name == "http3":
-                # Match HTTP/3 layer to the corresponding QUIC STREAM frame
-                if http3_layer_idx < len(stream_frames):
-                    stream_id = stream_frames[http3_layer_idx]
-                    http3_layer_idx += 1
-                else:
-                    raise ValueError("HTTP/3 layer count exceeds QUIC STREAM frames.")
+        for quic_frame in msg_dissector.quic_frames:
+            if type(quic_frame) == QuicAck:
+                msginfo += QUIC_FRAME_ABBREVIATIONS['ACK']
+            elif type(quic_frame) == QuicNewConnectionId:
+                msginfo += QUIC_FRAME_ABBREVIATIONS['NEW_CONNECTION_ID']
+            elif type(quic_frame) == QuicStream:
+                h3_frame_str = ''
 
-                h3_frames = get_frames_of_layer(layer)
+                if quic_frame is None:
+                    h3_frame_str = "\u2298"
+                elif type(quic_frame.h3_frame) == H3Settings:
+                    h3_frame_str = H3_FRAME_ABBREVIATIONS['SETTINGS']
+                elif type(quic_frame.h3_frame) == H3Headers:
+                    h3_frame_str = H3_FRAME_ABBREVIATIONS['HEADERS']
+                elif type(quic_frame.h3_frame) == H3Data:
+                    h3_frame_str = H3_FRAME_ABBREVIATIONS['DATA'] 
+                elif type(quic_frame.h3_frame) == H3PriorityUpdate:
+                    h3_frame_str = H3_FRAME_ABBREVIATIONS['PRIORITY_UPDATE']
+                elif type(quic_frame.h3_frame) == QpackEncoder:
+                    h3_frame_str = 'Enc'
+                elif type(quic_frame.h3_frame) == QpackDecoder:
+                    h3_frame_str = 'Dec'
                 
-                frame_info = ""
-                if h3_frames:
-                    # the layer has HTTP3 frames
-                    for frame_name in h3_frames:
-                        frame_info += frame_name + ","
                 else:
-                    # the layer has non-HTTP3 data (QPACK)
-                    if 'QPACK Encoder' in layer.stream_uni or 'qpack_encoder' in layer.field_names: 
-                        frame_info = "Enc" 
-                    elif 'QPACK Decoder' in layer.stream_uni: 
-                        frame_info = "Dec" 
-                    elif len(layer.field_names)==1 and layer.field_names[0]=='stream_uni':
-                        # this is an empty unidirectional stream
-                        frame_info = "\u2298"
-                    else:
-                        print(layer)
-                        raise Exception("Unknown Application Layer Data") 
-                frame_info = beautify_message_string(frame_info, True)
+                    raise Exception("Unknown HTTP/3 frame")
+            
+                msginfo += "{}({})[{}]".format(QUIC_FRAME_ABBREVIATIONS['STREAM'], quic_frame.stream_id, h3_frame_str)
+            else:
+                raise Exception("Unknown QUIC frame")
+            msginfo += ","
 
-                if msginfo:
-                    msginfo += ','
-                msginfo += '%s(%s)[%s]' % (QUIC_FRAME_ABBREVIATIONS['STREAM'], stream_id, frame_info)
-
-    return beautify_message_string(msginfo, True)
+    return beautify_message_string(msginfo,True) 
 
 
 def beautify_message_string(message:str, sent_by_client:bool) -> str:

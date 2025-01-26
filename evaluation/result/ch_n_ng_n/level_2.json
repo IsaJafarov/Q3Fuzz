@@ -4,92 +4,146 @@
     {
       "source": "Init",
       "dest": "Init",
-      "trigger": "ST(2)[SE] => ACK\n"
+      "trigger": "ST(2)[SE] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
     },
     {
       "source": "2",
       "dest": "2",
-      "trigger": "ST(2)[SE] => ACK\n"
+      "trigger": "ST(2)[SE] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
     },
     {
       "source": "5",
       "dest": "5",
-      "trigger": "ST(2)[SE] => ACK\n"
+      "trigger": "ST(2)[SE] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
     },
     {
       "source": "Init",
       "dest": "2",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
+      "conditions": [
+        "packet_number:8"
+      ]
     },
     {
       "source": "5",
       "dest": "14",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n"
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
+      "conditions": [
+        "packet_number:8"
+      ]
     },
     {
       "source": "Init",
       "dest": "Init",
-      "trigger": "ACK => \u2298\n"
+      "trigger": "ACK => \u2298\n",
+      "conditions": [
+        "packet_number:9"
+      ]
     },
     {
       "source": "2",
       "dest": "2",
-      "trigger": "ACK => \u2298\n"
+      "trigger": "ACK => \u2298\n",
+      "conditions": [
+        "packet_number:9"
+      ]
     },
     {
       "source": "5",
       "dest": "5",
-      "trigger": "ACK => \u2298\n"
+      "trigger": "ACK => \u2298\n",
+      "conditions": [
+        "packet_number:9"
+      ]
     },
     {
       "source": "Init",
       "dest": "5",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n"
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
+      "conditions": [
+        "packet_number:11"
+      ]
     },
     {
       "source": "2",
       "dest": "14",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n"
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
+      "conditions": [
+        "packet_number:11"
+      ]
     },
     {
       "source": "Init",
       "dest": "Init",
-      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
+      "trigger": "ACK => RETRANSMIT\n",
+      "conditions": [
+        "packet_number:12"
+      ]
     },
     {
       "source": "2",
       "dest": "2",
-      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
+      "trigger": "ACK => RETRANSMIT\n",
+      "conditions": [
+        "packet_number:12"
+      ]
     },
     {
       "source": "5",
       "dest": "5",
-      "trigger": "ACK => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]\n"
+      "trigger": "ACK => RETRANSMIT\n",
+      "conditions": [
+        "packet_number:12"
+      ]
     },
     {
       "source": "Init",
       "dest": "Finish",
-      "trigger": "ACK => CC\n"
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:13"
+      ]
     },
     {
       "source": "2",
       "dest": "Finish",
-      "trigger": "ACK => CC\n"
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:13"
+      ]
     },
     {
       "source": "5",
       "dest": "Finish",
-      "trigger": "ACK => CC\n"
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:13"
+      ]
     },
     {
       "source": "2",
       "dest": "2",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n"
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:8"
+      ]
     },
     {
       "source": "5",
       "dest": "5",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n"
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:11"
+      ]
     }
   ],
   "states": [

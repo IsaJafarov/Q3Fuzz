@@ -280,7 +280,7 @@ def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData)
     if md.src_s is not None and md.dst_s is not None:
         if len(sm.get_transitions(trigger=md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name)) > 0:
             return
-        sm.add_transition(md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name, conditions="packet_number:{}".format(cand_s.packet_number))
+        sm.add_transition(md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name, conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
     # Unique
     else:
         # Finished
@@ -288,12 +288,12 @@ def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData)
             print("  [lv.%d-MINIMIZATION-STATE %s] It is finishing state!" % (pm.current_level, cand_s.name))
             if len(sm.get_transitions(trigger=md.t_label + "\n", source=cand_s.parent_state.name, dest='Finish')) > 0:
                 return
-            sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest='Finish', conditions="packet_number:{}".format(cand_s.packet_number))
+            sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest='Finish', conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
         # Non-finished
         else:
             pm.state_list.add_state(cand_s)
             sm.add_state(cand_s.name)
-            sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest=cand_s.name, conditions="packet_number:{}".format(cand_s.packet_number))
+            sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest=cand_s.name, conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
 
 
 def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) -> None:
@@ -350,6 +350,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
         md = MergeData()
         msg_sent_str = util.h3msg_to_str(cand_s.msg_sent)
         msg_rcvd_str = cand_s.msg_rcvd_str
+        print("msg_rcvd_str: {}".format( msg_rcvd_str ))
         sr_msg = "%s => %s" % (msg_sent_str, msg_rcvd_str)
         md.t_label = sr_msg
 
@@ -392,8 +393,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
                 # no dup state found.
                 print("  [lv.%d-MINIMIZATION-STATE %s] -> **** Unique state %s found ****" % (pm.current_level, cand_s.name, cand_s.name))
         
-        # Add the triggering message's packet number to SM
-        # It will be used during fuzzing
-        cand_s.packet_number = state_moving_msgs_list[-1].quic.packet_number
+            # Add the triggering message's packet number to SM
+            # It will be used during fuzzing
         
         update_sm(pm, sm, cand_s, md)

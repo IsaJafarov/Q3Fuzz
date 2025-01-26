@@ -260,9 +260,13 @@ class HttpClient():
         
         crypto_frame = None
         # Wait till the server finishes sending all the CRYPTO data
-        while crypto_frame is None:
+        for i in range(30):
             crypto_frame = crypto_streams.sender.get_frame(1135)  # TODO: calculate max_size dynamically instead of giving static number
+            if crypto_frame is not None: break
             time.sleep(0.1)
+        else:
+            raise Exception("The Server did not send crypto data. Try again.")
+
 
         strm_data = crypto_frame.data
         buf = builder.start_frame(
@@ -579,12 +583,11 @@ class HttpClient():
         Replay QUIC and HTTP/3 packets by copying h3msg and capture responses.
         After capturing message, close 
         """
-
-        builder = None
-
-        # Build message by parsing h3msg
         
-        builder = self.crafter.copy_msg(h3msg, self.get_builder(Epoch.ONE_RTT))
+        # Build message by parsing h3msg
+        builder = self.get_builder(Epoch.ONE_RTT)
+        crafter = MSGCrafter()
+        crafter.copy_msg(h3msg, builder)
         self.send_quic_frames_from_builder(builder)
 
         response_packets = self.read_from_buffer()

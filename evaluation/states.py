@@ -10,7 +10,6 @@ class State:
 		self.msg_sent:Packet = msg_sent # Pyshark packet: Requested QUIC and HTTP/3 message to reach this state from its parent
 		self.msg_rcvd_str:str = msg_rcvd_str # Str: Responsed QUIC and HTTP/3 message to reach this state from its parent
 		self.child_sr_dict:dict = child_sr_dict
-		self.packet_number:int = None
 
 class StateList:
 	def __init__(self, state_list:List[State]=[]):

@@ -8,12 +8,17 @@ from aioquic.quic.connection import *
 from pyshark.packet.packet import Packet
 from urllib.parse import urlparse
 
+from aioquic.h3.connection import FrameType
 from crafter import MSGCrafter
 import util
 from rich.traceback import install
 from http_client import HttpClient
 from aioquic.h3.connection import H3_ALPN
 from aioquic.tls import Epoch
+from pyshark.packet.layers.xml_layer import XmlLayer
+
+
+PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
 
 class Fuzzer():
@@ -96,22 +101,19 @@ class Fuzzer():
 
     
     def fuzz_selected_state_transition(self, h3client:HttpClient, triggering_msg:Packet, expected_response:str):
-        #print("\nTriggering Message:")
         
-        response = h3client.replay_msg(triggering_msg)
-        #print("{} => {}".format(util.h3msg_to_str(triggering_msg), response))
-        #print("expected_response = {}".format(expected_response))
+        #modified_triggering_msg = self.fuzz(triggering_msg)
+        
 
-        if response != expected_response:
-            print(triggering_msg)
-            print("Expected response: {}".format(expected_response))
-            print("Actual response: {}".format(response))
-            raise Exception("Unexpected response!")
+        #builder = h3client.crafter.copy_msg(triggering_msg, h3client.get_builder(Epoch.ONE_RTT))
+
+        #h3client.crafter.dissect_msg(triggering_msg)
+
+        builder = h3client.get_builder(Epoch.ONE_RTT)
+        h3client.crafter.copy_msg(triggering_msg, builder)
+
 
     
-    def fuzz_msg(self, message:Packet):
-        pass
-
     def find_message_by_packet_number(self, packet_number:int):
         for msg in self.traffic_messages:
             #print(msg.quic.field_names)
@@ -120,10 +122,20 @@ class Fuzzer():
                 return msg
         raise Exception("Packet with packet_number {} does not exist!".format(packet_number)) 
             
-            
+    def test_dissection(self):
+        
+        for packet in self.traffic_messages:
+            print(packet)
+            print()
+            h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
+            h3client.crafter.copy_msg(packet, None)
 
 
-
+    def send_packets_in_custom_order(self):
+        h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
+        for i in [8,11]:
+            h3client.replay_msg( self.find_message_by_packet_number(i) )
+        pass
 
 if __name__ == "__main__":
     install()
@@ -170,13 +182,17 @@ if __name__ == "__main__":
         configuration.secrets_log_file = open(keylog_file, "a")
 
 
+
+    
+
     
 
     fuzzer = Fuzzer(configuration, urlparse(args.url).netloc, args.secrets_log)
     
-
+    
     fuzzer.set_up_graph(args.state_machine, args.pcap)
-    #print( fuzzer.find_message_by_packet_number(8) )
+    fuzzer.test_dissection()
+    sys.exit()
     fuzzer.fuzz()
 
 

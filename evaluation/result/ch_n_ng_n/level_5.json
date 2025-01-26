@@ -34,6 +34,22 @@
       ]
     },
     {
+      "source": "34",
+      "dest": "34",
+      "trigger": "ST(2)[SE] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "45",
+      "dest": "45",
+      "trigger": "ST(2)[SE] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
       "source": "Init",
       "dest": "2",
       "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
@@ -76,6 +92,30 @@
     {
       "source": "14",
       "dest": "14",
+      "trigger": "ACK => \u2298\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "34",
+      "dest": "34",
+      "trigger": "ACK => \u2298\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "35",
+      "dest": "34",
+      "trigger": "ACK => \u2298\n",
+      "conditions": [
+        "packet_number:14"
+      ]
+    },
+    {
+      "source": "45",
+      "dest": "45",
       "trigger": "ACK => \u2298\n",
       "conditions": [
         "packet_number:9"
@@ -127,6 +167,22 @@
       "trigger": "ACK => RETRANSMIT\n",
       "conditions": [
         "packet_number:12"
+      ]
+    },
+    {
+      "source": "34",
+      "dest": "45",
+      "trigger": "ACK => RETRANSMIT\n",
+      "conditions": [
+        "packet_number:15"
+      ]
+    },
+    {
+      "source": "35",
+      "dest": "45",
+      "trigger": "ACK => RETRANSMIT\n",
+      "conditions": [
+        "packet_number:15"
       ]
     },
     {
@@ -178,6 +234,22 @@
       ]
     },
     {
+      "source": "34",
+      "dest": "34",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:8"
+      ]
+    },
+    {
+      "source": "45",
+      "dest": "45",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:8"
+      ]
+    },
+    {
       "source": "5",
       "dest": "5",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n",
@@ -188,6 +260,22 @@
     {
       "source": "14",
       "dest": "14",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:11"
+      ]
+    },
+    {
+      "source": "34",
+      "dest": "34",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:11"
+      ]
+    },
+    {
+      "source": "45",
+      "dest": "45",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n",
       "conditions": [
         "packet_number:11"
@@ -207,6 +295,38 @@
       "trigger": "ACK => ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:14"
+      ]
+    },
+    {
+      "source": "35",
+      "dest": "34",
+      "trigger": "ST(2)[SE] => ACK|ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+]\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "35",
+      "dest": "34",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK|ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+]\n",
+      "conditions": [
+        "packet_number:8"
+      ]
+    },
+    {
+      "source": "35",
+      "dest": "34",
+      "trigger": "ACK => ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+]\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "35",
+      "dest": "34",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK|ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+]\n",
+      "conditions": [
+        "packet_number:11"
       ]
     }
   ],
@@ -231,6 +351,9 @@
     },
     {
       "name": "35"
+    },
+    {
+      "name": "45"
     }
   ],
   "before_state_change": [],
