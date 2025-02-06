@@ -17,12 +17,18 @@ class MSGCrafter():
     def __init__(self):
         self.quic_frames:list = []
 
-    def copy_msg(self, h3msg:Packet, builder:QuicPacketBuilder):
+    def copy_msg(self, h3msg:Packet, builder:QuicPacketBuilder) -> None:
         msg_dissector = MSGDissector()
-        msg_dissector.dissect_msg(h3msg)
+        quic_frames = msg_dissector.dissect_msg(h3msg)
 
-        for quic_frame in msg_dissector.quic_frames:
+        for quic_frame in quic_frames:
             self.add_dissected_frames_to_builder(quic_frame, builder)
+
+
+    def craft_msg_from_frames(self, quic_frames:List, builder:QuicPacketBuilder) -> None:
+        for quic_frame in quic_frames:
+            self.add_dissected_frames_to_builder(quic_frame, builder)
+
 
     def add_dissected_frames_to_builder(self, quic_frame, builder:QuicPacketBuilder):
         if type(quic_frame) == QuicAck:

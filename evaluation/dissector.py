@@ -62,7 +62,8 @@ class QuicStream:
     stream_id:int = None
     fin_bit:bool = None
     offset:int = None
-    length:int = None
+    # No need to play with the length field. We calculate length dynamically. Otherwise, the stream frame will be malformed most of the time.
+    # length:int = None
     h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
 
 
@@ -70,7 +71,7 @@ class MSGDissector():
     def __init__(self):
         self.quic_frames:list = []
 
-    def dissect_msg(self, message:Packet) -> None:
+    def dissect_msg(self, message:Packet) -> List:
 
         h3_frames = []
 
@@ -141,6 +142,7 @@ class MSGDissector():
         for quic_stream_frame, h3_frame in zip(quic_stream_frames, h3_frames):
             quic_stream_frame.h3_frame = h3_frame
         
+        return self.quic_frames
 
     def _dissect_stream_frame(self, showname:str) -> QuicStream:
         quic_stream = QuicStream()
@@ -148,7 +150,7 @@ class MSGDissector():
         quic_stream.stream_id = int(showname.split('id=')[1].split()[0])
         quic_stream.fin_bit = int(showname.split('fin=')[1].split()[0])
         quic_stream.offset = int(showname.split('off=')[1].split()[0])
-        quic_stream.length = int(showname.split('len=')[1].split()[0])
+        #quic_stream.length = int(showname.split('len=')[1].split()[0])
 
         return quic_stream
 

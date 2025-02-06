@@ -581,19 +581,36 @@ class HttpClient():
     def replay_msg(self, h3msg:Packet) -> str:
         """
         Replay QUIC and HTTP/3 packets by copying h3msg and capture responses.
-        After capturing message, close 
         """
         
         # Build message by parsing h3msg
         builder = self.get_builder(Epoch.ONE_RTT)
-        crafter = MSGCrafter()
-        crafter.copy_msg(h3msg, builder)
+        msg_crafter = MSGCrafter()
+        msg_crafter.copy_msg(h3msg, builder)
         self.send_quic_frames_from_builder(builder)
 
         response_packets = self.read_from_buffer()
 
         return response_packets
     
+    def send_frames(self, quic_frames:List) -> str:
+        """
+        Send the QUIC and HTTP/3 frames in a packet and capture responses.
+        """
+        #print("in send_frames")
+        
+        # Build message by parsing h3msg
+        builder = self.get_builder(Epoch.ONE_RTT)
+        msg_crafter = MSGCrafter()
+        msg_crafter.craft_msg_from_frames(quic_frames, builder)
+        self.send_quic_frames_from_builder(builder)
+
+        response_packets = self.read_from_buffer()
+        #print("Received response: {}".format(response_packets))
+
+        return response_packets
+
+
     def close_connection(self) -> None:
 
         builder = self.get_builder(Epoch.ONE_RTT)

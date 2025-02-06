@@ -54,7 +54,7 @@ QUIC_FRAME_ABBREVIATIONS = {
     0x31: "DT", # DATAGRAM
     0xaf: "ACKF", # ACK_FREQUENCY -  draft-ietf-quic-ack-frequency-10
     
-
+    # by frame name
     "PADDING": "PAD",
     "PING": "PING",
     "ACK": "ACK",
@@ -221,9 +221,9 @@ def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
             return msginfo
 
         msg_dissector = MSGDissector()
-        msg_dissector.dissect_msg(h3msg)    
+        quic_frames = msg_dissector.dissect_msg(h3msg)    
 
-        for quic_frame in msg_dissector.quic_frames:
+        for quic_frame in quic_frames:
             if type(quic_frame) == QuicAck:
                 msginfo += QUIC_FRAME_ABBREVIATIONS['ACK']
             elif type(quic_frame) == QuicNewConnectionId:
