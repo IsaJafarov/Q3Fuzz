@@ -53,16 +53,7 @@ class MSGCrafter():
         # Start the ACK frame in the builder
         buf = builder.start_frame(frame_type=QuicFrameType.ACK, capacity=16)
 
-        # Add largest acknowledged and ACK delay
-
-        # Convert -1 to bytes using two’s complement (1 byte)
-        negative_one = (-1).to_bytes(1, byteorder='big', signed=True)
-        print(negative_one)  # Output: b'\xff'
-
-
-
-        #buf.push_uint_var(quic_frame.largest_acknowledged)
-        buf.push_bytes(negative_one)
+        buf.push_uint_var(quic_frame.largest_acknowledged)
         buf.push_uint_var(quic_frame.ack_delay)
         buf.push_uint_var(quic_frame.ack_range_count)
         buf.push_uint_var(quic_frame.ack_first_ack_range)
