@@ -74,38 +74,45 @@ class HttpClient():
         self._http._quic._packet_number += 1
         return builder
 
-    def serialize_transport_parameters(self) -> bytes:
-        quic_transport_parameters = QuicTransportParameters(
-            ack_delay_exponent=3,
-            active_connection_id_limit=8,
-            max_idle_timeout=int(self.quic_conf.idle_timeout * 1000),
-            initial_max_data=self.quic_conf.max_data,
-            initial_max_stream_data_bidi_local=self.quic_conf.max_stream_data,
-            initial_max_stream_data_bidi_remote=self.quic_conf.max_stream_data,
-            initial_max_stream_data_uni=self.quic_conf.max_stream_data,
-            initial_max_streams_bidi=128,
-            initial_max_streams_uni=128,
-            initial_source_connection_id=self.connection._host_cids[0].cid,
-            max_ack_delay=25,
-            max_datagram_frame_size=self.quic_conf.max_datagram_frame_size,
-            quantum_readiness=(
-                b"Q" * SMALLEST_MAX_DATAGRAM_SIZE
-                if self.quic_conf.quantum_readiness_test
-                else None
-            ),
-            stateless_reset_token=self.connection._host_cids[0].stateless_reset_token,
-            version_information=QuicVersionInformation(
-                chosen_version=self.quic_conf.original_version,
-                available_versions=self.quic_conf.supported_versions,
-            ),
-        )
-        # print(">>> prett3.serialize_transport_parameters. quic_transport_parameters={}".format(quic_transport_parameters))
+    def serialize_transport_parameters(self, transport_params:QuicTransportParameters=None) -> bytes:
+        
+        quic_transport_parameters = None
+
+        if transport_params is None:
+            # use default transport parameters
+            quic_transport_parameters = QuicTransportParameters(
+                ack_delay_exponent=3,
+                active_connection_id_limit=8,
+                max_idle_timeout=int(self.quic_conf.idle_timeout * 1000),
+                initial_max_data=self.quic_conf.max_data,
+                initial_max_stream_data_bidi_local=self.quic_conf.max_stream_data,
+                initial_max_stream_data_bidi_remote=self.quic_conf.max_stream_data,
+                initial_max_stream_data_uni=self.quic_conf.max_stream_data,
+                initial_max_streams_bidi=128,
+                initial_max_streams_uni=128,
+                initial_source_connection_id=self.connection._host_cids[0].cid,
+                max_ack_delay=25,
+                max_datagram_frame_size=self.quic_conf.max_datagram_frame_size,
+                quantum_readiness=(
+                    b"Q" * SMALLEST_MAX_DATAGRAM_SIZE
+                    if self.quic_conf.quantum_readiness_test
+                    else None
+                ),
+                stateless_reset_token=self.connection._host_cids[0].stateless_reset_token,
+                version_information=QuicVersionInformation(
+                    chosen_version=self.quic_conf.original_version,
+                    available_versions=self.quic_conf.supported_versions,
+                ),
+            )
+        else:
+            # use the provided transport parameters
+            quic_transport_parameters = transport_params
 
         buf = Buffer(capacity=3 * self.connection._max_datagram_size)
         push_quic_transport_parameters(buf, quic_transport_parameters)
         return buf.data
 
-    def get_tls(self) -> None:
+    def get_tls(self, transport_params:QuicTransportParameters=None) -> None:
         self.connection.tls = tls.Context(
             alpn_protocols=self.quic_conf.alpn_protocols,
             cadata=self.quic_conf.cadata,
@@ -123,7 +130,7 @@ class HttpClient():
         self.connection.tls.handshake_extensions = [
             (
                 tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS,
-                self.serialize_transport_parameters(),
+                self.serialize_transport_parameters(transport_params)
             )
         ]
     
@@ -157,7 +164,7 @@ class HttpClient():
         
         # packet spaces
         def create_crypto_pair(epoch: tls.Epoch) -> CryptoPair:
-            # print(">>> prett3.get_tls.create_crypto_pair: start. epoch={}".format(epoch))
+            
             epoch_name = ["initial", "0rtt", "handshake", "1rtt"][epoch.value]
             
             recv_secret_name = "server_%s_secret" % epoch_name
@@ -205,7 +212,7 @@ class HttpClient():
 
         self.connection._loss.spaces = list(self.connection._spaces.values())
     
-    def connect(self):
+    def connect(self, transport_params:bytes=None) -> None:
         """
         How aioquic's QuicConnection does it:
         initialize() sets up tls context
@@ -216,7 +223,7 @@ class HttpClient():
 
         crypto_buf = Buffer(capacity=CRYPTO_BUFFER_SIZE)
 
-        self.get_tls() # better to build tls myself to construct transport params myself
+        self.get_tls(transport_params) # better to build tls myself to construct transport params myself
         
         self.connection.tls._client_send_hello(crypto_buf)
         

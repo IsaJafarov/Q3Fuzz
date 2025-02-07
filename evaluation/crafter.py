@@ -54,7 +54,15 @@ class MSGCrafter():
         buf = builder.start_frame(frame_type=QuicFrameType.ACK, capacity=16)
 
         # Add largest acknowledged and ACK delay
-        buf.push_uint_var(quic_frame.largest_acknowledged)
+
+        # Convert -1 to bytes using two’s complement (1 byte)
+        negative_one = (-1).to_bytes(1, byteorder='big', signed=True)
+        print(negative_one)  # Output: b'\xff'
+
+
+
+        #buf.push_uint_var(quic_frame.largest_acknowledged)
+        buf.push_bytes(negative_one)
         buf.push_uint_var(quic_frame.ack_delay)
         buf.push_uint_var(quic_frame.ack_range_count)
         buf.push_uint_var(quic_frame.ack_first_ack_range)
@@ -183,9 +191,9 @@ class MSGCrafter():
         """
 
         data_payload = b""
-        data_payload +=  h3_frame.element_id.to_bytes(1, 'big')
+        data_payload += encode_uint_var(h3_frame.element_id)  
         data_payload += h3_frame.field_value.encode()
-
+        
         # Encode the PRIORITY_UPDATE frame
         frame_data = encode_frame(PRIORITY_UPDATE_FRAME_IDS[0], data_payload )
         
