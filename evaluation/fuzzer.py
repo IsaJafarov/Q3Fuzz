@@ -22,7 +22,9 @@ from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 from datetime import datetime
 import time
 import concurrent.futures
-from tqdm import tqdm
+from rich.progress import Progress
+import warnings
+
 
 from hypothesis import example, given, note, reproduce_failure, settings, Verbosity, Phase, strategies as st
 
@@ -143,7 +145,7 @@ class Fuzzer():
                 if pre == node: 
                     continue
 
-                print("\n{} -> {}".format(pre, node))
+                print("\n\nTransition: {} -> {}\n".format(pre, node),flush=True)
                 
                 nodes_in_the_path = nx.shortest_path(self.graph, "Init", pre)
 
@@ -219,6 +221,8 @@ class Fuzzer():
                             preceding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]] = None, 
                             succeeding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]] = None) -> None:
         
+        
+
         num=1
         @given( strategy )
         @settings(deadline=None, verbosity=Verbosity.normal, print_blob=True, 
@@ -233,15 +237,16 @@ class Fuzzer():
             
             if self.verbose:
                 nonlocal num
-                print("\n{}. {}".format(num, fuzzed_thing))
+                print("\nMutation #{}: {}".format(num, fuzzed_thing))
                 num += 1
             
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 futures = []
 
-                print("\nSend {} requests in parallel for {} sec. with {} sec. interval".format( self.parallel_requests, self.duration, self.interval ))
-                for i in range(int(self.duration/self.interval)): # tqdm( range(0, int(20)), colour='red' ):
-                    print()
+                if self.verbose:
+                    print("\nSend {} requests in parallel for {} sec. with {} sec. interval".format( self.parallel_requests, self.duration, self.interval ))
+                for i in range(int(self.duration/self.interval)):
+                    
                     for j in range(self.parallel_requests):
 
                         # Submit each iteration as a separate task
@@ -253,13 +258,19 @@ class Fuzzer():
                     time.sleep(self.interval)
 
             fuzzer.check_server_availability()
+            
+            progress.update(mutations, advance=1)
 
             if self.verbose:
                 print("\n\n\n")
-        
-        print("Mutating the following object {} times".format(self.mutations))
+            
+            
+        progress = Progress()
+        mutations = progress.add_task("Fuzz "+self.extract_fuzzed_object_str_from_strategy(strategy), total=self.mutations, visible=not self.verbose)
+
+        progress.start()
         fuzz_msg_with_strategy_innner(moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
-        print()
+        progress.stop()
                 
 
     def check_server_availability(self) -> None:
@@ -278,15 +289,12 @@ class Fuzzer():
         res2 = received_after_init = h3client.read_from_buffer()
 
         if QUIC_FRAME_ABBREVIATIONS['HANDSHAKE_DONE'] not in res2:
-            raise Exception("Server is DOWN")
+            raise Exception("Server did not complete handshake")
         
         if self.verbose:
             print("Server is UP")
-            
-    
+        
 
-
-    
     def execute_attack(self, 
                        fuzzed_thing:Union[QuicTransportParameters,QuicAck,QuicNewConnectionId,QuicStream], 
                        moving_msgs_packet_nums:List[int]=None, 
@@ -295,29 +303,36 @@ class Fuzzer():
         
         h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
 
-        if type(fuzzed_thing) is QuicTransportParameters:
+        # Ignore errors during the attack.
+        # Once the attack complets, we will check the server availability. At that point, we will care about the connection errors.
+        try: 
+            if type(fuzzed_thing) is QuicTransportParameters:
 
-            # we need to keeep the connection id as is, otherwise the client doesn't know which received packets are for this connection
-            fuzzed_thing.initial_source_connection_id = h3client.connection._host_cids[0].cid
+                # we need to keeep the connection id as is, otherwise the client doesn't know which received packets are for this connection
+                fuzzed_thing.initial_source_connection_id = h3client.connection._host_cids[0].cid
 
-            h3client.connect(fuzzed_thing)
-            connect_response = h3client.read_from_buffer()
+                h3client.connect(fuzzed_thing)
+                connect_response = h3client.read_from_buffer()
+                if self.verbose:
+                    print("\tConnection {}. Response 1: {}".format(h3client.connection._host_cids[0].cid.hex(), connect_response) )
+
+                h3client.complete_connection()
+                completion_response = h3client.read_from_buffer()
+                if self.verbose:
+                    print("\tConnection {}. Response 2: {}".format(h3client.connection._host_cids[0].cid.hex(), completion_response) )
+
+            else:
+                self.reach_source_state(h3client, moving_msgs_packet_nums)
+
+                response = h3client.send_frames( preceding_quic_frames + [fuzzed_thing] + succeeding_quic_frames )
+
+                if self.verbose:
+                    print("\tResponse: {}".format(response) )
+        except Exception as e:
             if self.verbose:
-                print("Connection {}. Response 1: {}".format(h3client.connection._host_cids[0].cid.hex(), connect_response) )
-
-            h3client.complete_connection()
-            completion_response = h3client.read_from_buffer()
-            if self.verbose:
-                print("Connection {}. Response 2: {}".format(h3client.connection._host_cids[0].cid.hex(), completion_response) )
-
-        else:
-            self.reach_source_state(h3client, moving_msgs_packet_nums)
-
-            response = h3client.send_frames( preceding_quic_frames + [fuzzed_thing] + succeeding_quic_frames )
-
-            if self.verbose:
-                print("Response: {}".format(response) )
-
+                print(e)
+            else:
+                pass
 
     def find_message_by_packet_number(self, packet_number:int) -> Packet:
         for msg in self.traffic_messages:
@@ -575,8 +590,8 @@ class Fuzzer():
                 st.tuples( 
                     st.integers(min_value=0,max_value=255), 
                     st.integers(min_value=0,max_value=2**62+1) ) ),
-            st.sampled_from( [ (0, 5), (16, 5), (997, 5), (LARGEST_VARINT_LEN8, 5), (None, 5),
-                               (5, 0), (5, 16), (5, 997), (5, LARGEST_VARINT_LEN8), (5, None)] ),
+            st.sampled_from( [ (0, 5), (16, 5), (997, 5), (LARGEST_VARINT_LEN8, 5), (None, 5), (LARGEST_VARINT_LEN2, 5),
+                               (5, 0), (5, 16), (5, 997), (5, LARGEST_VARINT_LEN8), (5, None), (5, LARGEST_VARINT_LEN2)] ),
         )
         
         
@@ -900,28 +915,36 @@ class Fuzzer():
 
         return inter_field_strategies
     
-    # Temp
-    def isa(self):
-        packet = self.find_message_by_packet_number(9)
-        msgDissector = MSGDissector()
-        frames = msgDissector.dissect_msg(packet)
+    def extract_fuzzed_object_str_from_strategy(self, strategy:st.SearchStrategy) -> str:
+        
+        fuzzed_object_str = ""
 
-        print(frames)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            example = strategy.example()
+            if type(example) == QuicTransportParameters:
+                fuzzed_object_str = "Transport Params"
+            elif type(example) == QuicAck:
+                fuzzed_object_str = "ACK"
+            elif type(example) == QuicNewConnectionId:
+                fuzzed_object_str = "NCI"
+            elif type(example) == QuicStream:
+                h3FrameName = ""
+                if type(example.h3_frame) == H3Settings:
+                    h3FrameName = H3_FRAME_ABBREVIATIONS["SETTINGS"]
+                elif type(example.h3_frame) == H3Headers:
+                    h3FrameName = H3_FRAME_ABBREVIATIONS["HEADERS"]
+                elif type(example.h3_frame) == H3Data:
+                    h3FrameName = H3_FRAME_ABBREVIATIONS["DATA"]
+                elif type(example.h3_frame) == H3PriorityUpdate:
+                    h3FrameName = H3_FRAME_ABBREVIATIONS["PRIORITY_UPDATE"]
+                elif type(example.h3_frame) == QpackEncoder:
+                    h3FrameName = "Enc"
+                elif type(example.h3_frame) == QpackDecoder:
+                    h3FrameName = "Dec"
+                fuzzed_object_str = "Stream[{}]".format(h3FrameName)
 
-        #msgCrafter = MSGCrafter()
-        #msgCrafter.craft_msg_from_frames(frames, )
-
-        h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
-        print( h3client.quic_conf )
-        return
-        h3client.connect()
-        h3client.read_from_buffer()  # Receive any response from the server
-
-        # Complete the connection by sending handshake completion messages
-        h3client.complete_connection()
-        received_after_init = h3client.read_from_buffer()
-
-        h3client.send_frames(frames)
+        return fuzzed_object_str
 
 
 if __name__ == "__main__":

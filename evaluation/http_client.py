@@ -252,8 +252,7 @@ class HttpClient():
 
         crypto_pair = self.connection._cryptos[epoch]
         if not crypto_pair.send.is_valid():
-            print("The Encoding crypto is not valid to send data")
-            return
+            raise Exception("The Encoding crypto is not valid to send data. Is your server up?")
         
         builder = self.get_builder(epoch)
 
