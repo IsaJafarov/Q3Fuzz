@@ -626,8 +626,8 @@ class MSGHandler():
         """
         max_data = buf.pull_uint_var()
         
-        print("\033[31m\nMAX_DATA frame received. MAX DATA={}\033[0m"
-              .format(max_data))
+        #print("\033[31m\nMAX_DATA frame received. MAX DATA={}\033[0m"
+        #      .format(max_data))
 
         """
         if max_data > self._remote_max_data:
@@ -645,8 +645,8 @@ class MSGHandler():
         stream_id = buf.pull_uint_var()
         max_stream_data = buf.pull_uint_var()
 
-        print("\033[31m\nMAX_STREAM_DATA frame received. Stream ID={}, Max Stream Data={}\033[0m"
-              .format(stream_id, max_stream_data))
+        #print("\033[31m\nMAX_STREAM_DATA frame received. Stream ID={}, Max Stream Data={}\033[0m"
+        #      .format(stream_id, max_stream_data))
 
         """
         # check stream direction
@@ -709,8 +709,8 @@ class MSGHandler():
         """
         limit = buf.pull_uint_var()
 
-        print("\033[31m\nDATA_BLOCKED  frame received. Limit={}\033[0m"
-              .format(limit))
+        #print("\033[31m\nDATA_BLOCKED  frame received. Limit={}\033[0m"
+        #      .format(limit))
 
     def handle_stream_data_blocked_frame(
         self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -721,8 +721,8 @@ class MSGHandler():
         stream_id = buf.pull_uint_var()
         limit = buf.pull_uint_var()
 
-        print("\033[31m\nSTREAM_DATA_BLOCKED frame received. Stream ID={}, Limit={}\033[0m"
-              .format(stream_id, limit))
+        #print("\033[31m\nSTREAM_DATA_BLOCKED frame received. Stream ID={}, Limit={}\033[0m"
+        #      .format(stream_id, limit))
         
         """
         # check stream direction
@@ -739,8 +739,8 @@ class MSGHandler():
         """
         limit = buf.pull_uint_var()
 
-        print("\033[31m\nSTREAMS_BLOCKED frame received. Limit={}\033[0m"
-              .format(limit))
+        #print("\033[31m\nSTREAMS_BLOCKED frame received. Limit={}\033[0m"
+        #      .format(limit))
         
         """
         if limit > STREAM_COUNT_MAX:
@@ -856,8 +856,8 @@ class MSGHandler():
         """
         sequence_number = buf.pull_uint_var()
         
-        print("\033[31m\nRETIRE_CONNECTION_ID frame received. Sequence Number={}\033[0m"
-              .format(sequence_number))
+        #print("\033[31m\nRETIRE_CONNECTION_ID frame received. Sequence Number={}\033[0m"
+        #      .format(sequence_number))
 
         """
         if sequence_number >= self._quic._host_cid_seq:
@@ -894,8 +894,8 @@ class MSGHandler():
         """
         data = buf.pull_bytes(8)
 
-        print("\033[31m\nPATH_CHALLENGE frame received. Data={}\033[0m"
-              .format(data))
+        #print("\033[31m\nPATH_CHALLENGE frame received. Data={}\033[0m"
+        #      .format(data))
 
         """
         context.network_path.remote_challenges.append(data)
@@ -909,8 +909,8 @@ class MSGHandler():
         """
         data = buf.pull_bytes(8)
 
-        print("\033[31m\nSTREAM frame received. Data={}\033[0m"
-              .format(data))
+        #print("\033[31m\nSTREAM frame received. Data={}\033[0m"
+        #      .format(data))
 
         """
         try:
@@ -983,8 +983,8 @@ class MSGHandler():
             length = buf.capacity - start
         data = buf.pull_bytes(length)
 
-        print("\033[31m\nDATAGRAM frame received. Length={}, Data={}\033[0m"
-              .format(length, data))
+        #print("\033[31m\nDATAGRAM frame received. Length={}, Data={}\033[0m"
+        #      .format(length, data))
 
         """
         # check frame is allowed

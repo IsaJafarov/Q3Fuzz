@@ -74,11 +74,9 @@ class HttpClient():
         self._http._quic._packet_number += 1
         return builder
 
-    def serialize_transport_parameters(self, transport_params:QuicTransportParameters=None) -> bytes:
+    def serialize_transport_parameters(self, quic_transport_parameters:QuicTransportParameters=None) -> bytes:
         
-        quic_transport_parameters = None
-
-        if transport_params is None:
+        if quic_transport_parameters is None:
             # use default transport parameters
             quic_transport_parameters = QuicTransportParameters(
                 ack_delay_exponent=3,
@@ -104,10 +102,7 @@ class HttpClient():
                     available_versions=self.quic_conf.supported_versions,
                 ),
             )
-        else:
-            # use the provided transport parameters
-            quic_transport_parameters = transport_params
-
+        
         buf = Buffer(capacity=3 * self.connection._max_datagram_size)
         push_quic_transport_parameters(buf, quic_transport_parameters)
         return buf.data

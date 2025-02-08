@@ -20,19 +20,21 @@ from dissector import *
 from aioquic.h3.connection import encode_frame
 from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 from datetime import datetime
+import time
+import concurrent.futures
+from tqdm import tqdm
 
-from hypothesis import example, given, note, reproduce_failure, strategies as st
-from hypothesis import settings, Verbosity
+from hypothesis import example, given, note, reproduce_failure, settings, Verbosity, Phase, strategies as st
 
 
 
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
 # largest values in varint encoding. https://www.rfc-editor.org/rfc/rfc9000.html#section-16
-LARGEST_VARINT_LEN1 = 0x3F # length = 1. 63 in hex
-LARGEST_VARINT_LEN2 = 0x3FFF # length = 2. 16383 in hex
-LARGEST_VARINT_LEN4 = 0x3FFFFFFF # length = 4. 1073741823 in hex
-LARGEST_VARINT_LEN8 = 0x3FFFFFFFFFFFFFFF # length = 8. 4611686018427387903 in hex
+LARGEST_VARINT_LEN1 = 0x3F # length = 1. hex value is 63
+LARGEST_VARINT_LEN2 = 0x3FFF # length = 2. hex value is 16383
+LARGEST_VARINT_LEN4 = 0x3FFFFFFF # length = 4. hex value is 1073741823
+LARGEST_VARINT_LEN8 = 0x3FFFFFFFFFFFFFFF # length = 8. hex value is 4611686018427387903
 # Higher values throw "Integer is too big for a variable-length integer"
 SAMPLE_VALUES_FOR_VARINT_VALUES = [0, 16, 997, 10**5, 10**10, LARGEST_VARINT_LEN1, LARGEST_VARINT_LEN2, LARGEST_VARINT_LEN4, LARGEST_VARINT_LEN8 ]
 
@@ -94,13 +96,19 @@ class QuicStream:
 
 
 class Fuzzer():
-    def __init__(self, quic_conf:QuicConfiguration, hostname:str, secrets_log:str):
-        self.test_num = 0
+    def __init__(self, quic_conf:QuicConfiguration, hostname:str, secrets_log:str, mutations:int, parallel_requests:int, interval:int, duration:int, verbose:bool):
         self.quic_conf:QuicConfiguration = quic_conf
         self.hostname:str = hostname
         self.secrets_log:str = secrets_log
         self.graph:nx.DiGraph = nx.DiGraph()
         self.traffic_messages:list[Packet] = []
+        self.mutations:int = mutations
+        self.parallel_requests:int = parallel_requests
+        self.interval:int = interval
+        self.duration:int = duration
+        self.verbose = verbose
+
+
         
     
     def set_up_graph(self, sm_file_path:str, traffic_file_path:str):
@@ -119,10 +127,13 @@ class Fuzzer():
 
     def fuzz(self):
         
+        # Fuzz Transport Prameters
+        if self.verbose:
+            print("Fuzzing Transport Parameters at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
         transport_params_strategy = self.build_transport_params_strategy()
-        self.fuzz_transport_params(transport_params_strategy)
-        sys.exit()
+        self.fuzz_msg_with_strategy(transport_params_strategy)
 
+        # Fuzz individual messages
         for node in self.graph.nodes():
 
             if node=="Init" or node=="Finish":
@@ -131,7 +142,7 @@ class Fuzzer():
             for pre in self.graph.predecessors(node):
                 if pre == node: 
                     continue
-                #print("----------------------------")
+
                 print("\n{} -> {}".format(pre, node))
                 
                 nodes_in_the_path = nx.shortest_path(self.graph, "Init", pre)
@@ -151,7 +162,7 @@ class Fuzzer():
                 triggering_msg_packet_num = int(edge_to_fuzz['packet_number'])
                 triggering_msg = self.find_message_by_packet_number(triggering_msg_packet_num)
 
-                self.fuzz_state_transition(moving_msgs_packet_nums, triggering_msg, response)
+                self.fuzz_state_transition(moving_msgs_packet_nums, triggering_msg)
     
     def reach_source_state(self, h3client:HttpClient, moving_msgs_packet_nums:List[int]) -> None:
         
@@ -171,8 +182,7 @@ class Fuzzer():
             response = h3client.replay_msg(moving_msg)
             #print("{} => {}".format(util.h3msg_to_str(moving_msg), response))
 
-
-    def fuzz_state_transition(self, moving_msgs_packet_nums:List[int], triggering_msg: Packet, expected_response:str):
+    def fuzz_state_transition(self, moving_msgs_packet_nums:List[int], triggering_msg: Packet):
         
         msg_dissector = MSGDissector()
         quic_frames = msg_dissector.dissect_msg(triggering_msg)
@@ -185,62 +195,347 @@ class Fuzzer():
             succeeding_quic_frames = quic_frames[i+1:]
 
             if type(quic_frame) == QuicAck:
-                print("Fuzzing ACK at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
+                if self.verbose:
+                    print("Fuzzing ACK at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
                 strategy = self.build_ack_strategy(quic_frame)
-                self.fuzz_triggering_msg(moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames, expected_response, strategy)
+                self.fuzz_msg_with_strategy(strategy, moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
             
             elif type(quic_frame) == QuicNewConnectionId:
-                print("Fuzzing NCI at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
+                if self.verbose:
+                    print("Fuzzing NCI at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
                 strategy = self.build_nci_strategy(quic_frame)
-                self.fuzz_triggering_msg(moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames, expected_response, strategy)
+                self.fuzz_msg_with_strategy(strategy, moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
 
             elif type(quic_frame) == QuicStream:
-                print("Fuzzing STREAM at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
+                if self.verbose:
+                    print("Fuzzing STREAM at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
                 strategy = self.build_stream_strategy(quic_frame)
-                self.fuzz_triggering_msg(moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames, expected_response, strategy)
+                self.fuzz_msg_with_strategy(strategy, moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
 
 
-    
-    def fuzz_triggering_msg(self, moving_msgs_packet_nums:List[int], preceding_quic_frames, succeeding_quic_frames, expected_response, strategy:st.SearchStrategy) -> None:
+    def fuzz_msg_with_strategy(self, 
+                            strategy:st.SearchStrategy,
+                            moving_msgs_packet_nums:List[int] = None, 
+                            preceding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]] = None, 
+                            succeeding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]] = None) -> None:
         
-        i=0
+        num=1
         @given( strategy )
-        @settings(deadline=None, verbosity=Verbosity.normal, print_blob=True, max_examples=100)
+        @settings(deadline=None, verbosity=Verbosity.normal, print_blob=True, 
+                  # Exclude the Shrinking phase. We want to see the first example that caused the error.
+                  phases=[Phase.explicit , Phase.reuse, Phase.generate, Phase.target], 
+                  max_examples=self.mutations)
         #@reproduce_failure('6.113.0', b'AAAAAAAAAAAAAQ==')
-        def fuzz_triggering_msg_innner(moving_msgs_packet_nums:List[int], preceding_quic_frames, succeeding_quic_frames, expected_response, quic_frame):
-            nonlocal i
-            #print(".", end="")
-            sys.stdout.flush()
+        def fuzz_msg_with_strategy_innner(moving_msgs_packet_nums:List[int], 
+                                          preceding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]], 
+                                          succeeding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]], 
+                                          fuzzed_thing:Union[QuicTransportParameters,QuicAck,QuicNewConnectionId,QuicStream]):
             
-            print("{}. {}".format(i, quic_frame))
-            i+=1
-
+            if self.verbose:
+                nonlocal num
+                print("\n{}. {}".format(num, fuzzed_thing))
+                num += 1
             
-            h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                futures = []
 
-            #print("Reaching the source state")
-            self.reach_source_state(h3client, moving_msgs_packet_nums)
+                print("\nSend {} requests in parallel for {} sec. with {} sec. interval".format( self.parallel_requests, self.duration, self.interval ))
+                for i in range(int(self.duration/self.interval)): # tqdm( range(0, int(20)), colour='red' ):
+                    print()
+                    for j in range(self.parallel_requests):
 
-            #print("Sending the triggering message")
-
-            response = h3client.send_frames( preceding_quic_frames + [quic_frame] + succeeding_quic_frames )
-            note("Actual Response: {}".format(response))
-            #h3client.close_connection()
+                        # Submit each iteration as a separate task
+                        futures.append(executor.submit(self.execute_attack, 
+                                                       fuzzed_thing,
+                                                       moving_msgs_packet_nums=moving_msgs_packet_nums, 
+                                                       preceding_quic_frames=preceding_quic_frames,
+                                                       succeeding_quic_frames=succeeding_quic_frames))
+                    time.sleep(self.interval)
 
             fuzzer.check_server_availability()
 
-            #if response != expected_response: raise Exception("Aye")
-            
-            
+            if self.verbose:
+                print("\n\n\n")
+        
+        print("Mutating the following object {} times".format(self.mutations))
+        fuzz_msg_with_strategy_innner(moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
+        print()
                 
 
+    def check_server_availability(self) -> None:
+        """
+        Check if the web server is available by initiating a connection with a new client.
+        The server is up, if it responds with the HANDSHAKE_DONE frame
+        """
+
+        h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
+
+        h3client.connect()
+        res1 = h3client.read_from_buffer()  # Receive any response from the server
+
+        # Complete the connection by sending handshake completion messages
+        h3client.complete_connection()
+        res2 = received_after_init = h3client.read_from_buffer()
+
+        if QUIC_FRAME_ABBREVIATIONS['HANDSHAKE_DONE'] not in res2:
+            raise Exception("Server is DOWN")
+        
+        if self.verbose:
+            print("Server is UP")
             
-        
-        fuzz_triggering_msg_innner(moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames, expected_response)
-        print()
+    
 
 
+    
+    def execute_attack(self, 
+                       fuzzed_thing:Union[QuicTransportParameters,QuicAck,QuicNewConnectionId,QuicStream], 
+                       moving_msgs_packet_nums:List[int]=None, 
+                       preceding_quic_frames:List=None, 
+                       succeeding_quic_frames:List=None) -> None:
         
+        h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
+
+        if type(fuzzed_thing) is QuicTransportParameters:
+
+            # we need to keeep the connection id as is, otherwise the client doesn't know which received packets are for this connection
+            fuzzed_thing.initial_source_connection_id = h3client.connection._host_cids[0].cid
+
+            h3client.connect(fuzzed_thing)
+            connect_response = h3client.read_from_buffer()
+            if self.verbose:
+                print("Connection {}. Response 1: {}".format(h3client.connection._host_cids[0].cid.hex(), connect_response) )
+
+            h3client.complete_connection()
+            completion_response = h3client.read_from_buffer()
+            if self.verbose:
+                print("Connection {}. Response 2: {}".format(h3client.connection._host_cids[0].cid.hex(), completion_response) )
+
+        else:
+            self.reach_source_state(h3client, moving_msgs_packet_nums)
+
+            response = h3client.send_frames( preceding_quic_frames + [fuzzed_thing] + succeeding_quic_frames )
+
+            if self.verbose:
+                print("Response: {}".format(response) )
+
+
+    def find_message_by_packet_number(self, packet_number:int) -> Packet:
+        for msg in self.traffic_messages:
+            #print(msg.quic.field_names)
+            if int(msg.quic.packet_number) == packet_number:
+                #print(msg.quic)
+                return msg
+        raise Exception("Packet with packet_number {} does not exist!".format(packet_number)) 
+        
+
+    
+    # Build strategies
+    def build_transport_params_strategy(self) -> st.SearchStrategy:
+        """
+        class QuicTransportParameters:
+            original_destination_connection_id: Optional[bytes] = None
+            max_idle_timeout: Optional[int] = None
+            stateless_reset_token: Optional[bytes] = None
+            max_udp_payload_size: Optional[int] = None
+            initial_max_data: Optional[int] = None
+            initial_max_stream_data_bidi_local: Optional[int] = None
+            initial_max_stream_data_bidi_remote: Optional[int] = None
+            initial_max_stream_data_uni: Optional[int] = None
+            initial_max_streams_bidi: Optional[int] = None
+            initial_max_streams_uni: Optional[int] = None
+            ack_delay_exponent: Optional[int] = None
+            max_ack_delay: Optional[int] = None
+            disable_active_migration: Optional[bool] = False
+            preferred_address: Optional[QuicPreferredAddress] = None
+            active_connection_id_limit: Optional[int] = None
+            initial_source_connection_id: Optional[bytes] = None
+            retry_source_connection_id: Optional[bytes] = None
+            version_information: Optional[QuicVersionInformation] = None
+            max_datagram_frame_size: Optional[int] = None
+            quantum_readiness: Optional[bytes] = None                         
+        """
+
+
+        # variable length byte sequence. len<=20
+        original_destination_connection_id_field_strategy = st.one_of(
+            st.binary(min_size=0, max_size=21),
+            st.sampled_from( [None] ),
+        )
+
+        # variable length integer
+        max_idle_timeout_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # sequence of 16 bytes
+        stateless_reset_token_field_strategy = st.one_of(
+            st.binary(min_size=0, max_size=17),
+            st.sampled_from( [None] ),
+        )
+        
+        # variable-length integer. <1200 is invalid
+        max_udp_payload_size_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+        
+        # variable-length integer
+        initial_max_data_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # variable-length integer
+        initial_max_stream_data_bidi_local_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # variable-length integer
+        initial_max_stream_data_bidi_remote_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # variable-length integer
+        initial_max_stream_data_uni_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # variable-length integer
+        initial_max_streams_bidi_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # variable-length integer
+        initial_max_streams_uni_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # variable-length integer
+        ack_delay_exponent_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # variable-length integer
+        max_ack_delay_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # 0 length. Either exists or not TODO
+        disable_active_migration_field_strategy = None
+
+        
+        preferred_address_field_strategy = None # TODO
+
+        # variable-length integer. <2 should result in connection close
+        active_connection_id_limit_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+        
+        # variable length byte sequence. len<=20
+        initial_source_connection_id_field_strategy = st.one_of(
+            st.binary(min_size=0, max_size=21),
+            st.sampled_from( [None] ),
+        )
+
+        # variable length byte sequence. len<=20. this should be sent only by the sever
+        retry_source_connection_id_field_strategy = st.one_of(
+            st.binary(min_size=0, max_size=21),
+            st.sampled_from( [None] ),
+        )
+        
+        version_information_chosen_version_field_strategy = st.builds(QuicVersionInformation,
+            chosen_version = st.integers(min_value=1, max_value=1),
+            available_versions = st.lists( st.integers(min_value=1, max_value=1), min_size=1, max_size=1 )
+        )
+
+        # variable-length integer. RFC 9221
+        max_datagram_frame_size_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        
+        quantum_readiness_field_strategy = st.one_of(
+            st.binary(min_size=0, max_size=2000),
+            st.sampled_from( [None] ),
+        )
+        
+        
+        default_field_strategies = [
+            st.just(3),  # ack_delay_exponent
+            st.just(8), # active_connection_id_limit
+            st.just(int(self.quic_conf.idle_timeout * 1000)), # max_idle_timeout
+            st.just(self.quic_conf.max_data), # initial_max_data
+            st.just(self.quic_conf.max_stream_data ), # initial_max_stream_data_bidi_local
+            st.just(self.quic_conf.max_stream_data), # initial_max_stream_data_bidi_remote
+            st.just(self.quic_conf.max_stream_data), # initial_max_stream_data_uni
+            st.just(128), # initial_max_streams_bidi
+            st.just(128), # initial_max_streams_uni
+            #st.just(default_quic_conn._host_cids[0].cid), # initial_source_connection_id
+            st.just(25), # max_ack_delay
+            st.just(self.quic_conf.max_datagram_frame_size), # max_datagram_frame_size
+            st.just(( b"Q" * SMALLEST_MAX_DATAGRAM_SIZE if self.quic_conf.quantum_readiness_test else None)), # quantum_readiness
+            st.just(None), # stateless_reset_token
+            st.just(QuicVersionInformation( chosen_version=self.quic_conf.original_version, available_versions=self.quic_conf.supported_versions)), # version_information            
+        ]
+
+        modifying_field_strategies = [
+            ack_delay_exponent_field_strategy,
+            active_connection_id_limit_field_strategy,
+            max_idle_timeout_field_strategy,
+            initial_max_data_field_strategy,
+            initial_max_stream_data_bidi_local_field_strategy,
+            initial_max_stream_data_bidi_remote_field_strategy,
+            initial_max_stream_data_uni_field_strategy,
+            initial_max_streams_bidi_field_strategy,
+            initial_max_streams_uni_field_strategy,
+            #initial_source_connection_id_field_strategy,
+            max_ack_delay_field_strategy,
+            max_datagram_frame_size_field_strategy,
+            quantum_readiness_field_strategy,
+            stateless_reset_token_field_strategy,
+            version_information_chosen_version_field_strategy
+        ]
+        
+        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
+
+
+        built_strategies = []
+        for final_strategy in inter_field_strategies:
+            built_strategies.append(
+                st.builds(QuicTransportParameters, 
+                        ack_delay_exponent = final_strategy[0],
+                        active_connection_id_limit = final_strategy[1],
+                        max_idle_timeout = final_strategy[2],
+                        initial_max_data = final_strategy[3],
+                        initial_max_stream_data_bidi_local = final_strategy[4],
+                        initial_max_stream_data_bidi_remote = final_strategy[5],
+                        initial_max_stream_data_uni = final_strategy[6],
+                        initial_max_streams_bidi = final_strategy[7],
+                        initial_max_streams_uni = final_strategy[8],
+                        #initial_source_connection_id = final_strategy[9],
+                        max_ack_delay = final_strategy[9],
+                        max_datagram_frame_size = final_strategy[10],
+                        quantum_readiness = final_strategy[11],
+                        stateless_reset_token = final_strategy[12],
+                        version_information = final_strategy[13]
+                        )
+            )
+
+        
+        #print(st.one_of(built_strategies))
+
+        return st.one_of(built_strategies)
+
     def build_ack_strategy(self, ack_frame:QuicAck) -> st.SearchStrategy:
         """
         largest_acknowledged:int=None
@@ -280,8 +575,8 @@ class Fuzzer():
                 st.tuples( 
                     st.integers(min_value=0,max_value=255), 
                     st.integers(min_value=0,max_value=2**62+1) ) ),
-            st.sampled_from( [ (0, 5), (16, 5), (997, 5), (LARGEST_NUMBER_IN_VARINT_ENCODING, 5), (None, 5),
-                               (5, 0), (5, 16), (5, 997), (5, LARGEST_NUMBER_IN_VARINT_ENCODING), (5, None)] ),
+            st.sampled_from( [ (0, 5), (16, 5), (997, 5), (LARGEST_VARINT_LEN8, 5), (None, 5),
+                               (5, 0), (5, 16), (5, 997), (5, LARGEST_VARINT_LEN8), (5, None)] ),
         )
         
         
@@ -320,7 +615,6 @@ class Fuzzer():
 
         return st.one_of(built_strategies)
     
-
     def build_nci_strategy(self, nci_frame:QuicNewConnectionId) -> st.SearchStrategy:
         """
         sequence_number:int = None
@@ -464,7 +758,6 @@ class Fuzzer():
         
         return st.one_of(built_strategies)
     
-
     def build_h3_settings_strategy(self, settings_frame:H3Settings) -> st.SearchStrategy:
         """
         max_table_capacity:int = None
@@ -583,300 +876,7 @@ class Fuzzer():
         #print(st.one_of(built_strategies))
 
         return st.one_of(built_strategies)
-                                                      
-    def check_server_availability(self) -> None:
-        """
-        Check if the web server is available by initiating a connection with a new client.
-        The server is up, if it responds with the HANDSHAKE_DONE frame
-        """
-
-        h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
-
-        h3client.connect()
-        res1 = h3client.read_from_buffer()  # Receive any response from the server
-
-        # Complete the connection by sending handshake completion messages
-        h3client.complete_connection()
-        res2 = received_after_init = h3client.read_from_buffer()
-
-        if QUIC_FRAME_ABBREVIATIONS['HANDSHAKE_DONE'] not in res2:
-            raise Exception("Server is down")
-            
-    def build_transport_params_strategy(self) -> st.SearchStrategy:
-        """
-        class QuicTransportParameters:
-            original_destination_connection_id: Optional[bytes] = None
-            max_idle_timeout: Optional[int] = None
-            stateless_reset_token: Optional[bytes] = None
-            max_udp_payload_size: Optional[int] = None
-            initial_max_data: Optional[int] = None
-            initial_max_stream_data_bidi_local: Optional[int] = None
-            initial_max_stream_data_bidi_remote: Optional[int] = None
-            initial_max_stream_data_uni: Optional[int] = None
-            initial_max_streams_bidi: Optional[int] = None
-            initial_max_streams_uni: Optional[int] = None
-            ack_delay_exponent: Optional[int] = None
-            max_ack_delay: Optional[int] = None
-            disable_active_migration: Optional[bool] = False
-            preferred_address: Optional[QuicPreferredAddress] = None
-            active_connection_id_limit: Optional[int] = None
-            initial_source_connection_id: Optional[bytes] = None
-            retry_source_connection_id: Optional[bytes] = None
-            version_information: Optional[QuicVersionInformation] = None TODO
-            max_datagram_frame_size: Optional[int] = None
-            quantum_readiness: Optional[bytes] = None                         
-        """
-
-        """
-        QuicTransportParameters(
-            ack_delay_exponent=self._local_ack_delay_exponent,
-            active_connection_id_limit=self._local_active_connection_id_limit,
-            max_idle_timeout=int(self._configuration.idle_timeout * 1000),
-            initial_max_data=self._local_max_data.value,
-            initial_max_stream_data_bidi_local=self._local_max_stream_data_bidi_local,
-            initial_max_stream_data_bidi_remote=self._local_max_stream_data_bidi_remote,
-            initial_max_stream_data_uni=self._local_max_stream_data_uni,
-            initial_max_streams_bidi=self._local_max_streams_bidi.value,
-            initial_max_streams_uni=self._local_max_streams_uni.value,
-            initial_source_connection_id=self._local_initial_source_connection_id,
-            max_ack_delay=25,
-            max_datagram_frame_size=self._configuration.max_datagram_frame_size,
-            quantum_readiness=(
-                b"Q" * SMALLEST_MAX_DATAGRAM_SIZE
-                if self._configuration.quantum_readiness_test
-                else None
-            ),
-            stateless_reset_token=self._host_cids[0].stateless_reset_token,
-            version_information=QuicVersionInformation(
-                chosen_version=self._version,
-                available_versions=self._configuration.supported_versions,
-            ),
-        )
-        """
-
-        # variable length byte sequence. len<=20
-        original_destination_connection_id_field_strategy = st.one_of(
-            st.binary(min_size=0, max_size=21),
-            st.sampled_from( [None] ),
-        )
-
-        # variable length integer
-        max_idle_timeout_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        # sequence of 16 bytes
-        stateless_reset_token_field_strategy = st.one_of(
-            st.binary(min_size=0, max_size=17),
-            st.sampled_from( [None] ),
-        )
-        
-        # variable-length integer. <1200 is invalid
-        max_udp_payload_size_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-        
-        # variable-length integer
-        initial_max_data_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        # variable-length integer
-        initial_max_stream_data_bidi_local_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        # variable-length integer
-        initial_max_stream_data_bidi_remote_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        # variable-length integer
-        initial_max_stream_data_uni_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        # variable-length integer
-        initial_max_streams_bidi_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        # variable-length integer
-        initial_max_streams_uni_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        # variable-length integer
-        ack_delay_exponent_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        # variable-length integer
-        max_ack_delay_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        # 0 length. Either exists or not TODO
-        disable_active_migration_field_strategy = None
-
-        
-        preferred_address_field_strategy = None # TODO
-
-        # variable-length integer. <2 should result in connection close
-        active_connection_id_limit_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-        
-        # variable length byte sequence. len<=20
-        initial_source_connection_id_field_strategy = st.one_of(
-            st.binary(min_size=0, max_size=21),
-            st.sampled_from( [None] ),
-        )
-
-        # variable length byte sequence. len<=20. this should be sent only by the sever
-        retry_source_connection_id_field_strategy = st.one_of(
-            st.binary(min_size=0, max_size=21),
-            st.sampled_from( [None] ),
-        )
-        
-        version_information_chosen_version_field_strategy = st.builds(QuicVersionInformation,
-            chosen_version = st.integers(min_value=1, max_value=1),
-            available_versions = st.lists( st.integers(min_value=1, max_value=1), min_size=1, max_size=1 )
-        )
-
-        # variable-length integer. RFC 9221
-        max_datagram_frame_size_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
-
-        
-        quantum_readiness_field_strategy = st.one_of(
-            st.binary(min_size=0, max_size=2000),
-            st.sampled_from( [None] ),
-        )
-        
-
-        default_quic_conn = QuicConnection(configuration=self.quic_conf)
-        
-        default_field_strategies = [
-            st.just(3),  # ack_delay_exponent
-            st.just(8), # active_connection_id_limit
-            st.just(int(default_quic_conn._configuration.idle_timeout * 1000)), # max_idle_timeout
-            st.just(default_quic_conn.configuration.max_data), # initial_max_data
-            st.just(default_quic_conn.configuration.max_stream_data ), # initial_max_stream_data_bidi_local
-            st.just(default_quic_conn.configuration.max_stream_data), # initial_max_stream_data_bidi_remote
-            st.just(default_quic_conn.configuration.max_stream_data), # initial_max_stream_data_uni
-            st.just(128), # initial_max_streams_bidi
-            st.just(128), # initial_max_streams_uni
-            #st.just(default_quic_conn._host_cids[0].cid), # initial_source_connection_id
-            st.just(25), # max_ack_delay
-            st.just(default_quic_conn._configuration.max_datagram_frame_size), # max_datagram_frame_size
-            st.just(( b"Q" * SMALLEST_MAX_DATAGRAM_SIZE if default_quic_conn._configuration.quantum_readiness_test else None)), # quantum_readiness
-            st.just(default_quic_conn._host_cids[0].stateless_reset_token,), # stateless_reset_token
-            st.just(QuicVersionInformation( chosen_version=default_quic_conn.configuration.original_version, available_versions=default_quic_conn._configuration.supported_versions)), # version_information            
-        ]
-
-        modifying_field_strategies = [
-            ack_delay_exponent_field_strategy,
-            active_connection_id_limit_field_strategy,
-            max_idle_timeout_field_strategy,
-            initial_max_data_field_strategy,
-            initial_max_stream_data_bidi_local_field_strategy,
-            initial_max_stream_data_bidi_remote_field_strategy,
-            initial_max_stream_data_uni_field_strategy,
-            initial_max_streams_bidi_field_strategy,
-            initial_max_streams_uni_field_strategy,
-            #initial_source_connection_id_field_strategy,
-            max_ack_delay_field_strategy,
-            max_datagram_frame_size_field_strategy,
-            quantum_readiness_field_strategy,
-            stateless_reset_token_field_strategy,
-            version_information_chosen_version_field_strategy
-        ]
-        
-        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
-
-
-        built_strategies = []
-        for final_strategy in inter_field_strategies:
-            built_strategies.append(
-                st.builds(QuicTransportParameters, 
-                        ack_delay_exponent = final_strategy[0],
-                        active_connection_id_limit = final_strategy[1],
-                        max_idle_timeout = final_strategy[2],
-                        initial_max_data = final_strategy[3],
-                        initial_max_stream_data_bidi_local = final_strategy[4],
-                        initial_max_stream_data_bidi_remote = final_strategy[5],
-                        initial_max_stream_data_uni = final_strategy[6],
-                        initial_max_streams_bidi = final_strategy[7],
-                        initial_max_streams_uni = final_strategy[8],
-                        #initial_source_connection_id = final_strategy[9],
-                        max_ack_delay = final_strategy[9],
-                        max_datagram_frame_size = final_strategy[10],
-                        quantum_readiness = final_strategy[11],
-                        stateless_reset_token = final_strategy[12],
-                        version_information = final_strategy[13]
-                        )
-            )
-
-        
-        #print(st.one_of(built_strategies))
-
-        return st.one_of(built_strategies)
-
-        
-    def fuzz_transport_params(self, strategy:st.SearchStrategy) -> None:
-        
-        i=0
-        @given( strategy )
-        @settings(deadline=None, verbosity=Verbosity.normal, print_blob=True, max_examples=100)
-        #@reproduce_failure('6.113.0', b'AAAAAAAAAAAAAQ==')
-        def fuzz_transport_params_inner(transport_params:QuicTransportParameters):
-            nonlocal i
-            #print(".", end="")
-            #sys.stdout.flush()
-            print("------------------------------------------------------")
-            print("{}. {}".format(i, transport_params))
-            i+=1
-
-            
-            h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
-
-            # we need to keeep the connection id as is, otherwise the client doesn't know which received packets are for this connection
-            transport_params.initial_source_connection_id = h3client.connection._host_cids[0].cid
-
-            h3client.connect(transport_params)
-            asas = h3client.read_from_buffer()  # Receive any response from the server
-            print(asas)
-
-            # Complete the connection by sending handshake completion messages
-            h3client.complete_connection()
-            asas = received_after_init = h3client.read_from_buffer()
-            print(asas)
-            
-            
-            #note("Actual Response: {}".format(response))
-            #h3client.close_connection()
-
-            fuzzer.check_server_availability()
-            
-        fuzz_transport_params_inner()
-        print()
-
-
-
+    
     def build_inter_field_strategies(self, default_field_strategies:List[st.SearchStrategy], modifying_field_strategies:List[st.SearchStrategy]) -> List[List[st.SearchStrategy]]:
        
         inter_field_strategies:List[List[st.SearchStrategy]] = []
@@ -900,18 +900,7 @@ class Fuzzer():
 
         return inter_field_strategies
     
-
-
-
-    def find_message_by_packet_number(self, packet_number:int) -> Packet:
-        for msg in self.traffic_messages:
-            #print(msg.quic.field_names)
-            if int(msg.quic.packet_number) == packet_number:
-                #print(msg.quic)
-                return msg
-        raise Exception("Packet with packet_number {} does not exist!".format(packet_number)) 
-            
-
+    # Temp
     def isa(self):
         packet = self.find_message_by_packet_number(9)
         msgDissector = MSGDissector()
@@ -933,9 +922,6 @@ class Fuzzer():
         received_after_init = h3client.read_from_buffer()
 
         h3client.send_frames(frames)
-
-    
-
 
 
 if __name__ == "__main__":
@@ -961,9 +947,38 @@ if __name__ == "__main__":
         help="log secrets to a file, for use with Wireshark",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", help="increase logging verbosity"
+        "-m",
+        "--mutations",
+        type=int,
+        default=100,
+        help="The number of mutations to apply on each QUIC, HTTP/3 frame and Transport Params (default 100)"
     )
-
+    parser.add_argument(
+        "-p",
+        "--parallel-requests",
+        type=int,
+        default=20,
+        help="The number of requests to send in parallel (default 20)"
+    )
+    parser.add_argument(
+        "-i",
+        "--interval",
+        type=int,
+        default=1,
+        help="Time to wait before sending the next parallel requests (in sec.) (default 1)"
+    )
+    parser.add_argument(
+        "-d",
+        "--duration",
+        type=int,
+        default=30,
+        help="The length of attack (in sec.) (default 30)"
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Verbose output"
+    )
+    
+    
 
 
     args = parser.parse_args()
@@ -982,14 +997,18 @@ if __name__ == "__main__":
 
 
 
-
-    fuzzer = Fuzzer(configuration, urlparse(args.url).netloc, args.secrets_log)
+    fuzzer = Fuzzer(
+        configuration, 
+        urlparse(args.url).netloc, 
+        args.secrets_log,
+        mutations=args.mutations,
+        parallel_requests=args.parallel_requests,
+        interval=args.interval,
+        duration=args.duration,
+        verbose = args.verbose)
     
     
     fuzzer.set_up_graph(args.state_machine, args.pcap)
-
-    #fuzzer.hypo("isa")
-    #sys.exit()
 
     fuzzer.fuzz()
     #fuzzer.isa()
