@@ -32,7 +32,7 @@ import util
 
 
 class HttpClient():
-    def __init__(self, quic_conf: QuicConfiguration, hostname: str, keylog_file: str) -> None:
+    def __init__(self, quic_conf: QuicConfiguration, hostname: str) -> None:
         self.quic_conf = quic_conf
         self.quic_conf.original_version = 1
         self.hostname = hostname
@@ -43,8 +43,6 @@ class HttpClient():
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
         self.sock.settimeout(0.2)
         self.handler = MSGHandler(qc = self.connection)
-        self.crafter = MSGCrafter()
-        os.environ['SSLKEYLOGFILE'] = keylog_file
         
         
     def get_builder(self, epoch: Epoch):

@@ -5,7 +5,6 @@ from http_client import HttpClient
 import util
 import json
 import time
-import logging
 import sys
 from typing import List
 from collections import OrderedDict
@@ -13,7 +12,6 @@ import copy
 import traceback
 from urllib.parse import urlparse
 from pyshark.packet.packet import Packet
-from pyshark import FileCapture
 from aioquic.quic.configuration import QuicConfiguration
 
 class ProtoModel(object):
@@ -22,7 +20,6 @@ class ProtoModel(object):
 
         # For HTTP/3 communication
         self.configuration:QuicConfiguration = None
-        self.keylog:str = None
 
         # overall status
         self.is_pruning:bool = False
@@ -75,7 +72,7 @@ def get_move_state_h3msgs(pm:ProtoModel, target_state:states.State) -> List[Pack
     
     return state_moving_msgs
 
-def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Packet], outdir:str) -> None:
+def modeller_h3(conf:QuicConfiguration, url:str, sample_msgs:List[Packet], outdir:str) -> None:
     global expand_sm, minimize_sm
     g_start_time = time.time()
     print("\n[STEP 3] Modeling started at %s" % time.ctime(g_start_time))
@@ -85,7 +82,6 @@ def modeller_h3(conf:QuicConfiguration, keylog:str, url:str, sample_msgs:List[Pa
     pm.testmsgs = sample_msgs
     pm.dst_ip = url
     pm.configuration = conf
-    pm.keylog = keylog
 
     while True:
         ### Expand candidate states in this level ###
@@ -315,7 +311,7 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
                 skipped_messages += 1
                 continue
 
-            h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc, pm.keylog)
+            h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc)
             state_moving_msgs_list = get_move_state_h3msgs(pm, leaf_state)
 
             print("┌────────────────────────────────────────────────────────────────────────────────────")
@@ -370,7 +366,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
                     skipped_messages += 1
                     continue
 
-                h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc, pm.keylog)
+                h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc)
                 msg_rcvd_str = send_receive_http3(pm, h3client, state_moving_msgs_list, msg_sent)
                 
                 

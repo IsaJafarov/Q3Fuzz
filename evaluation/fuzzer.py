@@ -98,10 +98,10 @@ class QuicStream:
 
 
 class Fuzzer():
-    def __init__(self, quic_conf:QuicConfiguration, hostname:str, secrets_log:str, mutations:int, parallel_requests:int, interval:int, duration:int, verbose:bool):
+    def __init__(self, quic_conf:QuicConfiguration, hostname:str, keylog_file:str, mutations:int, parallel_requests:int, interval:int, duration:int, verbose:bool):
         self.quic_conf:QuicConfiguration = quic_conf
         self.hostname:str = hostname
-        self.secrets_log:str = secrets_log
+        self.keylog_file:str = keylog_file
         self.graph:nx.DiGraph = nx.DiGraph()
         self.traffic_messages:list[Packet] = []
         self.mutations:int = mutations
@@ -109,9 +109,6 @@ class Fuzzer():
         self.interval:int = interval
         self.duration:int = duration
         self.verbose = verbose
-
-
-        
     
     def set_up_graph(self, sm_file_path:str, traffic_file_path:str):
         with open(sm_file_path, 'r') as f:
@@ -124,7 +121,7 @@ class Fuzzer():
             packet_number = t['conditions'][0].split(":")[1]
             self.graph.add_edge(source, destination, trigger=trigger, packet_number=packet_number)
 
-        self.traffic_messages = util.h3msg_from_pcap(traffic_file_path, True)
+        self.traffic_messages = util.h3msg_from_pcap(traffic_file_path, self.keylog_file, True)
 
 
     def fuzz(self):
@@ -279,7 +276,7 @@ class Fuzzer():
         The server is up, if it responds with the HANDSHAKE_DONE frame
         """
 
-        h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
+        h3client = HttpClient(self.quic_conf, self.hostname)
 
         h3client.connect()
         res1 = h3client.read_from_buffer()  # Receive any response from the server
@@ -301,7 +298,7 @@ class Fuzzer():
                        preceding_quic_frames:List=None, 
                        succeeding_quic_frames:List=None) -> None:
         
-        h3client = HttpClient(self.quic_conf, self.hostname, self.secrets_log)
+        h3client = HttpClient(self.quic_conf, self.hostname)
 
         # Ignore errors during the attack.
         # Once the attack complets, we will check the server availability. At that point, we will care about the connection errors.
@@ -336,7 +333,6 @@ class Fuzzer():
 
     def find_message_by_packet_number(self, packet_number:int) -> Packet:
         for msg in self.traffic_messages:
-            #print(msg.quic.field_names)
             if int(msg.quic.packet_number) == packet_number:
                 #print(msg.quic)
                 return msg
@@ -951,7 +947,6 @@ if __name__ == "__main__":
     #install()
 
     defaults = QuicConfiguration(is_client=True)
-    keylog_file = None
 
     parser = argparse.ArgumentParser(description="HTTP/3 client")
     parser.add_argument(
@@ -1014,16 +1009,15 @@ if __name__ == "__main__":
     )
 
     configuration.verify_mode = ssl.CERT_NONE
+    keylog_file = None
     if args.secrets_log:
         keylog_file = os.path.abspath(args.secrets_log) 
         configuration.secrets_log_file = open(keylog_file, "a")
 
-
-
     fuzzer = Fuzzer(
         configuration, 
         urlparse(args.url).netloc, 
-        args.secrets_log,
+        keylog_file,
         mutations=args.mutations,
         parallel_requests=args.parallel_requests,
         interval=args.interval,
@@ -1034,7 +1028,6 @@ if __name__ == "__main__":
     fuzzer.set_up_graph(args.state_machine, args.pcap)
 
     fuzzer.fuzz()
-    #fuzzer.isa()
     
 
 

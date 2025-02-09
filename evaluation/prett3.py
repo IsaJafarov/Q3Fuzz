@@ -20,8 +20,6 @@ import aioquic.buffer
 import asyncio
 import ssl
 import aioquic
-import wsproto
-import wsproto.events
 from aioquic.h3.connection import H3_ALPN, ErrorCode, H3Connection, FrameType, StreamType, encode_frame, encode_settings
 from aioquic.h3.events import (
     DataReceived,

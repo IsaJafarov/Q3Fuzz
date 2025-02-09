@@ -161,7 +161,7 @@ def get_frames_of_layer(layer:XmlLayer) -> List[str]:
     return frame_names
 
 
-def h3msg_from_pcap(file_path:str, client_only:bool=False) -> List[Packet]: # for HTTP3
+def h3msg_from_pcap(file_path:str, keylog_file:str, client_only:bool=False) -> List[Packet]: # for HTTP3
     """
     Extract all QUIC messages from pcapfile and return an array of http3 messages
     Now we only consider EXPORTED_PDU layer exported by wireshark instead of preserving data of UDP layer.
@@ -173,8 +173,7 @@ def h3msg_from_pcap(file_path:str, client_only:bool=False) -> List[Packet]: # fo
         quic_packet_list (FileCapture): QUIC or HTTP/3 messages that are seen in the pcap file.
     """
     client_ip = None   # Get ip to gather client message 
-    raw_cap = pyshark.FileCapture(file_path)
-    quic_cap = pyshark.FileCapture(file_path, display_filter='quic')
+    quic_cap = pyshark.FileCapture(file_path, display_filter='quic', override_prefs={"tls.keylog_file": keylog_file})
     quic_packet_list = []
     quic_cap_cnt = 0
 

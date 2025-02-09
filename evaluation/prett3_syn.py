@@ -53,7 +53,6 @@ if __name__ == "__main__":
     install()
 
     defaults = QuicConfiguration(is_client=True)
-    keylog_file = None
 
     parser = argparse.ArgumentParser(description="HTTP/3 client")
     parser.add_argument(
@@ -143,6 +142,7 @@ if __name__ == "__main__":
         configuration.max_stream_data = args.max_stream_data
     if args.quic_log:
         configuration.quic_logger = QuicFileLogger(args.quic_log)
+    keylog_file = None
     if args.secrets_log:
         keylog_file = os.path.abspath(args.secrets_log) 
         configuration.secrets_log_file = open(keylog_file, "a")
@@ -151,10 +151,9 @@ if __name__ == "__main__":
     init(args)
     
     ### Extract initial state machine ###
-    http3_basic_messages = util.h3msg_from_pcap(args.pcap, client_only=True)
+    http3_basic_messages = util.h3msg_from_pcap(args.pcap, keylog_file, client_only=True)
 
     stma.modeller_h3(conf=configuration, 
-                     keylog=keylog_file, 
                      url=args.url, 
                      sample_msgs=http3_basic_messages, 
                      outdir="./result")

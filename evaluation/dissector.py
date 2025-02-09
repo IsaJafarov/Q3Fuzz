@@ -72,7 +72,7 @@ class MSGDissector():
         self.quic_frames:list = []
 
     def dissect_msg(self, message:Packet) -> List:
-
+        
         h3_frames = []
 
         # Parse layers in the h3msg
