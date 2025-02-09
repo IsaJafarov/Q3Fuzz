@@ -22,7 +22,7 @@ from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 from datetime import datetime
 import time
 import concurrent.futures
-from rich.progress import Progress
+from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, SpinnerColumn
 import warnings
 
 
@@ -262,7 +262,13 @@ class Fuzzer():
                 print("\n\n\n")
             
             
-        progress = Progress()
+        progress = progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            SpinnerColumn())
+
         mutations = progress.add_task("Fuzz "+self.extract_fuzzed_object_str_from_strategy(strategy), total=self.mutations, visible=not self.verbose)
 
         progress.start()
