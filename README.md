@@ -4,7 +4,9 @@
 - python 3.x
 - pyshark and aioquic packages
 ```
-$ sudo apt install tshark
+$ sudo add-apt-repository ppa:wireshark-dev/stable
+$ sudo apt update
+$ sudo apt install tshark=4.4.3-1~ubuntu20.04.0~ppa1
 $ pip3 install pyshark==0.6
 $ pip3 install aioquic==1.2.0
 $ pip3 install networkx==3.1
