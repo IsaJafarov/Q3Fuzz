@@ -965,10 +965,17 @@ if __name__ == "__main__":
         "state_machine", type=str, help="Path to the state machine json file"
     )
     parser.add_argument(
-        "-l",
-        "--secrets-log",
+        "-dk",
+        "--decrypt_keylog",
+        default="./sample_traffics/secrets.keylog",
         type=str,
-        help="log secrets to a file, for use with Wireshark",
+        help="SSLKEYLOG file to decrypt the traffic files (default ./sample_traffics/secrets.keylog)",
+    )
+    parser.add_argument(
+        "-ok",
+        "--output_keylog",
+        type=str,
+        help="File path to log new traffic secrets",
     )
     parser.add_argument(
         "-m",
@@ -1015,15 +1022,20 @@ if __name__ == "__main__":
     )
 
     configuration.verify_mode = ssl.CERT_NONE
-    keylog_file = None
-    if args.secrets_log:
-        keylog_file = os.path.abspath(args.secrets_log) 
-        configuration.secrets_log_file = open(keylog_file, "a")
+
+    if args.output_keylog:
+        output_keylog_file = os.path.abspath(args.output_keylog) 
+        configuration.secrets_log_file = open(output_keylog_file, "a")
+
+    decrypt_keylog_file = os.path.abspath(args.decrypt_keylog)
+    if not os.path.exists(decrypt_keylog_file):
+        raise Exception("{} does not exist".format(decrypt_keylog_file))
+
 
     fuzzer = Fuzzer(
         configuration, 
         urlparse(args.url).netloc, 
-        keylog_file,
+        decrypt_keylog_file,
         mutations=args.mutations,
         parallel_requests=args.parallel_requests,
         interval=args.interval,
@@ -1035,8 +1047,4 @@ if __name__ == "__main__":
 
     fuzzer.fuzz()
     
-
-
-
-
 

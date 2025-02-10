@@ -95,10 +95,17 @@ if __name__ == "__main__":
         help="log QUIC events to QLOG files in the specified directory",
     )
     parser.add_argument(
-        "-l",
-        "--secrets-log",
+        "-dk",
+        "--decrypt_keylog",
+        default="./sample_traffics/secrets.keylog",
         type=str,
-        help="log secrets to a file, for use with Wireshark",
+        help="SSLKEYLOG file to decrypt the traffic files (default ./sample_traffics/secrets.keylog)",
+    )
+    parser.add_argument(
+        "-ok",
+        "--output_keylog",
+        type=str,
+        help="File path to log new traffic secrets",
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="increase logging verbosity"
@@ -142,16 +149,20 @@ if __name__ == "__main__":
         configuration.max_stream_data = args.max_stream_data
     if args.quic_log:
         configuration.quic_logger = QuicFileLogger(args.quic_log)
-    keylog_file = None
-    if args.secrets_log:
-        keylog_file = os.path.abspath(args.secrets_log) 
-        configuration.secrets_log_file = open(keylog_file, "a")
+    
+    if args.output_keylog:
+        output_keylog_file = os.path.abspath(args.output_keylog) 
+        configuration.secrets_log_file = open(output_keylog_file, "a")
+
+    decrypt_keylog_file = os.path.abspath(args.decrypt_keylog)
+    if not os.path.exists(decrypt_keylog_file):
+        raise Exception("{} does not exist".format(decrypt_keylog_file))
 
     ### General setting ###
     init(args)
     
     ### Extract initial state machine ###
-    http3_basic_messages = util.h3msg_from_pcap(args.pcap, keylog_file, client_only=True)
+    http3_basic_messages = util.h3msg_from_pcap(args.pcap, decrypt_keylog_file, client_only=True)
 
     stma.modeller_h3(conf=configuration, 
                      url=args.url, 
