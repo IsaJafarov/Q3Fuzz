@@ -23,6 +23,8 @@ from datetime import datetime
 import time
 import concurrent.futures
 from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, SpinnerColumn
+from rich.console import Console
+from rich.table import Table
 import warnings
 
 
@@ -123,9 +125,41 @@ class Fuzzer():
 
         self.traffic_messages = util.h3msg_from_pcap(traffic_file_path, self.keylog_file, True)
 
+    def print_info(self, transitions:List[Tuple]):
+        table = Table(title="Fuzzing Data")
+        table.add_column("Parameter")
+        table.add_column("Value")
+
+        table.add_row("Parallel Requests", "{}".format(self.parallel_requests))
+        table.add_row("Interval", "{} sec.".format(self.interval) )
+        table.add_row("Attack Duration for each mutation", "{} sec.".format(self.duration) )
+        table.add_row("Number of mutations for each transition", "{}".format(self.mutations) )
+        table.add_row("Fuzzing transitions", "Transport parameters, {}".format(", ".join(f"{i}->{j}" for i, j in transitions)))
+        
+        console = Console()
+        console.print(table)
+
 
     def fuzz(self):
         
+        def get_transitions_to_fuzz():
+            transitions = []
+            for node in self.graph.nodes():
+
+                if node=="Init" or node=="Finish":
+                    continue
+                
+                for pre in self.graph.predecessors(node):
+                    if pre == node: 
+                        continue
+                    
+                    transitions.append( (pre, node) )
+
+            return transitions
+
+        transitions_to_fuzz = get_transitions_to_fuzz()
+        self.print_info(get_transitions_to_fuzz())
+
         # Fuzz Transport Prameters
         if self.verbose:
             print("Fuzzing Transport Parameters at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
@@ -133,35 +167,34 @@ class Fuzzer():
         self.fuzz_msg_with_strategy(transport_params_strategy)
 
         # Fuzz individual messages
-        for node in self.graph.nodes():
+        for source_node,target_node in transitions_to_fuzz:
+            print("\n\nTransition: {} -> {}\n".format(source_node, target_node),flush=True)
 
-            if node=="Init" or node=="Finish":
-                continue
-            
-            for pre in self.graph.predecessors(node):
-                if pre == node: 
-                    continue
+            nodes_in_the_path = nx.shortest_path(self.graph, "Init", source_node)
 
-                print("\n\nTransition: {} -> {}\n".format(pre, node),flush=True)
+            moving_msgs_packet_nums = []
+            for i in range(len(nodes_in_the_path)-1):
+                source_node = nodes_in_the_path[i]
+                destination_node = nodes_in_the_path[i+1]
+                edge = self.graph.get_edge_data(source_node, destination_node)
+                trigger = edge['trigger']
+                packet_number = int(edge['packet_number'])
+
+                moving_msgs_packet_nums.append( packet_number )
+
+            edge_to_fuzz = self.graph.get_edge_data(source_node, target_node)
+            response = edge_to_fuzz['trigger'].split("=>")[1].strip()
+            triggering_msg_packet_num = int(edge_to_fuzz['packet_number'])
+            triggering_msg = self.find_message_by_packet_number(triggering_msg_packet_num)
+
+            self.fuzz_state_transition(moving_msgs_packet_nums, triggering_msg)
+
+
+
+
                 
-                nodes_in_the_path = nx.shortest_path(self.graph, "Init", pre)
-
-                moving_msgs_packet_nums = []
-                for i in range(len(nodes_in_the_path)-1):
-                    source_node = nodes_in_the_path[i]
-                    destination_node = nodes_in_the_path[i+1]
-                    edge = self.graph.get_edge_data(source_node, destination_node)
-                    trigger = edge['trigger']
-                    packet_number = int(edge['packet_number'])
-
-                    moving_msgs_packet_nums.append( packet_number )
-
-                edge_to_fuzz = self.graph.get_edge_data(pre, node)
-                response = edge_to_fuzz['trigger'].split("=>")[1].strip()
-                triggering_msg_packet_num = int(edge_to_fuzz['packet_number'])
-                triggering_msg = self.find_message_by_packet_number(triggering_msg_packet_num)
-
-                self.fuzz_state_transition(moving_msgs_packet_nums, triggering_msg)
+                
+                
     
     def reach_source_state(self, h3client:HttpClient, moving_msgs_packet_nums:List[int]) -> None:
         
@@ -193,24 +226,23 @@ class Fuzzer():
             preceding_quic_frames = quic_frames[:i]
             succeeding_quic_frames = quic_frames[i+1:]
 
+            strategy = None
             if type(quic_frame) == QuicAck:
                 if self.verbose:
                     print("Fuzzing ACK at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
                 strategy = self.build_ack_strategy(quic_frame)
-                self.fuzz_msg_with_strategy(strategy, moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
-            
+                
             elif type(quic_frame) == QuicNewConnectionId:
                 if self.verbose:
                     print("Fuzzing NCI at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
                 strategy = self.build_nci_strategy(quic_frame)
-                self.fuzz_msg_with_strategy(strategy, moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
 
             elif type(quic_frame) == QuicStream:
                 if self.verbose:
                     print("Fuzzing STREAM at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
                 strategy = self.build_stream_strategy(quic_frame)
-                self.fuzz_msg_with_strategy(strategy, moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
 
+            self.fuzz_msg_with_strategy(strategy, moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
 
     def fuzz_msg_with_strategy(self, 
                             strategy:st.SearchStrategy,
@@ -219,7 +251,6 @@ class Fuzzer():
                             succeeding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]] = None) -> None:
         
         
-
         num=1
         @given( strategy )
         @settings(deadline=None, verbosity=Verbosity.normal, print_blob=True, 
