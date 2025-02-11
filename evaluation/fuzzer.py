@@ -126,7 +126,7 @@ class Fuzzer():
         self.traffic_messages = util.h3msg_from_pcap(traffic_file_path, self.keylog_file, True)
 
     def print_info(self, transitions:List[Tuple]):
-        table = Table(title="Fuzzing Data")
+        table = Table(title="Fuzzing Configuration")
         table.add_column("Parameter")
         table.add_column("Value")
 
@@ -160,6 +160,7 @@ class Fuzzer():
         transitions_to_fuzz = get_transitions_to_fuzz()
         self.print_info(get_transitions_to_fuzz())
 
+
         # Fuzz Transport Prameters
         if self.verbose:
             print("Fuzzing Transport Parameters at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
@@ -167,19 +168,17 @@ class Fuzzer():
         self.fuzz_msg_with_strategy(transport_params_strategy)
 
         # Fuzz individual messages
-        for source_node,target_node in transitions_to_fuzz:
-            print("\n\nTransition: {} -> {}\n".format(source_node, target_node),flush=True)
+        for source_node, target_node in transitions_to_fuzz:
+            
+            print("\n\nTransition: {} -> {}\n".format(source_node, target_node))
 
             nodes_in_the_path = nx.shortest_path(self.graph, "Init", source_node)
 
             moving_msgs_packet_nums = []
             for i in range(len(nodes_in_the_path)-1):
-                source_node = nodes_in_the_path[i]
-                destination_node = nodes_in_the_path[i+1]
-                edge = self.graph.get_edge_data(source_node, destination_node)
+                edge = self.graph.get_edge_data(nodes_in_the_path[i], nodes_in_the_path[i+1])
                 trigger = edge['trigger']
                 packet_number = int(edge['packet_number'])
-
                 moving_msgs_packet_nums.append( packet_number )
 
             edge_to_fuzz = self.graph.get_edge_data(source_node, target_node)
@@ -219,7 +218,6 @@ class Fuzzer():
         msg_dissector = MSGDissector()
         quic_frames = msg_dissector.dissect_msg(triggering_msg)
 
-        #print("triggering_msg: {}".format(util.h3msg_to_str(triggering_msg)))
         for i in range(len(quic_frames)):
             quic_frame = quic_frames[i]
 
@@ -244,12 +242,12 @@ class Fuzzer():
 
             self.fuzz_msg_with_strategy(strategy, moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
 
+
     def fuzz_msg_with_strategy(self, 
                             strategy:st.SearchStrategy,
                             moving_msgs_packet_nums:List[int] = None, 
                             preceding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]] = None, 
                             succeeding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]] = None) -> None:
-        
         
         num=1
         @given( strategy )
@@ -262,6 +260,7 @@ class Fuzzer():
                                           preceding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]], 
                                           succeeding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]], 
                                           fuzzed_thing:Union[QuicTransportParameters,QuicAck,QuicNewConnectionId,QuicStream]):
+            
             
             if self.verbose:
                 nonlocal num
@@ -287,25 +286,24 @@ class Fuzzer():
 
             fuzzer.check_server_availability()
             
-            progress.update(mutations, advance=1)
+            progress.update(mutations_bar, advance=1)
 
             if self.verbose:
                 print("\n\n\n")
             
-            
-        progress = progress = Progress(
+
+        with Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
             TimeElapsedColumn(),
-            SpinnerColumn())
+            SpinnerColumn()) as progress:
 
-        mutations = progress.add_task("Fuzz "+self.extract_fuzzed_object_str_from_strategy(strategy), total=self.mutations, visible=not self.verbose)
+            mutations_bar = progress.add_task("Fuzz "+self.extract_fuzzed_object_str_from_strategy(strategy), total=self.mutations, visible=not self.verbose)
 
-        progress.start()
-        fuzz_msg_with_strategy_innner(moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
-        progress.stop()
-                
+            
+            fuzz_msg_with_strategy_innner(moving_msgs_packet_nums, preceding_quic_frames, succeeding_quic_frames)
+            
 
     def check_server_availability(self) -> None:
         """
@@ -771,8 +769,16 @@ class Fuzzer():
             h3_frame_strategy = self.build_h3_settings_strategy(stream_frame.h3_frame)
         elif type(stream_frame.h3_frame) == H3PriorityUpdate:
             h3_frame_strategy = self.build_h3_priority_update_strategy(stream_frame.h3_frame)
-        elif type(stream_frame.h3_frame) in [H3Headers, H3Data, QpackEncoder, QpackDecoder]:
-            h3_frame_strategy = st.just(stream_frame.h3_frame) # TODO: build strategy for each
+
+        # TODO: build strategy for each properly
+        elif type(stream_frame.h3_frame) == H3Headers:
+            h3_frame_strategy = st.builds(H3Headers, st.binary())
+        elif type(stream_frame.h3_frame) == H3Data:
+            h3_frame_strategy = st.builds(H3Data, st.binary())
+        elif type(stream_frame.h3_frame) == QpackEncoder:
+            h3_frame_strategy = st.builds(QpackEncoder, st.binary())
+        elif type(stream_frame.h3_frame) == QpackDecoder:
+            h3_frame_strategy = st.builds(QpackDecoder, st.binary())
         
         
         
@@ -938,12 +944,18 @@ class Fuzzer():
             default_values_strategy_copy[i] = modifying_field_strategies[i]
 
             # add it to the inter-field strategies
-            inter_field_strategies.append( default_values_strategy_copy )
+            inter_field_strategies.append(default_values_strategy_copy )
 
 
         # Additionally, modify all fileds at the same time
-        inter_field_strategies.append( modifying_field_strategies )
-
+        # There are more possible test cases when we modify all fields at once than modifying each field
+        # Therefore, we want the strategy that modifies all fields together has higher priority
+        # Hypothesis does not allow giving weights to priorities, when we merge them with one_of() method
+        # Through observation, we see that when multiple strategies are merged with one_of() method, the first one is used more for data generation
+        # Thefore, insert modifying_field_strategies at the beginning of the list
+        inter_field_strategies.insert(0, modifying_field_strategies )
+        # P.S. adding the same strategy multiple times to one_of() does not increase its 'priority'
+        
         #print(inter_field_strategies)
 
         return inter_field_strategies
