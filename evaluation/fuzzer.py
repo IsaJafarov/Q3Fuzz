@@ -40,7 +40,7 @@ LARGEST_VARINT_LEN2 = 0x3FFF # length = 2. hex value is 16383
 LARGEST_VARINT_LEN4 = 0x3FFFFFFF # length = 4. hex value is 1073741823
 LARGEST_VARINT_LEN8 = 0x3FFFFFFFFFFFFFFF # length = 8. hex value is 4611686018427387903
 # Higher values throw "Integer is too big for a variable-length integer"
-SAMPLE_VALUES_FOR_VARINT_VALUES = [0, 16, 997, 10**5, 10**10, LARGEST_VARINT_LEN1, LARGEST_VARINT_LEN2, LARGEST_VARINT_LEN4, LARGEST_VARINT_LEN8 ]
+SAMPLE_VALUES_FOR_VARINT_VALUES = [0, 16, 997, 10**5, 10**10, LARGEST_VARINT_LEN1, LARGEST_VARINT_LEN2, LARGEST_VARINT_LEN4, LARGEST_VARINT_LEN8, LARGEST_VARINT_LEN8+1 ]
 
 """
 @dataclass
@@ -267,6 +267,7 @@ class Fuzzer():
                 print("\nMutation #{}: {}".format(num, fuzzed_thing))
                 num += 1
             
+            attack_start_time = time.time()
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 futures = []
 
@@ -283,8 +284,18 @@ class Fuzzer():
                                                        preceding_quic_frames=preceding_quic_frames,
                                                        succeeding_quic_frames=succeeding_quic_frames))
                     time.sleep(self.interval)
+            attack_end_time = time.time()
 
+            # check if we can establish a connection with the server.
+            # if we can't, then the server is down
             fuzzer.check_server_availability()
+
+            if self.verbose:
+                print("\nAttack lasted for {} seconds".format(attack_end_time - attack_start_time))
+
+            # 2 sec. difference is understandable
+            if attack_end_time - attack_start_time > self.duration + 2:
+                raise Exception("The attack took {} sec. longer than expected".format( attack_end_time - attack_start_time - self.duration ))
             
             progress.update(mutations_bar, advance=1)
 
@@ -1088,6 +1099,24 @@ if __name__ == "__main__":
     
     fuzzer.set_up_graph(args.state_machine, args.pcap)
 
-    fuzzer.fuzz()
-    
 
+    fuzzer.fuzz()
+
+    '''
+    fuzzer.execute_attack(
+        QuicStream(
+            2,1,0,H3Settings(100,100,100,1,1)
+        ),
+        [
+            10
+        ],
+        [
+            QuicNewConnectionId(11,12,8,b'helloooo',b'worldddd12345678')
+        ],
+        [
+            QuicStream(
+            3,1,1,H3Data(b'AAAAAAAAAAAAAAAAAAAAAAAAAAA')
+        ),
+        ]
+    )
+    '''

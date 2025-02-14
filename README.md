@@ -11,4 +11,5 @@ $ pip3 install pyshark==0.6
 $ pip3 install aioquic==1.2.0
 $ pip3 install networkx==3.1
 $ pip3 install hypothesis==6.113.0
+$ pip3 install rich
 ```
