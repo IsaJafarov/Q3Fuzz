@@ -1,9 +1,19 @@
 {
-  "initial": "Init",
+  "initial": "START",
   "transitions": [
     {
-      "source": "Init",
-      "dest": "Init",
+      "source": "START",
+      "dest": "HANDSHAKING",
+      "trigger": "INITIAL => ACK,CRY,CRY,CRY|CRY,CRY,CRY"
+    },
+    {
+      "source": "HANDSHAKING",
+      "dest": "CONNECTED",
+      "trigger": "HANDSHAKE => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
       "trigger": "ST(2)[SE] => ACK\n",
       "conditions": [
         "packet_number:7"
@@ -26,7 +36,7 @@
       ]
     },
     {
-      "source": "Init",
+      "source": "CONNECTED",
       "dest": "2",
       "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
@@ -42,8 +52,8 @@
       ]
     },
     {
-      "source": "Init",
-      "dest": "Init",
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
       "trigger": "ACK => \u2298\n",
       "conditions": [
         "packet_number:9"
@@ -66,7 +76,7 @@
       ]
     },
     {
-      "source": "Init",
+      "source": "CONNECTED",
       "dest": "5",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
@@ -82,8 +92,8 @@
       ]
     },
     {
-      "source": "Init",
-      "dest": "Init",
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
       "trigger": "ACK => RETRANSMIT\n",
       "conditions": [
         "packet_number:12"
@@ -106,8 +116,32 @@
       ]
     },
     {
-      "source": "Init",
-      "dest": "Finish",
+      "source": "CONNECTED",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:14"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:15"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
       "trigger": "ACK => CC\n",
       "conditions": [
         "packet_number:13"
@@ -115,7 +149,23 @@
     },
     {
       "source": "2",
-      "dest": "Finish",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:14"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:15"
+      ]
+    },
+    {
+      "source": "5",
+      "dest": "FINISH",
       "trigger": "ACK => CC\n",
       "conditions": [
         "packet_number:13"
@@ -123,10 +173,18 @@
     },
     {
       "source": "5",
-      "dest": "Finish",
+      "dest": "FINISH",
       "trigger": "ACK => CC\n",
       "conditions": [
-        "packet_number:13"
+        "packet_number:14"
+      ]
+    },
+    {
+      "source": "5",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:15"
       ]
     },
     {
@@ -148,10 +206,16 @@
   ],
   "states": [
     {
-      "name": "Init"
+      "name": "START"
     },
     {
-      "name": "Finish"
+      "name": "FINISH"
+    },
+    {
+      "name": "HANDSHAKING"
+    },
+    {
+      "name": "CONNECTED"
     },
     {
       "name": "2"
@@ -167,17 +231,13 @@
   "after_state_change": [],
   "prepare_event": [],
   "finalize_event": [],
-  "on_exception": [],
-  "on_final": [],
   "send_event": false,
   "auto_transitions": false,
-  "model_attribute": "state",
-  "model_override": false,
   "ignore_invalid_triggers": null,
   "queued": false,
   "models": [
     {
-      "state": "Init",
+      "state": "START",
       "name": "HTTP/3 State Machine",
       "class-name": "statemachine.ProtoModel"
     }

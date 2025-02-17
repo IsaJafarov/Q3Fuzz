@@ -30,7 +30,7 @@ class ProtoModel(object):
         # State searching information
         self.current_state = 0
         self.num_of_states = 0
-        self.state_list = states.StateList(state_list=[states.State('Init', 1)])  # basic state '0' in level 1
+        self.state_list = states.StateList(state_list=[states.State('CONNECTED', 1)])  # basic state in level 1
         self.candidate_state_list = states.StateList(state_list=[])
 
         # Transition information
@@ -48,7 +48,7 @@ class MergeData():
 
 def generate_sm():
     pm = ProtoModel("HTTP/3 State Machine")
-    sm = GraphMachine(model=pm, states=['Init', 'Finish'], initial='Init', auto_transitions=False)
+    sm = GraphMachine(model=pm, states=['START', 'FINISH'], initial='START', auto_transitions=False)
     return pm, sm
 
 def get_move_state_h3msgs(pm:ProtoModel, target_state:states.State) -> List[Packet]:
@@ -83,6 +83,17 @@ def modeller_h3(conf:QuicConfiguration, url:str, sample_msgs:List[Packet], outdi
     pm.dst_ip = url
     pm.configuration = conf
 
+    ### Record 0-RTT INIT and HANDSHAKE ###
+    h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc)
+    quicmsg_rcvd = connect_initial(h3client)
+    sm.add_state('HANDSHAKING')
+    sm.add_transition('INITIAL => '+quicmsg_rcvd, source='START', dest='HANDSHAKING') # We skip recording condition; it is just a simple transition before connection
+    quicmsg_rcvd = connect_handshake(h3client)
+    sm.add_state('CONNECTED')
+    sm.add_transition('HANDSHAKE => '+quicmsg_rcvd, source='HANDSHAKING', dest='CONNECTED') # We skip recording condition; it is just a simple transition before connection
+    h3client.close_connection()
+
+
     while True:
         ### Expand candidate states in this level ###
         print("\033[31m[LEVEL %d] STATE MACHINE EXPANSION started at %s\033[0m" % (pm.current_level, time.ctime(time.time())))
@@ -97,7 +108,7 @@ def modeller_h3(conf:QuicConfiguration, url:str, sample_msgs:List[Packet], outdi
 
         ### Prune candidate states in this level ###
         print("\033[31m[LEVEL %d] STATE MACHINE MINIMIZATION started at %s\033[0m" % (pm.current_level, time.ctime(time.time())))
-        is_pruning = True
+        pm.is_pruning = True
         minimize_sm(pm, sm)
         print("\033[31m[LEVEL %d] STATE MACHINE MINIMIZATION ended at %s\033[0m" % (pm.current_level, time.ctime(time.time())))
 
@@ -169,22 +180,28 @@ def modeller_h3(conf:QuicConfiguration, url:str, sample_msgs:List[Packet], outdi
     #     json.dump(sm.markup, jsonfile, indent=2)
     sys.exit()
 
+def connect_initial(h3client:HttpClient) -> str:
+    ### INITIAL CONNECTION ###
+    # Establish initial connection by sending handshake messages
+    h3client.connect()
+    quicmsg_rcvd = h3client.read_from_buffer()  # Receive any response from the server
+    return quicmsg_rcvd
+
+def connect_handshake(h3client:HttpClient) -> str:
+    # Complete the connection by sending handshake completion messages
+    h3client.complete_connection()
+    quicmsg_rcvd = h3client.read_from_buffer()  # Receive any response from the server
+    print("received_after_init = {}".format(quicmsg_rcvd))
+    return quicmsg_rcvd
 
 def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Packet], h3msg_sent:Packet) -> str:
     h3msg_rcvd = ''
     
     is_already_closed = False
+
+    connect_initial(h3client)
+    connect_handshake(h3client)
     
-    ### INITIAL CONNECTION ###
-    # Establish initial connection by sending handshake messages
-    h3client.connect()
-    h3client.read_from_buffer()  # Receive any response from the server
-
-    # Complete the connection by sending handshake completion messages
-    h3client.complete_connection()
-    received_after_init = h3client.read_from_buffer()  # Receive any response from the server
-    print("received_after_init = {}".format(received_after_init))
-
     ### SENDING STATE MOVING MESSAGES ###
     for mov_msg in mov_msg_list:
         print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg)}")
@@ -202,11 +219,8 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
     
     h3client.close_connection()
 
-
     print("\033[92m  [SUMMARY] (%s) => %s => %s\033[0m" % (
-    util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd))
-    
-    
+    util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd))    
 
     return h3msg_rcvd
 
@@ -284,7 +298,7 @@ def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData)
             print("  [lv.%d-MINIMIZATION-STATE %s] It is finishing state!" % (pm.current_level, cand_s.name))
             if len(sm.get_transitions(trigger=md.t_label + "\n", source=cand_s.parent_state.name, dest='Finish')) > 0:
                 return
-            sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest='Finish', conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
+            sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest='FINISH', conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
         # Non-finished
         else:
             pm.state_list.add_state(cand_s)

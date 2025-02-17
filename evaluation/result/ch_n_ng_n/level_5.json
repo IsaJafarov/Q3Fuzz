@@ -1,9 +1,19 @@
 {
-  "initial": "Init",
+  "initial": "START",
   "transitions": [
     {
-      "source": "Init",
-      "dest": "Init",
+      "source": "START",
+      "dest": "HANDSHAKING",
+      "trigger": "INITIAL => ACK,CRY,CRY,CRY|CRY,CRY,CRY"
+    },
+    {
+      "source": "HANDSHAKING",
+      "dest": "CONNECTED",
+      "trigger": "HANDSHAKE => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
       "trigger": "ST(2)[SE] => ACK\n",
       "conditions": [
         "packet_number:7"
@@ -34,23 +44,15 @@
       ]
     },
     {
-      "source": "34",
-      "dest": "34",
+      "source": "37",
+      "dest": "37",
       "trigger": "ST(2)[SE] => ACK\n",
       "conditions": [
         "packet_number:7"
       ]
     },
     {
-      "source": "45",
-      "dest": "45",
-      "trigger": "ST(2)[SE] => ACK\n",
-      "conditions": [
-        "packet_number:7"
-      ]
-    },
-    {
-      "source": "Init",
+      "source": "CONNECTED",
       "dest": "2",
       "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
@@ -66,8 +68,8 @@
       ]
     },
     {
-      "source": "Init",
-      "dest": "Init",
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
       "trigger": "ACK => \u2298\n",
       "conditions": [
         "packet_number:9"
@@ -92,14 +94,6 @@
     {
       "source": "14",
       "dest": "14",
-      "trigger": "ACK => \u2298\n",
-      "conditions": [
-        "packet_number:9"
-      ]
-    },
-    {
-      "source": "34",
-      "dest": "34",
       "trigger": "ACK => \u2298\n",
       "conditions": [
         "packet_number:9"
@@ -107,22 +101,22 @@
     },
     {
       "source": "35",
-      "dest": "34",
+      "dest": "14",
       "trigger": "ACK => \u2298\n",
       "conditions": [
         "packet_number:14"
       ]
     },
     {
-      "source": "45",
-      "dest": "45",
+      "source": "37",
+      "dest": "37",
       "trigger": "ACK => \u2298\n",
       "conditions": [
         "packet_number:9"
       ]
     },
     {
-      "source": "Init",
+      "source": "CONNECTED",
       "dest": "5",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
@@ -138,8 +132,8 @@
       ]
     },
     {
-      "source": "Init",
-      "dest": "Init",
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
       "trigger": "ACK => RETRANSMIT\n",
       "conditions": [
         "packet_number:12"
@@ -170,48 +164,96 @@
       ]
     },
     {
-      "source": "34",
-      "dest": "45",
+      "source": "37",
+      "dest": "54",
       "trigger": "ACK => RETRANSMIT\n",
+      "conditions": [
+        "packet_number:15"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:14"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:15"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:14"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:15"
+      ]
+    },
+    {
+      "source": "5",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "5",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:14"
+      ]
+    },
+    {
+      "source": "5",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
+      "conditions": [
+        "packet_number:15"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "FINISH",
+      "trigger": "ACK => CC\n",
       "conditions": [
         "packet_number:15"
       ]
     },
     {
       "source": "35",
-      "dest": "45",
-      "trigger": "ACK => RETRANSMIT\n",
-      "conditions": [
-        "packet_number:15"
-      ]
-    },
-    {
-      "source": "Init",
-      "dest": "Finish",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:13"
-      ]
-    },
-    {
-      "source": "2",
-      "dest": "Finish",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:13"
-      ]
-    },
-    {
-      "source": "5",
-      "dest": "Finish",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:13"
-      ]
-    },
-    {
-      "source": "14",
-      "dest": "Finish",
+      "dest": "FINISH",
       "trigger": "ACK => CC\n",
       "conditions": [
         "packet_number:15"
@@ -234,16 +276,8 @@
       ]
     },
     {
-      "source": "34",
-      "dest": "34",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
-      "conditions": [
-        "packet_number:8"
-      ]
-    },
-    {
-      "source": "45",
-      "dest": "45",
+      "source": "37",
+      "dest": "37",
       "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
       "conditions": [
         "packet_number:8"
@@ -266,16 +300,8 @@
       ]
     },
     {
-      "source": "34",
-      "dest": "34",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n",
-      "conditions": [
-        "packet_number:11"
-      ]
-    },
-    {
-      "source": "45",
-      "dest": "45",
+      "source": "37",
+      "dest": "37",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n",
       "conditions": [
         "packet_number:11"
@@ -283,7 +309,7 @@
     },
     {
       "source": "14",
-      "dest": "34",
+      "dest": "14",
       "trigger": "ACK => ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:13"
@@ -299,7 +325,7 @@
     },
     {
       "source": "35",
-      "dest": "34",
+      "dest": "37",
       "trigger": "ST(2)[SE] => ACK|ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+]\n",
       "conditions": [
         "packet_number:7"
@@ -307,7 +333,7 @@
     },
     {
       "source": "35",
-      "dest": "34",
+      "dest": "37",
       "trigger": "ST(2)[PU],ST(0)[HE] => ACK|ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+]\n",
       "conditions": [
         "packet_number:8"
@@ -315,7 +341,7 @@
     },
     {
       "source": "35",
-      "dest": "34",
+      "dest": "37",
       "trigger": "ACK => ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+]\n",
       "conditions": [
         "packet_number:9"
@@ -323,7 +349,7 @@
     },
     {
       "source": "35",
-      "dest": "34",
+      "dest": "37",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK|ACK,CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec],ST(0)[HE,DA]|ST(0)[DA+]\n",
       "conditions": [
         "packet_number:11"
@@ -332,10 +358,16 @@
   ],
   "states": [
     {
-      "name": "Init"
+      "name": "START"
     },
     {
-      "name": "Finish"
+      "name": "FINISH"
+    },
+    {
+      "name": "HANDSHAKING"
+    },
+    {
+      "name": "CONNECTED"
     },
     {
       "name": "2"
@@ -347,30 +379,26 @@
       "name": "14"
     },
     {
-      "name": "34"
-    },
-    {
       "name": "35"
     },
     {
-      "name": "45"
+      "name": "37"
+    },
+    {
+      "name": "54"
     }
   ],
   "before_state_change": [],
   "after_state_change": [],
   "prepare_event": [],
   "finalize_event": [],
-  "on_exception": [],
-  "on_final": [],
   "send_event": false,
   "auto_transitions": false,
-  "model_attribute": "state",
-  "model_override": false,
   "ignore_invalid_triggers": null,
   "queued": false,
   "models": [
     {
-      "state": "Init",
+      "state": "START",
       "name": "HTTP/3 State Machine",
       "class-name": "statemachine.ProtoModel"
     }
