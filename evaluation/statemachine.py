@@ -321,7 +321,7 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
         pm.current_state = leaf_state
         skipped_messages = 0
         for msg_sent in pm.testmsgs:
-            if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent) or 'ACK' == util.h3msg_to_str(msg_sent):
+            if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent) or 'ACK' in util.h3msg_to_str(msg_sent):
                 skipped_messages += 1
                 continue
 
@@ -375,7 +375,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
             state_moving_msgs_list = get_move_state_h3msgs(pm, cand_s)
 
             for msg_sent in pm.testmsgs:
-                if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent) or 'ACK' == util.h3msg_to_str(msg_sent):
+                if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent) or 'ACK' in util.h3msg_to_str(msg_sent):
                     continue
 
                 h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc)

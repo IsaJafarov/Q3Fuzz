@@ -543,7 +543,7 @@ class HttpClient():
             
             # Step 10: Determine if ACK should be sent based on `res_per_packet` and `self.ack_needed`
             # QUIC ACK should be sent in response to STREAM and CRYPTO
-            if self.ack_needed and epoch == tls.Epoch.ONE_RTT:
+            if self.ack_needed and (epoch == tls.Epoch.ONE_RTT or epoch == tls.Epoch.HANDSHAKE):
                 # If "ST" or "CRY" is present, trigger ACK
                 if "ST" in res_per_packet or "CRY" in res_per_packet or "HD" in res_per_packet:
                     self.send_ack_frame(context, packet_number)
