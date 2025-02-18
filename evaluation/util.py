@@ -155,6 +155,8 @@ def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict
     if not changed_items:
         return True
 
+    ### FOR DEBUGGING USE 
+    """
     # Print only if there are differences
     print(colored(f"\n[DIFFERENCE REPORT] - State: {state_name}", "cyan", attrs=["bold"]))
 
@@ -164,6 +166,7 @@ def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict
         print(colored(f"  🔄 {key}:", "blue", attrs=["bold"]))
         print(highlight_differences(val1, val2))
     print('\n')
+    """
     return False  # Return False if differences exist
 
 def highlight_differences(str1: str, str2: str) -> str:
