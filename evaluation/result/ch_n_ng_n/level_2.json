@@ -28,8 +28,8 @@
       ]
     },
     {
-      "source": "5",
-      "dest": "5",
+      "source": "3",
+      "dest": "3",
       "trigger": "ST(2)[SE] => ACK\n",
       "conditions": [
         "packet_number:7"
@@ -44,40 +44,31 @@
       ]
     },
     {
-      "source": "5",
-      "dest": "14",
+      "source": "3",
+      "dest": "6",
       "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:8"
       ]
     },
     {
-      "source": "CONNECTED",
-      "dest": "CONNECTED",
-      "trigger": "ACK => \u2298\n",
-      "conditions": [
-        "packet_number:9"
-      ]
-    },
-    {
       "source": "2",
-      "dest": "2",
-      "trigger": "ACK => \u2298\n",
-      "conditions": [
-        "packet_number:9"
-      ]
+      "dest": "FINISH",
+      "trigger": "CLOSE"
     },
     {
-      "source": "5",
-      "dest": "5",
-      "trigger": "ACK => \u2298\n",
-      "conditions": [
-        "packet_number:9"
-      ]
+      "source": "3",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "6",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
     },
     {
       "source": "CONNECTED",
-      "dest": "5",
+      "dest": "3",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:11"
@@ -85,106 +76,10 @@
     },
     {
       "source": "2",
-      "dest": "14",
+      "dest": "6",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:11"
-      ]
-    },
-    {
-      "source": "CONNECTED",
-      "dest": "CONNECTED",
-      "trigger": "ACK => RETRANSMIT\n",
-      "conditions": [
-        "packet_number:12"
-      ]
-    },
-    {
-      "source": "2",
-      "dest": "2",
-      "trigger": "ACK => RETRANSMIT\n",
-      "conditions": [
-        "packet_number:12"
-      ]
-    },
-    {
-      "source": "5",
-      "dest": "5",
-      "trigger": "ACK => RETRANSMIT\n",
-      "conditions": [
-        "packet_number:12"
-      ]
-    },
-    {
-      "source": "CONNECTED",
-      "dest": "FINISH",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:13"
-      ]
-    },
-    {
-      "source": "CONNECTED",
-      "dest": "FINISH",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:14"
-      ]
-    },
-    {
-      "source": "CONNECTED",
-      "dest": "FINISH",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:15"
-      ]
-    },
-    {
-      "source": "2",
-      "dest": "FINISH",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:13"
-      ]
-    },
-    {
-      "source": "2",
-      "dest": "FINISH",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:14"
-      ]
-    },
-    {
-      "source": "2",
-      "dest": "FINISH",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:15"
-      ]
-    },
-    {
-      "source": "5",
-      "dest": "FINISH",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:13"
-      ]
-    },
-    {
-      "source": "5",
-      "dest": "FINISH",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:14"
-      ]
-    },
-    {
-      "source": "5",
-      "dest": "FINISH",
-      "trigger": "ACK => CC\n",
-      "conditions": [
-        "packet_number:15"
       ]
     },
     {
@@ -196,8 +91,8 @@
       ]
     },
     {
-      "source": "5",
-      "dest": "5",
+      "source": "3",
+      "dest": "3",
       "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK\n",
       "conditions": [
         "packet_number:11"
@@ -221,10 +116,10 @@
       "name": "2"
     },
     {
-      "name": "5"
+      "name": "3"
     },
     {
-      "name": "14"
+      "name": "6"
     }
   ],
   "before_state_change": [],

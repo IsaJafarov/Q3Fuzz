@@ -14,17 +14,25 @@
     {
       "source": "CONNECTED",
       "dest": "CONNECTED",
-      "trigger": "ST(2)[SE] => ACK\n",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
       "conditions": [
-        "packet_number:7"
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:1"
       ]
     },
     {
       "source": "CONNECTED",
       "dest": "2",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
-        "packet_number:8"
+        "packet_number:2"
       ]
     },
     {
@@ -33,16 +41,27 @@
       "trigger": "CLOSE"
     },
     {
-      "source": "3",
-      "dest": "FINISH",
-      "trigger": "CLOSE"
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:8"
+      ]
     },
     {
-      "source": "CONNECTED",
-      "dest": "3",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n",
       "conditions": [
-        "packet_number:11"
+        "packet_number:8"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
       ]
     }
   ],
@@ -61,9 +80,6 @@
     },
     {
       "name": "2"
-    },
-    {
-      "name": "3"
     }
   ],
   "before_state_change": [],

@@ -4,28 +4,25 @@
     {
       "source": "START",
       "dest": "HANDSHAKING",
-      "trigger": "INITIAL => ACK,CRY,CRY,CRY|CRY,CRY,CRY"
+      "trigger": "INITIAL => CRY|CRY|CRY,ACK|ACK|ACK"
     },
     {
       "source": "HANDSHAKING",
       "dest": "CONNECTED",
-      "trigger": "HANDSHAKE => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]"
+      "trigger": "HANDSHAKE => ACK,HD|ST(7)[Dec],ST(3)[SE]"
     },
     {
       "source": "CONNECTED",
-      "dest": "CONNECTED",
-      "trigger": "ST(2)[SE] => ACK\n",
+      "dest": "1",
+      "trigger": "ST(2)[SE] => ACK,ST(11)[Enc]\n",
       "conditions": [
-        "packet_number:7"
+        "packet_number:5"
       ]
     },
     {
-      "source": "CONNECTED",
-      "dest": "2",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
-      "conditions": [
-        "packet_number:8"
-      ]
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
     },
     {
       "source": "2",
@@ -39,10 +36,18 @@
     },
     {
       "source": "CONNECTED",
-      "dest": "3",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
+      "dest": "2",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
       "conditions": [
-        "packet_number:11"
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "3",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:10"
       ]
     }
   ],
@@ -58,6 +63,9 @@
     },
     {
       "name": "CONNECTED"
+    },
+    {
+      "name": "1"
     },
     {
       "name": "2"
