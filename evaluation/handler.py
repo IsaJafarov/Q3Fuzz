@@ -62,7 +62,6 @@ class MSGHandler():
             # Ignore if the payload consists of only PING and PADDING frames
             if any(byte not in (QuicFrameType.PADDING, QuicFrameType.PING) for byte in plain):
                 return "RETRANSMIT"
-                
 
         buf = Buffer(data=plain)
         
@@ -236,8 +235,6 @@ class MSGHandler():
             
         return util.beautify_message_string(msg_http3, False) if msg_http3 != '' else "\u2298"
       
-  
-
     def handle_padding_frame(
         self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:

@@ -191,7 +191,7 @@ def connect_handshake(h3client:HttpClient) -> str:
     # Complete the connection by sending handshake completion messages
     h3client.complete_connection()
     quicmsg_rcvd = h3client.read_from_buffer()  # Receive any response from the server
-    print("received_after_init = {}".format(quicmsg_rcvd))
+    # print("received_after_init = {}".format(quicmsg_rcvd))
     return quicmsg_rcvd
 
 def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Packet], h3msg_sent:Packet) -> str:
@@ -204,16 +204,16 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
     
     ### SENDING STATE MOVING MESSAGES ###
     for mov_msg in mov_msg_list:
-        print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg)}")
+        # print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg)}")
         state_msg = h3client.replay_msg(mov_msg)  # Send HTTP/3 state-moving message
         if state_msg:
-            print(f"  [+] Received state-moving response: {state_msg}")
-            # h3msg_rcvd.append(state_msg)
+            # print(f"  [+] Received state-moving response: {state_msg}")
+            pass
             
     ### SENDING TARGET MSG ###
     if is_already_closed is False: # check for goaway in state moving (TODO)
-        print("  [+] Sending testing message...")
-        print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
+        # print("  [+] Sending testing message...")
+        # print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
         # h3msg_sent.show()
         h3msg_rcvd = h3client.replay_msg(h3msg_sent)  # Send HTTP/3 target message
     
@@ -245,7 +245,8 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
     if mode == 'p':
         # Case 1. Parent:
         # Compare its SR dict with that of its parent
-        if util.compare_ordered_dict(cand_s.parent_state.child_sr_dict, cand_s.child_sr_dict):
+        target_state = cand_s.parent_state.name + " (its parent)"
+        if util.compare_ordered_dict(target_state, cand_s.parent_state.child_sr_dict, cand_s.child_sr_dict):
             md.src_s = cand_s.parent_state
             md.dst_s = cand_s.parent_state
             return True
@@ -258,8 +259,8 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
         for state_v in pm.state_list.state_list:  # check all states that are valid till now
             if state_v.parent_state is not None and state_v.parent_state.name == cand_s.parent_state.name:  #
                 # siblings; same parent
-                # print("Compare state %s with sibling state %s" % (cand_s.name, state_v.name))
-                if util.compare_ordered_dict(state_v.child_sr_dict, cand_s.child_sr_dict):
+                target_state = state_v.name + " (its sibling)"
+                if util.compare_ordered_dict(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
                     md.src_s = cand_s.parent_state
                     md.dst_s = state_v
                     return True
@@ -270,11 +271,10 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
         # Compare its child dict with that of the other states
         for state_v in pm.state_list.state_list:  # check all states that are valid till now
             if state_v.name == cand_s.parent_state.name:
-                # print("Relative of state %s is same as its parent state %s" % (cand_s.name, state_v.name))
                 continue
             if state_v.parent_state is None or state_v.parent_state.name != cand_s.parent_state.name:  # relative; different parent or ancestor
-                # print("Comparing state %s with its relative state %s" % (cand_s.name, state_v.name))
-                if util.compare_ordered_dict(state_v.child_sr_dict, cand_s.child_sr_dict):
+                target_state = state_v.name + " (its relative)"
+                if util.compare_ordered_dict(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
                     md.src_s = cand_s.parent_state
                     md.dst_s = state_v
                     return True
@@ -321,7 +321,7 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
         pm.current_state = leaf_state
         skipped_messages = 0
         for msg_sent in pm.testmsgs:
-            if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent):
+            if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent) or 'ACK' == util.h3msg_to_str(msg_sent):
                 skipped_messages += 1
                 continue
 
@@ -360,7 +360,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
         md = MergeData()
         msg_sent_str = util.h3msg_to_str(cand_s.msg_sent)
         msg_rcvd_str = cand_s.msg_rcvd_str
-        print("msg_rcvd_str: {}".format( msg_rcvd_str ))
+        # print("msg_rcvd_str: {}".format( msg_rcvd_str ))
         sr_msg = "%s => %s" % (msg_sent_str, msg_rcvd_str)
         md.t_label = sr_msg
 
@@ -374,15 +374,12 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
             cand_sr_dict = OrderedDict()
             state_moving_msgs_list = get_move_state_h3msgs(pm, cand_s)
 
-            skipped_messages = 0
             for msg_sent in pm.testmsgs:
-                if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent):
-                    skipped_messages += 1
+                if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent) or 'ACK' == util.h3msg_to_str(msg_sent):
                     continue
 
                 h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc)
                 msg_rcvd_str = send_receive_http3(pm, h3client, state_moving_msgs_list, msg_sent)
-                
                 
                 msg_sent_str = util.h3msg_to_str(msg_sent)
                 cand_sr_dict[msg_sent_str] = msg_rcvd_str

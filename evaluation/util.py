@@ -1,8 +1,9 @@
 # -*- coding: UTF-8 -*-
 # Modules for HTTP3
 import pyshark
-import re
-import traceback
+import difflib
+from termcolor import colored
+from collections import OrderedDict
 from typing import List, Union
 from aioquic.buffer import Buffer
 from aioquic.quic.packet import QuicFrameType, QuicPacketType
@@ -133,16 +134,50 @@ class Tee(object):
 def cmp(a, b):
     return (a > b) - (a < b)
 
+def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict) -> bool:
+    """Compare two OrderedDicts for a given state and return True if all values are the same, otherwise return False.
+       If differences exist, print a report with the state name and highlight the changed values."""
+    
+    all_keys = dict1.keys()
+    unchanged_items = []
+    changed_items = []
 
-def compare_ordered_dict(dict1:dict, dict2:dict) -> bool:
-    for i, j in zip(dict1.items(), dict2.items()):
-        if cmp(i, j) != 0:
-            return False
-    # print("compare_ordered_dict(): Two dict is same")
-    # print(dict1)
-    # print("---")
-    # print(dict2)
-    return True
+    for key in all_keys:
+        val1 = str(dict1[key])
+        val2 = str(dict2[key])
+
+        if val1 == val2:
+            unchanged_items.append((key, val1))
+        else:
+            changed_items.append((key, val1, val2))
+
+    # If there are no changes, return True without printing anything
+    if not changed_items:
+        return True
+
+    # Print only if there are differences
+    print(colored(f"\n[DIFFERENCE REPORT] - State: {state_name}", "cyan", attrs=["bold"]))
+
+    # Print changed items
+    print(colored("\n⚠️ Changed Items:", "yellow", attrs=["bold"]))
+    for key, val1, val2 in changed_items:
+        print(colored(f"  🔄 {key}:", "blue", attrs=["bold"]))
+        print(highlight_differences(val1, val2))
+    print('\n')
+    return False  # Return False if differences exist
+
+def highlight_differences(str1: str, str2: str) -> str:
+    """Generate a visual diff highlighting changes between two strings."""
+    diff = difflib.ndiff(str1.splitlines(), str2.splitlines())
+    highlighted_diff = []
+    for line in diff:
+        if line.startswith('- '):
+            highlighted_diff.append(colored(line, 'red'))  # Removed value
+        elif line.startswith('+ '):
+            highlighted_diff.append(colored(line, 'green'))  # Added value
+        elif not line.startswith('? '):
+            highlighted_diff.append(line)  # Unchanged value
+    return "\n".join(highlighted_diff)
 
 def get_frames_of_layer(layer:XmlLayer) -> List[str]:
     frame_names = []
