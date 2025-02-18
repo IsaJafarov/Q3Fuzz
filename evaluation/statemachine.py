@@ -296,7 +296,7 @@ def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData)
         # Finished
         if cand_s.msg_rcvd_str.find("CC") >= 0:
             print("  [lv.%d-MINIMIZATION-STATE %s] It is finishing state!" % (pm.current_level, cand_s.name))
-            if len(sm.get_transitions(trigger=md.t_label + "\n", source=cand_s.parent_state.name, dest='Finish')) > 0:
+            if len(sm.get_transitions(trigger=md.t_label + "\n", source=cand_s.parent_state.name, dest='FINISH')) > 0:
                 return
             sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest='FINISH', conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
         # Non-finished
@@ -304,7 +304,8 @@ def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData)
             pm.state_list.add_state(cand_s)
             sm.add_state(cand_s.name)
             sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest=cand_s.name, conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
-
+            # Explicitly add finishing transition
+            sm.add_transition("CLOSE", source=cand_s.name, dest='FINISH')
 
 def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) -> None:
     # Find candidate states in the next level from leaf states found in the current level.
@@ -338,7 +339,6 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
             print("└────────────────────────────────────────────────────────────────────────────────────")
             #print(msg_sent)
             msg_rcvd_str = send_receive_http3(pm, h3client, state_moving_msgs_list, msg_sent)
-
 
             message_num += 1
             msg_sent_str = util.h3msg_to_str(msg_sent)
