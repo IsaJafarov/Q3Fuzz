@@ -36,7 +36,7 @@ import statemachine as stma
 
 def init(args):
     print("\n[STEP 1] Initializing...")
-    os.system("sudo rm -r __pycache__")
+    os.system("rm -r __pycache__")
     # Create result directory, if it doesn't already exist
     os.system("mkdir -p result")
 

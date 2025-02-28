@@ -93,7 +93,6 @@ def modeller_h3(conf:QuicConfiguration, url:str, sample_msgs:List[Packet], outdi
     sm.add_transition('HANDSHAKE => '+quicmsg_rcvd, source='HANDSHAKING', dest='CONNECTED') # We skip recording condition; it is just a simple transition before connection
     h3client.close_connection()
 
-
     while True:
         ### Expand candidate states in this level ###
         print("\033[31m[LEVEL %d] STATE MACHINE EXPANSION started at %s\033[0m" % (pm.current_level, time.ctime(time.time())))
@@ -204,8 +203,8 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
     
     ### SENDING STATE MOVING MESSAGES ###
     for mov_msg in mov_msg_list:
-        # print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg)}")
-        state_msg = h3client.replay_msg(mov_msg)  # Send HTTP/3 state-moving message
+        # print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg, exclude_opt_client_frames=True)}")
+        state_msg = h3client.replay_msg(mov_msg, exclude_ack=True)  # Send HTTP/3 state-moving message
         if state_msg:
             # print(f"  [+] Received state-moving response: {state_msg}")
             pass
@@ -213,14 +212,14 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
     ### SENDING TARGET MSG ###
     if is_already_closed is False: # check for goaway in state moving (TODO)
         # print("  [+] Sending testing message...")
-        # print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent)}")
+        # print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent, exclude_opt_client_frames=True)}")
         # h3msg_sent.show()
-        h3msg_rcvd = h3client.replay_msg(h3msg_sent)  # Send HTTP/3 target message
+        h3msg_rcvd = h3client.replay_msg(h3msg_sent, exclude_ack=True)  # Send HTTP/3 target message
     
     h3client.close_connection()
 
     print("\033[92m  [SUMMARY] (%s) => %s => %s\033[0m" % (
-    util.h3msg_to_str(mov_msg_list), util.h3msg_to_str(h3msg_sent), h3msg_rcvd))    
+    util.h3msg_to_str(mov_msg_list, exclude_opt_client_frames=True), util.h3msg_to_str(h3msg_sent, exclude_opt_client_frames=True), h3msg_rcvd))   
 
     return h3msg_rcvd
 
@@ -322,7 +321,11 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
         pm.current_state = leaf_state
         skipped_messages = 0
         for msg_sent in pm.testmsgs:
-            if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent) or 'ACK' in util.h3msg_to_str(msg_sent):
+            
+
+            msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
+            print("msg_sent_str = {}".format(msg_sent_str))
+            if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
                 skipped_messages += 1
                 continue
 
@@ -333,17 +336,18 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
             print("│    [LV %d | EXP | LEAF %d/%d | State '%s' | MSG %d/%d]         " %
                 (pm.current_level, leafstate_num, len(leaf_states), leaf_state.name, message_num, len(pm.testmsgs)-skipped_messages))
             print("│    - Moving MSG: %s                                            " % 
-                util.h3msg_to_str(state_moving_msgs_list))
+                util.h3msg_to_str(state_moving_msgs_list, exclude_opt_client_frames=True))
             print("│    - Test MSG  : %s                                            " % 
-                util.h3msg_to_str(msg_sent))
+                util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True))
             print("└────────────────────────────────────────────────────────────────────────────────────")
-            #print(msg_sent)
+
             msg_rcvd_str = send_receive_http3(pm, h3client, state_moving_msgs_list, msg_sent)
 
             message_num += 1
-            msg_sent_str = util.h3msg_to_str(msg_sent)
+            msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
 
             update_candidates(pm, sm, msg_sent, msg_rcvd_str)
+            print("sr_dict[{}] = {}".format( msg_sent_str, msg_rcvd_str ))
             sr_dict[msg_sent_str] = msg_rcvd_str
         leafstate_num += 1
         pm.current_state.child_sr_dict = sr_dict
@@ -358,7 +362,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
     print("  [INFO] Test %d candidate states in level %d" % (len(cand_s_list), pm.current_level))
     for cand_s in cand_s_list:
         md = MergeData()
-        msg_sent_str = util.h3msg_to_str(cand_s.msg_sent)
+        msg_sent_str = util.h3msg_to_str(cand_s.msg_sent, exclude_opt_client_frames=True)
         msg_rcvd_str = cand_s.msg_rcvd_str
         # print("msg_rcvd_str: {}".format( msg_rcvd_str ))
         sr_msg = "%s => %s" % (msg_sent_str, msg_rcvd_str)
@@ -375,13 +379,15 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
             state_moving_msgs_list = get_move_state_h3msgs(pm, cand_s)
 
             for msg_sent in pm.testmsgs:
-                if 'INIT' in util.h3msg_to_str(msg_sent) or 'HANDSHAKE' in util.h3msg_to_str(msg_sent) or 'ACK' in util.h3msg_to_str(msg_sent):
+
+                msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
+                if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
                     continue
 
                 h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc)
                 msg_rcvd_str = send_receive_http3(pm, h3client, state_moving_msgs_list, msg_sent)
                 
-                msg_sent_str = util.h3msg_to_str(msg_sent)
+                msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
                 cand_sr_dict[msg_sent_str] = msg_rcvd_str
 
             cand_s.child_sr_dict = cand_sr_dict

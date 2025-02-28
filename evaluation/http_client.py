@@ -545,7 +545,7 @@ class HttpClient():
                 if "ST" in res_per_packet or "CRY" in res_per_packet or "HD" in res_per_packet:
                     self.send_ack_frame(context, packet_number)
 
-        return util.beautify_message_string(res_per_packet, False)
+        return util.beautify_message_string(res_per_packet, exclude_opt_server_frames=True)
 
     def handle_retry_packet(self, header: QuicHeader, packet_without_tag: bytes) -> None:
         """
@@ -750,7 +750,7 @@ class HttpClient():
 
     #     return util.beautify_message_string(res_per_packet, False)
 
-    def replay_msg(self, h3msg:Packet) -> str:
+    def replay_msg(self, h3msg:Packet, exclude_ack:bool = False) -> str:
         """
         Replay QUIC and HTTP/3 packets by copying h3msg and capture responses.
         """
@@ -758,7 +758,7 @@ class HttpClient():
         # Build message by parsing h3msg
         builder = self.get_builder(Epoch.ONE_RTT)
         msg_crafter = MSGCrafter()
-        msg_crafter.copy_msg(h3msg, builder)
+        msg_crafter.copy_msg(h3msg, builder, exclude_ack)
         self.send_quic_frames_from_builder(builder)
 
         response_packets = self.read_from_buffer()
