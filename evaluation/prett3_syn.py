@@ -34,17 +34,25 @@ import statemachine as stma
 
 
 
-def init(args):
+def init(args) -> str:
     print("\n[STEP 1] Initializing...")
     os.system("rm -r __pycache__")
+    
     # Create result directory, if it doesn't already exist
-    os.system("mkdir -p result")
+    output_dir = "result"
+    
+    # write it in try block, in case the pcap file has a weird name
+    try: 
+        output_dir += "/{}".format( args.pcap.split("/")[-1].split(".")[-2] )
+    except: pass
+
+    os.system( "mkdir -p {}".format(output_dir) )
 
     SERVER_ADDR = args.url
     pcapfile = args.pcap
 
     print("  [+] Initializing done!\n    => pcap : %s, SERVER_ADDR : %s" % (pcapfile, SERVER_ADDR))
-    return
+    return output_dir
 
 
 if __name__ == "__main__":
@@ -158,15 +166,17 @@ if __name__ == "__main__":
     if not os.path.exists(decrypt_keylog_file):
         raise Exception("{} does not exist".format(decrypt_keylog_file))
 
+    
     ### General setting ###
-    init(args)
+    output_dir = init(args)
     
     ### Extract initial state machine ###
     http3_basic_messages = util.h3msg_from_pcap(args.pcap, decrypt_keylog_file, client_only=True)
 
+    
     stma.modeller_h3(conf=configuration, 
                      url=args.url, 
                      sample_msgs=http3_basic_messages, 
-                     outdir="./result")
+                     outdir=output_dir)
     
     

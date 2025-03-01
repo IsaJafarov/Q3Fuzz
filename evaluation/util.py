@@ -268,7 +268,7 @@ def h3msg_to_str(h3msg:Union[list, Packet], exclude_opt_client_frames:bool = Fal
             elif type(quic_frame) == QuicStream:
                 h3_frame_str = ''
 
-                if quic_frame is None:
+                if quic_frame.h3_frame is None:
                     h3_frame_str = "\u2298"
                 elif type(quic_frame.h3_frame) == H3Settings:
                     h3_frame_str = H3_FRAME_ABBREVIATIONS['SETTINGS']
@@ -282,8 +282,8 @@ def h3msg_to_str(h3msg:Union[list, Packet], exclude_opt_client_frames:bool = Fal
                     h3_frame_str = 'Enc'
                 elif type(quic_frame.h3_frame) == QpackDecoder:
                     h3_frame_str = 'Dec'
-                
                 else:
+                    print(quic_frame)
                     raise Exception("Unknown HTTP/3 frame")
             
                 msginfo += "{}({})[{}]".format(QUIC_FRAME_ABBREVIATIONS['STREAM'], quic_frame.stream_id, h3_frame_str)

@@ -23,9 +23,6 @@ traffics=(
 for traffic in "${traffics[@]}"; do
     echo "\n\n\n\n\n----------------------------------------------------------------------\n\n\n\n\n"
     echo "Traffic: $traffic"
-    python3 prett3_syn.py https://prett3.com ./sample_traffics/"$traffic".pcapng -l ./result/keylogs/"$traffic".keylog
-    rm -rf ./result/"$traffic"
-    mkdir ./result/"$traffic"
-    mv ./result/*.{png,json} ./result/"$traffic"
-    sleep 30
+    python3 prett3_syn.py https://prett3.com ./sample_traffics/"$traffic".pcapng -ok $server.keylog
+    sleep 5
 done

@@ -7,7 +7,7 @@ from aioquic.buffer import Buffer
 import util
 from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 
-
+@dataclass
 class Stream():
     """
     Stream management throughtout a connection

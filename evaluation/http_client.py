@@ -41,8 +41,9 @@ class HttpClient():
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
         self.sock.settimeout(0.1)
         self.handler = MSGHandler(qc = self.connection)
+        self.msg_crafter = MSGCrafter()
         self.received_packet_numbers = set()
-        self.ack_needed = True  # Flag to determine if an ACK should be sent against specific QUIC messages        
+        self.ack_needed = True  # Flag to determine if an ACK should be sent against specific QUIC messages   
         
     def get_builder(self, epoch: Epoch):
         builder = QuicPacketBuilder(
@@ -757,8 +758,8 @@ class HttpClient():
         
         # Build message by parsing h3msg
         builder = self.get_builder(Epoch.ONE_RTT)
-        msg_crafter = MSGCrafter()
-        msg_crafter.copy_msg(h3msg, builder, exclude_ack)
+        
+        self.msg_crafter.copy_msg(h3msg, builder, exclude_ack)
         self.send_quic_frames_from_builder(builder)
 
         response_packets = self.read_from_buffer()
@@ -773,8 +774,7 @@ class HttpClient():
         
         # Build message by parsing h3msg
         builder = self.get_builder(Epoch.ONE_RTT)
-        msg_crafter = MSGCrafter()
-        msg_crafter.craft_msg_from_frames(quic_frames, builder)
+        self.msg_crafter.craft_msg_from_frames(quic_frames, builder)
         self.send_quic_frames_from_builder(builder)
 
         response_packets = self.read_from_buffer()

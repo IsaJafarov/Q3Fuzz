@@ -13,19 +13,24 @@ from dissector import *
 
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
+
+
 class MSGCrafter():
+
     def __init__(self):
         self.quic_frames:list = []
+        self.stream_offsets = dict()
+        self.opened_uni_streams = set()
 
     def copy_msg(self, h3msg:Packet, builder:QuicPacketBuilder, exclude_ack:bool = False) -> None:
         msg_dissector = MSGDissector()
         quic_frames = msg_dissector.dissect_msg(h3msg)
 
         for quic_frame in quic_frames:
+
             if exclude_ack and type(quic_frame) is QuicAck:
                 continue
             self.add_dissected_frames_to_builder(quic_frame, builder)
-
 
     def craft_msg_from_frames(self, quic_frames:List, builder:QuicPacketBuilder) -> None:
         for quic_frame in quic_frames:
@@ -96,14 +101,16 @@ class MSGCrafter():
         h3_frame:int = None
         """
 
+        current_offset = self.stream_offsets.get(quic_frame.stream_id, 0)
+        
         stream_type = QuicFrameType.STREAM_BASE | 2  # Include LEN bit
-        if quic_frame.offset != 0:
+        if current_offset > 0:# quic_frame.offset != 0:
             stream_type |= 4  # Include OFF bit
-        if quic_frame.fin_bit:
-            stream_type |= 1  # Include FIN bit
+        # During SM generation, we will not include the FIN. So that one stream frame will not close the stream and all stream frames will freely carry data.
+        #if quic_frame.fin_bit:
+        #    stream_type |= 1  # Include FIN bit
 
         # Combine all HTTP/3 frames into a single payload
-
         h3_frame_payload = None
         if type(quic_frame.h3_frame) == H3Settings:
             h3_frame_payload = self.generate_h3_settings_frame(quic_frame.h3_frame)
@@ -122,14 +129,27 @@ class MSGCrafter():
         else:
             raise Exception("Unexpected HTTP/3 frame {}. Add it here...".format(quic_frame.h3_frame))
 
+        if quic_frame.stream_id % 4 == 2 and quic_frame.stream_id not in self.opened_uni_streams:
+            if quic_frame.stream_id==2:
+                h3_frame_payload = encode_uint_var(StreamType.CONTROL) + h3_frame_payload
+            elif quic_frame.stream_id==6:
+                h3_frame_payload = encode_uint_var(StreamType.QPACK_ENCODER) + h3_frame_payload
+            elif quic_frame.stream_id==10:
+                h3_frame_payload = encode_uint_var(StreamType.QPACK_DECODER) + h3_frame_payload
+            self.opened_uni_streams.add(quic_frame.stream_id)
 
+        
         buf = builder.start_frame(stream_type, capacity=len(h3_frame_payload) + 8)
         buf.push_uint_var(quic_frame.stream_id)  # Push stream ID
-        if quic_frame.offset != 0:
-            buf.push_uint_var(quic_frame.offset)  # Push offset
+        if current_offset > 0:
+            buf.push_uint_var( current_offset ) # (quic_frame.offset)  # Push offset
         buf.push_uint_var(len(h3_frame_payload))  # Push total length
         
         buf.push_bytes(h3_frame_payload)  # Push combined payload
+
+        self.stream_offsets[quic_frame.stream_id] = current_offset + len(h3_frame_payload)
+
+        
 
     def generate_h3_settings_frame(self, h3_frame:H3Settings) -> bytes:
         """
@@ -156,18 +176,13 @@ class MSGCrafter():
         if h3_frame.webtransport is not None:
             settings[0x2B603742] = h3_frame.webtransport
 
-
         # Encode the settings into SETTINGS frame payload
         settings_data = encode_settings(settings)
 
         # Encode the SETTINGS frame
         frame_data = encode_frame(FrameType.SETTINGS, settings_data)
 
-        # Prepend the Uni Stream Type for control stream
-        stream_type = encode_uint_var(0x00)  # Control Stream Type
-        h3_frame_data = stream_type + frame_data
-
-        return h3_frame_data
+        return frame_data
     
     def generate_h3_headers_frame(self, h3_frame:H3Headers) -> bytes:
 
@@ -195,14 +210,14 @@ class MSGCrafter():
     def generate_qpack_encoder(self, h3_frame:QpackEncoder, include_stream_type:bool=True) -> bytes:
         
         if include_stream_type:
-            return encode_uint_var(StreamType.QPACK_ENCODER) + h3_frame.payload
+            return h3_frame.payload
         else:
             return h3_frame.payload
     
     def generate_qpack_decoder(self, h3_frame:QpackDecoder, include_stream_type:bool=True) -> bytes:
         
         if include_stream_type:
-            return encode_uint_var(StreamType.QPACK_DECODER) + h3_frame.payload
+            return h3_frame.payload
         else:
             return h3_frame.payload
 

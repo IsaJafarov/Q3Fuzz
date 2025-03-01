@@ -324,7 +324,6 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
             
 
             msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
-            print("msg_sent_str = {}".format(msg_sent_str))
             if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
                 skipped_messages += 1
                 continue
