@@ -13,19 +13,16 @@
     },
     {
       "source": "CONNECTED",
-      "dest": "CONNECTED",
+      "dest": "1",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
       "conditions": [
         "packet_number:1"
       ]
     },
     {
-      "source": "CONNECTED",
-      "dest": "2",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
-      "conditions": [
-        "packet_number:2"
-      ]
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
     },
     {
       "source": "2",
@@ -33,9 +30,30 @@
       "trigger": "CLOSE"
     },
     {
+      "source": "3",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
       "source": "CONNECTED",
-      "dest": "CONNECTED",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(0)[\u2298],SS\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "3",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,SS|CC\n",
       "conditions": [
         "packet_number:8"
       ]
@@ -55,15 +73,25 @@
       "name": "CONNECTED"
     },
     {
+      "name": "1"
+    },
+    {
       "name": "2"
+    },
+    {
+      "name": "3"
     }
   ],
   "before_state_change": [],
   "after_state_change": [],
   "prepare_event": [],
   "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
   "send_event": false,
   "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
   "ignore_invalid_triggers": null,
   "queued": false,
   "models": [
