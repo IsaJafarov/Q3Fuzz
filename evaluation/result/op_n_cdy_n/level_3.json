@@ -1,0 +1,392 @@
+{
+  "initial": "START",
+  "transitions": [
+    {
+      "source": "START",
+      "dest": "HANDSHAKING",
+      "trigger": "INITIAL => ACK,CRY,CRY|CRY|ST(3)[SE]"
+    },
+    {
+      "source": "HANDSHAKING",
+      "dest": "CONNECTED",
+      "trigger": "HANDSHAKE => HD,CRY|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "1",
+      "trigger": "ST(2)[SE] => ACK|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "1",
+      "trigger": "ST(2)[SE] => ACK|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "10",
+      "dest": "25",
+      "trigger": "ST(2)[SE] => ACK|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "3",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "4",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "7",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "8",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "9",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "10",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "16",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "17",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "18",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "20",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "22",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "23",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "24",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "25",
+      "dest": "FINISH",
+      "trigger": "CLOSE"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "2",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK|SS,ST(0)[HE,DA]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "3",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK|SS,ST(4)[HE]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "4",
+      "trigger": "ST(2)[SE] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "16",
+      "trigger": "ST(2)[SE] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "8",
+      "dest": "2",
+      "trigger": "ST(2)[SE] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "2",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS,ST(0)[HE,DA]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "9",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS,ST(0)[HE,DA]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "10",
+      "dest": "18",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS,ST(0)[HE,DA]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "3",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,SS,ST(4)[HE]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "9",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,SS,ST(4)[HE]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "3",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,SS,ST(4)[HE]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "18",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,SS,ST(4)[HE]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "8",
+      "dest": "18",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,SS,ST(4)[HE]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "7",
+      "trigger": "ST(2)[SE] => ACK,ST(3)[SE]|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "10",
+      "trigger": "ST(2)[SE] => ACK,ST(3)[SE]|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "22",
+      "trigger": "ST(2)[SE] => ACK,ST(3)[SE]|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "8",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(3)[SE]|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "10",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,ST(3)[SE]|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "24",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,ST(3)[SE]|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "2",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(3)[SE]|RETRANSMIT|SS,ST(0)[HE,DA]|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "17",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "23",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "8",
+      "dest": "20",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:9"
+      ]
+    },
+    {
+      "source": "10",
+      "dest": "3",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK|RETRANSMIT|RETRANSMIT\n",
+      "conditions": [
+        "packet_number:13"
+      ]
+    }
+  ],
+  "states": [
+    {
+      "name": "START"
+    },
+    {
+      "name": "FINISH"
+    },
+    {
+      "name": "HANDSHAKING"
+    },
+    {
+      "name": "CONNECTED"
+    },
+    {
+      "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "3"
+    },
+    {
+      "name": "4"
+    },
+    {
+      "name": "7"
+    },
+    {
+      "name": "8"
+    },
+    {
+      "name": "9"
+    },
+    {
+      "name": "10"
+    },
+    {
+      "name": "16"
+    },
+    {
+      "name": "17"
+    },
+    {
+      "name": "18"
+    },
+    {
+      "name": "20"
+    },
+    {
+      "name": "22"
+    },
+    {
+      "name": "23"
+    },
+    {
+      "name": "24"
+    },
+    {
+      "name": "25"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "START",
+      "name": "HTTP/3 State Machine",
+      "class-name": "statemachine.ProtoModel"
+    }
+  ]
+}

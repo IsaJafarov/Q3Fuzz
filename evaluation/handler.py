@@ -7,7 +7,7 @@ from aioquic.buffer import Buffer
 import util
 from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 
-
+@dataclass
 class Stream():
     """
     Stream management throughtout a connection
@@ -159,7 +159,7 @@ class MSGHandler():
             
         self.previous_quic_payloads.append( plain )
 
-        return util.beautify_message_string(msg_per_layer, False)
+        return util.beautify_message_string(msg_per_layer, exclude_opt_server_frames=True)
     
 
     def process_http3_payload( self, received_stream:ReceivedStreamFrame ) -> str:
@@ -193,10 +193,10 @@ class MSGHandler():
             # Check if the stream is a QPACK Encoder/Decoder stream
             if stream.uni_stream_type == StreamType.QPACK_ENCODER:
                 msg_http3 += "Enc,"
-                return util.beautify_message_string(msg_http3, False)
+                return util.beautify_message_string(msg_http3, exclude_opt_server_frames=True)
             elif stream.uni_stream_type == StreamType.QPACK_DECODER:
                 msg_http3 += "Dec,"
-                return util.beautify_message_string(msg_http3, False)
+                return util.beautify_message_string(msg_http3, exclude_opt_server_frames=True)
             
 
 
@@ -234,7 +234,7 @@ class MSGHandler():
                 #print("Frame data length to read in the next stream {}".format( stream.unfinished_h3_frame_len_to_read ))
                 
             
-        return util.beautify_message_string(msg_http3, False) if msg_http3 != '' else "\u2298"
+        return util.beautify_message_string(msg_http3, exclude_opt_server_frames=True) if msg_http3 != '' else "\u2298"
       
     def handle_padding_frame(
         self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -998,15 +998,3 @@ class MSGHandler():
 
         self._quic._events.append(events.DatagramFrameReceived(data=data))
         """
-
-    def handle_retry_packet(self, header: QuicHeader, packet_without_tag: bytes) -> None:
-        """
-        Reinitialize connection, when the server sends RETRY type packet
-        Caddy old does it.
-        """
-        #print("Reinitialize connection, because RETRY packet is received!")
-        self._quic._peer_cid.cid = header.source_cid
-        self._quic._peer_token = header.token
-        self._quic._retry_count += 1
-        self._quic._retry_source_connection_id = header.source_cid
-        self.connect()

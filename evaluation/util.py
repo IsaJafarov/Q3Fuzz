@@ -232,7 +232,7 @@ def h3msg_from_pcap(file_path:str, keylog_file:str, client_only:bool=False) -> L
     return quic_packet_list
 
 
-def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
+def h3msg_to_str(h3msg:Union[list, Packet], exclude_opt_client_frames:bool = False, exclude_opt_server_frames:bool = False) -> str:
     """
     Convert a QUIC or HTTP3 message in a human-readable format.
     args:
@@ -268,7 +268,7 @@ def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
             elif type(quic_frame) == QuicStream:
                 h3_frame_str = ''
 
-                if quic_frame is None:
+                if quic_frame.h3_frame is None:
                     h3_frame_str = "\u2298"
                 elif type(quic_frame.h3_frame) == H3Settings:
                     h3_frame_str = H3_FRAME_ABBREVIATIONS['SETTINGS']
@@ -282,8 +282,8 @@ def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
                     h3_frame_str = 'Enc'
                 elif type(quic_frame.h3_frame) == QpackDecoder:
                     h3_frame_str = 'Dec'
-                
                 else:
+                    print(quic_frame)
                     raise Exception("Unknown HTTP/3 frame")
             
                 msginfo += "{}({})[{}]".format(QUIC_FRAME_ABBREVIATIONS['STREAM'], quic_frame.stream_id, h3_frame_str)
@@ -291,10 +291,10 @@ def h3msg_to_str(h3msg:Union[list, Packet]) -> str:
                 raise Exception("Unknown QUIC frame")
             msginfo += ","
 
-    return beautify_message_string(msginfo,True) 
+    return beautify_message_string(msginfo, exclude_opt_client_frames=exclude_opt_client_frames, exclude_opt_server_frames=exclude_opt_server_frames) 
 
 
-def beautify_message_string(message:str, sent_by_client:bool) -> str:
+def beautify_message_string(message:str, exclude_opt_client_frames:bool = False, exclude_opt_server_frames:bool = False) -> str:
     
     message = message\
         .replace(H3_FRAME_ABBREVIATIONS["RESERVED"]+",", "")\
@@ -302,11 +302,15 @@ def beautify_message_string(message:str, sent_by_client:bool) -> str:
         .replace(QUIC_FRAME_ABBREVIATIONS["NEW_TOKEN"]+",", "")\
         .replace(QUIC_FRAME_ABBREVIATIONS["PING"]+",", "")
 
-    if not sent_by_client:
+    if exclude_opt_server_frames:
         message = message\
         .replace(QUIC_FRAME_ABBREVIATIONS["NEW_CONNECTION_ID"]+",", "")\
         .replace(QUIC_FRAME_ABBREVIATIONS["MAX_STREAMS"]+",", "")\
         .replace(QUIC_FRAME_ABBREVIATIONS["MAX_STREAM_DATA"]+",", "")\
+    
+    if exclude_opt_client_frames:
+        message = message\
+        .replace(QUIC_FRAME_ABBREVIATIONS["ACK"]+",", "")\
 
     message = message\
         .rstrip(",")    

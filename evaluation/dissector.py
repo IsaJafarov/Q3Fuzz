@@ -98,6 +98,8 @@ class MSGDissector():
             
             elif layer.layer_name == 'http3':
                 #print(layer)
+                #print(layer.stream_uni)
+                #print(layer.stream_uni_type)
 
                 # This HTTP/3 layer has HTTP/3 frames
                 if layer.has_field("frame_type"):
@@ -196,7 +198,7 @@ class MSGDissector():
         Returns:
             Encoded HTTP/3 SETTINGS frame data.
         """
-
+        
         h3_settings = H3Settings()
 
         # Extract SETTINGS fields from the HTTP/3 layer
