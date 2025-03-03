@@ -61,7 +61,8 @@ class MSGHandler():
         if plain in self.previous_quic_payloads:           
             # Ignore if the payload consists of only PING and PADDING frames
             if any(byte not in (QuicFrameType.PADDING, QuicFrameType.PING) for byte in plain):
-                return "RETRANSMIT"
+                return ''
+                # return 'RETRANSMIT'
 
         buf = Buffer(data=plain)
         

@@ -409,12 +409,14 @@ class HttpClient():
 
                 if res_per_packet != '':
                     res += res_per_packet
-                    res += '|'
+                    res += ','
+                    # res += '|'
 
         except socket.timeout:
             # Return parsed packets after timeout
             if res:
-                res = res.rstrip('|')
+                res = res.rstrip(',')
+                # res = res.rstrip('|')
             else:
                 res="\u2298"
             return res
@@ -742,7 +744,7 @@ class HttpClient():
         
         # Build message by parsing h3msg
         builder = self.get_builder(Epoch.ONE_RTT)
-        msg_crafter = MSGCrafter()
+        msg_crafter = MSGCrafter(http_client=self)
         msg_crafter.copy_msg(h3msg, builder)
         self.send_quic_frames_from_builder(builder)
 
@@ -758,7 +760,7 @@ class HttpClient():
         
         # Build message by parsing h3msg
         builder = self.get_builder(Epoch.ONE_RTT)
-        msg_crafter = MSGCrafter()
+        msg_crafter = MSGCrafter(http_client=self)
         msg_crafter.craft_msg_from_frames(quic_frames, builder)
         self.send_quic_frames_from_builder(builder)
 
@@ -785,3 +787,4 @@ class HttpClient():
         self.send_quic_frames_from_builder(builder=builder)
         #self.read_from_buffer()
         self.sock.close()
+        self.received_packet_numbers.clear()
