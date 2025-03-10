@@ -321,8 +321,6 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
         pm.current_state = leaf_state
         skipped_messages = 0
         for msg_sent in pm.testmsgs:
-            
-
             msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
             if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
                 skipped_messages += 1
@@ -378,7 +376,6 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
             state_moving_msgs_list = get_move_state_h3msgs(pm, cand_s)
 
             for msg_sent in pm.testmsgs:
-
                 msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
                 if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
                     continue

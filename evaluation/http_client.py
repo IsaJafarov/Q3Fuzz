@@ -41,7 +41,7 @@ class HttpClient():
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
         self.sock.settimeout(0.1)
         self.handler = MSGHandler(qc = self.connection)
-        self.msg_crafter = MSGCrafter()
+        self.msg_crafter = MSGCrafter(http_client=self)
         self.received_packet_numbers = set()
         self.ack_needed = True  # Flag to determine if an ACK should be sent against specific QUIC messages   
         
@@ -410,12 +410,14 @@ class HttpClient():
                 #print()
                 if res_per_packet and res_per_packet != '':
                     res += res_per_packet
-                    res += '|'
+                    res += ','
+                    # res += '|'
 
         except socket.timeout:
             # Return parsed packets after timeout
             if res:
-                res = res.rstrip('|')
+                res = res.rstrip(',')
+                # res = res.rstrip('|')
             else:
                 res="\u2298"
             return res
@@ -761,7 +763,6 @@ class HttpClient():
         
         # Build message by parsing h3msg
         builder = self.get_builder(Epoch.ONE_RTT)
-        
         self.msg_crafter.copy_msg(h3msg, builder, exclude_ack)
         self.send_quic_frames_from_builder(builder)
 
@@ -807,3 +808,4 @@ class HttpClient():
     def close_local_socket(self) -> None:
 
         self.sock.close()
+        self.received_packet_numbers.clear()

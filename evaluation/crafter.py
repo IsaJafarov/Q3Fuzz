@@ -13,15 +13,13 @@ from dissector import *
 
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
-
-
 class MSGCrafter():
-
-    def __init__(self):
+    def __init__(self, http_client=None):
         self.quic_frames:list = []
+        self.http_client = http_client
         self.stream_offsets = dict()
         self.opened_uni_streams = set()
-
+        
     def copy_msg(self, h3msg:Packet, builder:QuicPacketBuilder, exclude_ack:bool = False) -> None:
         msg_dissector = MSGDissector()
         quic_frames = msg_dissector.dissect_msg(h3msg)
@@ -59,8 +57,12 @@ class MSGCrafter():
 
         # Start the ACK frame in the builder
         buf = builder.start_frame(frame_type=QuicFrameType.ACK, capacity=16)
-
-        buf.push_uint_var(quic_frame.largest_acknowledged)
+        largest_acknowledged = quic_frame.largest_acknowledged
+        # For every ACK to be sent, we update largest_ack to the latest packet to avoid a server from thinking packet loss
+        if self.http_client is not None and len(self.http_client.received_packet_numbers):
+            largest_acknowledged = max(self.http_client.received_packet_numbers)
+            # print("largest_acknowledged is updated to %d" % largest_acknowledged)
+        buf.push_uint_var(largest_acknowledged)
         buf.push_uint_var(quic_frame.ack_delay)
         buf.push_uint_var(quic_frame.ack_range_count)
         buf.push_uint_var(quic_frame.ack_first_ack_range)
