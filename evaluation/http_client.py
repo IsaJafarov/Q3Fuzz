@@ -804,8 +804,9 @@ class HttpClient():
         #self.read_from_buffer()
         
         self.close_local_socket()
+        self.received_packet_numbers.clear()
 
     def close_local_socket(self) -> None:
 
         self.sock.close()
-        self.received_packet_numbers.clear()
+        
