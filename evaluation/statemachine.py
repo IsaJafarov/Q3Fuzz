@@ -346,7 +346,7 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
             msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
 
             update_candidates(pm, sm, msg_sent, msg_rcvd_str)
-            print("sr_dict[{}] = {}".format( msg_sent_str, msg_rcvd_str ))
+
             sr_dict[msg_sent_str] = msg_rcvd_str
         leafstate_num += 1
         pm.current_state.child_sr_dict = sr_dict

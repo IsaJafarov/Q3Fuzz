@@ -71,8 +71,8 @@ class MSGDissector():
     def __init__(self):
         self.quic_frames:list = []
 
-    def dissect_msg(self, message:Packet) -> List:
-        
+    def dissect_msg(self, message:Packet) -> List[Union[QuicAck,QuicNewConnectionId,QuicStream]]:
+
         h3_frames = []
 
         # Parse layers in the h3msg
@@ -90,7 +90,7 @@ class MSGDissector():
                     elif 'PADDING' in field.showname:
                         pass
                     elif 'CRYPTO' in field.showname or 'PING' in field.showname:
-                        return
+                        pass
                     else:
                         print(field)
                         raise Exception("[-] Unsupported QUIC Frame: {}".format(field.showname))
@@ -98,8 +98,6 @@ class MSGDissector():
             
             elif layer.layer_name == 'http3':
                 #print(layer)
-                #print(layer.stream_uni)
-                #print(layer.stream_uni_type)
 
                 # This HTTP/3 layer has HTTP/3 frames
                 if layer.has_field("frame_type"):

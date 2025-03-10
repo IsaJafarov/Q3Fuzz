@@ -247,6 +247,7 @@ class HttpClient():
 
         crypto_pair = self._http._quic._cryptos[epoch]
         if not crypto_pair.send.is_valid():
+            self.close_local_socket()
             raise Exception("The Encoding crypto is not valid to send data. Is your server up?")
         
         builder = self.get_builder(epoch)
@@ -258,9 +259,11 @@ class HttpClient():
         # Wait till the server finishes sending all the CRYPTO data
         for i in range(30):
             crypto_frame = crypto_streams.sender.get_frame(1135)  # TODO: calculate max_size dynamically instead of giving static number
-            if crypto_frame is not None: break
+            if crypto_frame is not None: 
+                break
             # time.sleep(0.1)
         else:
+            self.close_local_socket()
             raise Exception("The Server did not send crypto data. Try again.")
 
 
@@ -770,7 +773,6 @@ class HttpClient():
         """
         Send the QUIC and HTTP/3 frames in a packet and capture responses.
         """
-        #print("in send_frames")
         
         # Build message by parsing h3msg
         builder = self.get_builder(Epoch.ONE_RTT)
@@ -799,4 +801,9 @@ class HttpClient():
 
         self.send_quic_frames_from_builder(builder=builder)
         #self.read_from_buffer()
+        
+        self.close_local_socket()
+
+    def close_local_socket(self) -> None:
+
         self.sock.close()

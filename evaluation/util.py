@@ -258,7 +258,7 @@ def h3msg_to_str(h3msg:Union[list, Packet], exclude_opt_client_frames:bool = Fal
             return msginfo
 
         msg_dissector = MSGDissector()
-        quic_frames = msg_dissector.dissect_msg(h3msg)    
+        quic_frames = msg_dissector.dissect_msg(h3msg)
 
         for quic_frame in quic_frames:
             if type(quic_frame) == QuicAck:

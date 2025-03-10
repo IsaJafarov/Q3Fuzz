@@ -106,6 +106,8 @@ class MSGCrafter():
         stream_type = QuicFrameType.STREAM_BASE | 2  # Include LEN bit
         if current_offset > 0:# quic_frame.offset != 0:
             stream_type |= 4  # Include OFF bit
+        
+
         # During SM generation, we will not include the FIN. So that one stream frame will not close the stream and all stream frames will freely carry data.
         #if quic_frame.fin_bit:
         #    stream_type |= 1  # Include FIN bit
@@ -129,12 +131,14 @@ class MSGCrafter():
         else:
             raise Exception("Unexpected HTTP/3 frame {}. Add it here...".format(quic_frame.h3_frame))
 
+        # If unidirection stream has already been created by previously sent STREAM frames, then do not prepend the HTTP/3 stream type.
+        # Otherwise, prepend the corresponding stream type.
         if quic_frame.stream_id % 4 == 2 and quic_frame.stream_id not in self.opened_uni_streams:
             if quic_frame.stream_id==2:
                 h3_frame_payload = encode_uint_var(StreamType.CONTROL) + h3_frame_payload
-            elif quic_frame.stream_id==6:
-                h3_frame_payload = encode_uint_var(StreamType.QPACK_ENCODER) + h3_frame_payload
-            elif quic_frame.stream_id==10:
+            elif type(quic_frame.h3_frame) == QpackEncoder:
+                h3_frame_payload = encode_uint_var(StreamType.QPACK_ENCODER) + h3_frame_payload 
+            elif type(quic_frame.h3_frame) == QpackDecoder:
                 h3_frame_payload = encode_uint_var(StreamType.QPACK_DECODER) + h3_frame_payload
             self.opened_uni_streams.add(quic_frame.stream_id)
 
