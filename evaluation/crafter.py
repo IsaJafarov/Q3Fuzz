@@ -176,8 +176,9 @@ class MSGCrafter():
         if h3_frame.blocked_streams is not None:
             settings[0x07] = h3_frame.blocked_streams
 
-        if h3_frame.h3_datagram is not None:
-            settings[0x33] = h3_frame.h3_datagram
+        # Removed Enable Datagram field (prevent CC by included LEN bit in stream type)
+        # if h3_frame.h3_datagram is not None:
+        #     settings[0x33] = h3_frame.h3_datagram
 
         if h3_frame.webtransport is not None:
             settings[0x2B603742] = h3_frame.webtransport
