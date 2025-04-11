@@ -61,9 +61,9 @@ class QpackDecoder:
 class QuicStream:
     stream_id:int = None
     fin_bit:bool = None
-    offset:int = None
     # No need to play with the length field. We calculate length dynamically. Otherwise, the stream frame will be malformed most of the time.
     # length:int = None
+    offset:int = None
     h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
 
 
@@ -79,8 +79,9 @@ class MSGDissector():
         for layer in message.layers:
             if layer.layer_name == 'quic':
                 #print(layer)
+                
                 for field in layer.frame.fields:
-
+                   
                     if 'STREAM' in field.showname:
                         self.quic_frames.append( self._dissect_stream_frame(field.showname) )
                     elif 'ACK' in field.showname:
@@ -138,7 +139,7 @@ class MSGDissector():
                         raise Exception("[-] Unsupported Application Layer Data")
         
         # Put application layer data into the corresponding quic stream frame
-        quic_stream_frames = [qf for qf in self.quic_frames if type(qf) == QuicStream]
+        quic_stream_frames = [qf for qf in self.quic_frames if isinstance(qf, QuicStream)]
         for quic_stream_frame, h3_frame in zip(quic_stream_frames, h3_frames):
             quic_stream_frame.h3_frame = h3_frame
         

@@ -26,7 +26,7 @@ class MSGCrafter():
 
         for quic_frame in quic_frames:
 
-            if exclude_ack and type(quic_frame) is QuicAck:
+            if isinstance(quic_frame, QuicAck):
                 continue
             self.add_dissected_frames_to_builder(quic_frame, builder)
 
@@ -36,11 +36,11 @@ class MSGCrafter():
 
 
     def add_dissected_frames_to_builder(self, quic_frame, builder:QuicPacketBuilder):
-        if type(quic_frame) == QuicAck:
+        if isinstance(quic_frame, QuicAck):
             self.add_ack_frame(quic_frame, builder)
-        elif type(quic_frame) == QuicNewConnectionId:
+        elif isinstance(quic_frame, QuicNewConnectionId):
             self.add_nci_frame(quic_frame, builder)
-        elif type(quic_frame) == QuicStream:
+        elif isinstance(quic_frame, QuicStream):
             self.add_stream_frame(quic_frame, builder)
         else:
             raise Exception("Unexpected QUIC frame {}. Add it here.".format(quic_frame))
@@ -116,17 +116,17 @@ class MSGCrafter():
 
         # Combine all HTTP/3 frames into a single payload
         h3_frame_payload = None
-        if type(quic_frame.h3_frame) == H3Settings:
+        if isinstance(quic_frame.h3_frame, H3Settings):
             h3_frame_payload = self.generate_h3_settings_frame(quic_frame.h3_frame)
-        elif type(quic_frame.h3_frame) == H3Headers:
+        elif isinstance(quic_frame.h3_frame, H3Headers):
             h3_frame_payload = self.generate_h3_headers_frame(quic_frame.h3_frame)
-        elif type(quic_frame.h3_frame) == H3Data:
+        elif isinstance(quic_frame.h3_frame, H3Data):
             h3_frame_payload = self.generate_h3_data_frame(quic_frame.h3_frame)
-        elif type(quic_frame.h3_frame) == H3PriorityUpdate:
+        elif isinstance(quic_frame.h3_frame, H3PriorityUpdate):
             h3_frame_payload = self.generate_h3_priority_update_frame(quic_frame.h3_frame)
-        elif type(quic_frame.h3_frame) == QpackEncoder:
+        elif isinstance(quic_frame.h3_frame, QpackEncoder):
             h3_frame_payload = self.generate_qpack_encoder(quic_frame.h3_frame, quic_frame.offset==0)
-        elif type(quic_frame.h3_frame) == QpackDecoder:
+        elif isinstance(quic_frame.h3_frame, QpackDecoder):
             h3_frame_payload = self.generate_qpack_decoder(quic_frame.h3_frame, quic_frame.offset==0)
         elif quic_frame.h3_frame is None:
             h3_frame_payload = b'' # the stream does not have an application layer data
@@ -138,9 +138,9 @@ class MSGCrafter():
         if quic_frame.stream_id % 4 == 2 and quic_frame.stream_id not in self.opened_uni_streams:
             if quic_frame.stream_id==2:
                 h3_frame_payload = encode_uint_var(StreamType.CONTROL) + h3_frame_payload
-            elif type(quic_frame.h3_frame) == QpackEncoder:
+            elif isinstance(quic_frame.h3_frame, QpackEncoder):
                 h3_frame_payload = encode_uint_var(StreamType.QPACK_ENCODER) + h3_frame_payload 
-            elif type(quic_frame.h3_frame) == QpackDecoder:
+            elif isinstance(quic_frame.h3_frame, QpackDecoder):
                 h3_frame_payload = encode_uint_var(StreamType.QPACK_DECODER) + h3_frame_payload
             self.opened_uni_streams.add(quic_frame.stream_id)
 
@@ -176,8 +176,8 @@ class MSGCrafter():
         if h3_frame.blocked_streams is not None:
             settings[0x07] = h3_frame.blocked_streams
 
-        if h3_frame.h3_datagram is not None:
-            settings[0x33] = h3_frame.h3_datagram
+        #if h3_frame.h3_datagram is not None:
+            #settings[0x33] = h3_frame.h3_datagram
 
         if h3_frame.webtransport is not None:
             settings[0x2B603742] = h3_frame.webtransport

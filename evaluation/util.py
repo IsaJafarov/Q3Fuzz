@@ -243,7 +243,7 @@ def h3msg_to_str(h3msg:Union[list, Packet], exclude_opt_client_frames:bool = Fal
     
     msginfo = ''
 
-    if type(h3msg) is list: # for moving messages
+    if isinstance(h3msg, list): # for moving messages
         for h3msg_sub in h3msg:
             msginfo += h3msg_to_str(h3msg_sub) + " => "
         if msginfo != '':
@@ -261,26 +261,26 @@ def h3msg_to_str(h3msg:Union[list, Packet], exclude_opt_client_frames:bool = Fal
         quic_frames = msg_dissector.dissect_msg(h3msg)
 
         for quic_frame in quic_frames:
-            if type(quic_frame) == QuicAck:
+            if isinstance(quic_frame, QuicAck):
                 msginfo += QUIC_FRAME_ABBREVIATIONS['ACK']
-            elif type(quic_frame) == QuicNewConnectionId:
+            elif isinstance(quic_frame, QuicNewConnectionId):
                 msginfo += QUIC_FRAME_ABBREVIATIONS['NEW_CONNECTION_ID']
-            elif type(quic_frame) == QuicStream:
+            elif isinstance(quic_frame, QuicStream):
                 h3_frame_str = ''
 
                 if quic_frame.h3_frame is None:
                     h3_frame_str = "\u2298"
-                elif type(quic_frame.h3_frame) == H3Settings:
+                elif isinstance(quic_frame.h3_frame, H3Settings):
                     h3_frame_str = H3_FRAME_ABBREVIATIONS['SETTINGS']
-                elif type(quic_frame.h3_frame) == H3Headers:
+                elif isinstance(quic_frame.h3_frame, H3Headers):
                     h3_frame_str = H3_FRAME_ABBREVIATIONS['HEADERS']
-                elif type(quic_frame.h3_frame) == H3Data:
+                elif isinstance(quic_frame.h3_frame, H3Data):
                     h3_frame_str = H3_FRAME_ABBREVIATIONS['DATA'] 
-                elif type(quic_frame.h3_frame) == H3PriorityUpdate:
+                elif isinstance(quic_frame.h3_frame, H3PriorityUpdate):
                     h3_frame_str = H3_FRAME_ABBREVIATIONS['PRIORITY_UPDATE']
-                elif type(quic_frame.h3_frame) == QpackEncoder:
+                elif isinstance(quic_frame.h3_frame, QpackEncoder):
                     h3_frame_str = 'Enc'
-                elif type(quic_frame.h3_frame) == QpackDecoder:
+                elif isinstance(quic_frame.h3_frame, QpackDecoder):
                     h3_frame_str = 'Dec'
                 else:
                     print(quic_frame)

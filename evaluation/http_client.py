@@ -43,7 +43,7 @@ class HttpClient():
         self.handler = MSGHandler(qc = self.connection)
         self.msg_crafter = MSGCrafter(http_client=self)
         self.received_packet_numbers = set()
-        self.ack_needed = True  # Flag to determine if an ACK should be sent against specific QUIC messages   
+        self.ack_needed = True  # Flag to determine if an ACK should be sent against specific QUIC messages   TODO
         
     def get_builder(self, epoch: Epoch):
         builder = QuicPacketBuilder(

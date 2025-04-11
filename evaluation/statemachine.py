@@ -170,7 +170,7 @@ def modeller_h3(conf:QuicConfiguration, url:str, sample_msgs:List[Packet], outdi
         pm.current_level = pm.current_level + 1
 
     elapsed_time = time.time() - g_start_time
-    print ("[+] All jobs done. Total elapsed time is ", elapsed_time)
+    print ("[+] All jobs done. Total elapsed time is ", round(elapsed_time, 2))
 
     ### Final graph drawing ###
     # graphname = "%s/level_" % outdir + str(pm.current_level-1) + "(fin).png"
