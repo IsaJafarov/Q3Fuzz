@@ -16,7 +16,7 @@ def run_caddy(version):
 def run_nginx(version):
     print("[+] Running nginx %s..." % version)
     if version=='1.23.4':
-        os.chdir("./nginx-1.23.4/nginx-1.23.4")
+        os.chdir("./nginx-1.23.4/nginx-quic")
     elif version=='1.25.5':
         os.chdir("./nginx-1.25.5/nginx-1.25.5")
     elif version=='1.27.0':
