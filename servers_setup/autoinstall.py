@@ -1,4 +1,5 @@
 import os, argparse
+import subprocess
 
 current_folder = os.path.dirname(os.path.abspath(__file__))
 os.chdir(current_folder)
@@ -162,22 +163,48 @@ def install_h2o(version):
         os.system("sudo make install")
         os.system("cp ../../../h2o-files/16b13ee/h2o.conf ../examples/h2o/h2o.conf")
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
-        
+    
+def install_quiche(version):
+    if version == '0.23.5':
+        os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo sh") # install rustub https://rustup.rs/
+        os.system("sudo apt install -y cmake")
+        os.system("sudo rm -r ./quiche-0.23.5; mkdir ./quiche-0.23.5")
+        os.chdir("quiche-0.23.5")
+        os.system("cp ../quiche-files/v0.23.5/quiche_0.23.5.tar.gz ./")
+        os.system("tar -zxf quiche_0.23.5.tar.gz")
+        os.system("cp ../quiche-files/v0.23.5/boringssl.tar.gz ./quiche-0.23.5/quiche/deps/boringssl")
+        os.system("tar -zxf ./quiche-0.23.5/quiche/deps/boringssl/boringssl.tar.gz -C ./quiche-0.23.5/quiche/deps/boringssl/")
+        os.system("mv ./quiche-0.23.5/quiche/deps/boringssl/boringssl-0.20250311.0/* ./quiche-0.23.5/quiche/deps/boringssl/")
+        os.chdir("quiche-0.23.5")
+        #os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo build --examples")
+        os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo run --bin quiche-server -- --listen 0.0.0.0:443 --cert ../../certs/prett3.com.crt --key ../../certs/prett3.com.key --root /usr/local/nginx/html/ --name prett3.com")
+
 
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation', formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("server", help="supported servers \n\t- nginx\n\t- caddy\n\t- h2o\n\t- ols (openlitespeed)")
-    parser.add_argument("version", help="corresponding version(s) \n\t- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n\t- 2.4.6, 2.7.6, 2.8.4\t(for caddy)\n\t- a429117, 222b36d or 16b13ee\t(for h2o)\n\t- 1.7.15 or 1.8.1\t(for ols)")
+    parser.add_argument("server", help="supported servers \n\t"
+    "- nginx\n\t"
+    "- caddy\n\t"
+    "- h2o\n\t"
+    "- ols (openlitespeed)\n\t"
+    "- quiche")
+
+    parser.add_argument("version", help="corresponding version(s) \n\t"
+    "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n\t"
+    "- 2.4.6, 2.7.6, 2.8.4\t(for caddy) \n\t"
+    "- a429117, 222b36d or 16b13ee\t(for h2o) \n\t"
+    "- 1.7.15 or 1.8.1\t(for ols)\n\t"
+    "- 0.23.5 \t(for quiche)")
     args = parser.parse_args()
     server = args.server
     version = args.version
     
     # kill the running webserver processes
-    os.system("sudo pkill -9 nginx")
-    os.system("sudo pkill -9 caddy")
-    os.system("sudo pkill -9 h2o")
-    os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
+    #os.system("sudo pkill -9 nginx")
+    #os.system("sudo pkill -9 caddy")
+    #os.system("sudo pkill -9 h2o")
+    #os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
     
 
     if server == 'caddy':
@@ -188,3 +215,5 @@ if __name__ == '__main__':
         install_openlitespeed(version)
     elif server == 'h2o':
         install_h2o(version)
+    elif server == "quiche":
+        install_quiche(version)
