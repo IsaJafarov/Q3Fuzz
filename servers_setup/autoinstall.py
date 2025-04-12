@@ -183,7 +183,7 @@ def install_quic_go(version):
     if version == '0.50.1':
         os.system("sudo rm -r ./quic-go-0.50.1; mkdir ./quic-go-0.50.1")
         os.chdir("quic-go-0.50.1")
-        os.system("cp ../quic-go-files/v0.50.1/go1.24.2.linux-amd64.tar.gz ./")
+        os.system("wget https://go.dev/dl/go1.24.2.linux-amd64.tar.gz")
         os.system("sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz") # https://go.dev/doc/install
         os.system("cp ../quic-go-files/v0.50.1/v0.50.1.tar.gz ./")
         os.system("tar -zxf v0.50.1.tar.gz")
