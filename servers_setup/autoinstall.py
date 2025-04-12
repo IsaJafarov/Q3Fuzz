@@ -179,6 +179,17 @@ def install_quiche(version):
         #os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo build --examples")
         os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo run --bin quiche-server -- --listen 0.0.0.0:443 --cert ../../certs/prett3.com.crt --key ../../certs/prett3.com.key --root /usr/local/nginx/html/ --name prett3.com")
 
+def install_quic_go(version):
+    if version == '0.50.1':
+        os.system("sudo rm -r ./quic-go-0.50.1; mkdir ./quic-go-0.50.1")
+        os.chdir("quic-go-0.50.1")
+        os.system("cp ../quic-go-files/v0.50.1/go1.24.2.linux-amd64.tar.gz ./")
+        os.system("sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz") # https://go.dev/doc/install
+        os.system("cp ../quic-go-files/v0.50.1/v0.50.1.tar.gz ./")
+        os.system("tar -zxf v0.50.1.tar.gz")
+        os.chdir("quic-go-0.50.1")
+        os.system("sudo /usr/local/go/bin/go run example/main.go -bind 0.0.0.0:443 -www /usr/local/nginx/html/ -cert ../../certs/prett3.com.crt -key ../../certs/prett3.com.key")
+
 
 if __name__ == '__main__':
     
@@ -188,14 +199,19 @@ if __name__ == '__main__':
     "- caddy\n\t"
     "- h2o\n\t"
     "- ols (openlitespeed)\n\t"
-    "- quiche")
+    "- quiche\n\t"
+    "- quic-go"
+    )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
     "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n\t"
     "- 2.4.6, 2.7.6, 2.8.4\t(for caddy) \n\t"
     "- a429117, 222b36d or 16b13ee\t(for h2o) \n\t"
     "- 1.7.15 or 1.8.1\t(for ols)\n\t"
-    "- 0.23.5 \t(for quiche)")
+    "- 0.23.5 \t(for quiche)\n\t"
+    "- 0.50.1 \t (for quic-go)"
+    
+    )
     args = parser.parse_args()
     server = args.server
     version = args.version
@@ -217,3 +233,6 @@ if __name__ == '__main__':
         install_h2o(version)
     elif server == "quiche":
         install_quiche(version)
+    elif server == "quic-go":
+        install_quic_go(version)
+
