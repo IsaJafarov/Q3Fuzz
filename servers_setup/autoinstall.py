@@ -190,27 +190,51 @@ def install_quic_go(version):
         os.chdir("quic-go-0.50.1")
         os.system("sudo /usr/local/go/bin/go run example/main.go -bind 0.0.0.0:443 -www /usr/local/nginx/html/ -cert ../../certs/prett3.com.crt -key ../../certs/prett3.com.key")
 
+def install_msquic_kestrel(version):
+    if version == '2.4.8':
+        os.system("sudo rm -r ./msquic_kestrel; mkdir ./msquic_kestrel")
+        os.chdir("msquic_kestrel")
+        # install msquic library
+        os.system("wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | sudo apt-key add -")
+        os.system("sudo add-apt-repository \"deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-$(lsb_release -cs)-prod $(lsb_release -cs) main\"")
+        os.system("sudo apt update")
+        # install the latest (2.4.8) libmsquic. Previous versions causes problems https://github.com/dotnet/runtime/issues/105788
+        os.system("sudo apt install -y libmsquic=2.4.8")
+
+        # install .NET SDK
+        os.system("sudo add-apt-repository ppa:dotnet/backports")
+        os.system("sudo apt update")
+        os.system("sudo apt install -y dotnet-sdk-9.0=9.0.203-1")
+
+        # create .NET project
+        os.system("dotnet new web -n Http3Server")
+        os.chdir("Http3Server")
+        os.system("cp ../msquic-kestrel-files/Program.cs ./")
+        os.system("sudo dotnet run")
+        
+
 
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("server", help="supported servers \n\t"
-    "- nginx\n\t"
-    "- caddy\n\t"
-    "- h2o\n\t"
-    "- ols (openlitespeed)\n\t"
-    "- quiche\n\t"
-    "- quic-go"
+    "- nginx\n"
+    "- caddy\n"
+    "- h2o\n"
+    "- ols (openlitespeed)\n"
+    "- quiche\n"
+    "- quic-go\n"
+    "- msquic-kestrel"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
-    "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n\t"
-    "- 2.4.6, 2.7.6, 2.8.4\t(for caddy) \n\t"
-    "- a429117, 222b36d or 16b13ee\t(for h2o) \n\t"
-    "- 1.7.15 or 1.8.1\t(for ols)\n\t"
-    "- 0.23.5 \t(for quiche)\n\t"
-    "- 0.50.1 \t (for quic-go)"
-    
+    "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n"
+    "- 2.4.6, 2.7.6, 2.8.4\t(for caddy) \n"
+    "- a429117, 222b36d or 16b13ee\t(for h2o) \n"
+    "- 1.7.15 or 1.8.1\t(for ols)\n"
+    "- 0.23.5 \t(for quiche)\n"
+    "- 0.50.1 \t (for quic-go)\n"
+    "- 2.4.8 \t (for msquic-kestrel)"
     )
     args = parser.parse_args()
     server = args.server
@@ -221,7 +245,8 @@ if __name__ == '__main__':
     #os.system("sudo pkill -9 caddy")
     #os.system("sudo pkill -9 h2o")
     #os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
-    
+    # TODO add ll servers
+    os.system("sudo pkill -9 dotnet")    
 
     if server == 'caddy':
         install_caddy(version)
@@ -235,4 +260,7 @@ if __name__ == '__main__':
         install_quiche(version)
     elif server == "quic-go":
         install_quic_go(version)
+    elif server == "msquic-kestrel":
+        install_msquic_kestrel(version)
+
 
