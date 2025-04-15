@@ -166,7 +166,7 @@ def install_h2o(version):
     
 def install_quiche(version):
     if version == '0.23.5':
-        os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo sh") # install rustub https://rustup.rs/
+        os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo sh -s -- -y") # install rustub https://rustup.rs/
         os.system("sudo apt install -y cmake")
         os.system("sudo rm -r ./quiche-0.23.5; mkdir ./quiche-0.23.5")
         os.chdir("quiche-0.23.5")
@@ -192,8 +192,8 @@ def install_quic_go(version):
 
 def install_msquic_kestrel(version):
     if version == '2.4.8':
-        os.system("sudo rm -r ./msquic_kestrel; mkdir ./msquic_kestrel")
-        os.chdir("msquic_kestrel")
+        os.system("sudo rm -rf ./msquic_kestrel")
+
         # install msquic library
         os.system("wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | sudo apt-key add -")
         os.system("sudo add-apt-repository \"deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-$(lsb_release -cs)-prod $(lsb_release -cs) main\"")
@@ -201,16 +201,57 @@ def install_msquic_kestrel(version):
         # install the latest (2.4.8) libmsquic. Previous versions causes problems https://github.com/dotnet/runtime/issues/105788
         os.system("sudo apt install -y libmsquic=2.4.8")
 
-        # install .NET SDK
+        # install .NET SDK. msquic needs it https://github.com/microsoft/msquic/blob/main/docs/BUILD.md
+        # https://learn.microsoft.com/en-us/dotnet/core/install/linux-ubuntu-install
         os.system("sudo add-apt-repository ppa:dotnet/backports")
         os.system("sudo apt update")
         os.system("sudo apt install -y dotnet-sdk-9.0=9.0.203-1")
 
-        # create .NET project
-        os.system("dotnet new web -n Http3Server")
-        os.chdir("Http3Server")
+        # create and run .NET project
+        os.system("dotnet new web -n msquic_kestrel")
+        os.chdir("msquic_kestrel")
         os.system("cp ../msquic-kestrel-files/Program.cs ./")
         os.system("sudo dotnet run")
+        
+def install_neqo(version):
+    if version == '0.13.1':
+        
+        os.system("sudo rm -rf ./neqo")
+        
+        # clone Neqo v0.13.1
+        os.system("git clone https://github.com/mozilla/neqo.git")
+        os.chdir("neqo")
+        os.system("git checkout tags/v0.13.1")
+
+        # clone Neqo's dependencies: NSS v3.110 and NSPR v4.36
+        os.system("sudo apt install -y mercurial")
+        os.system("hg clone https://hg.mozilla.org/projects/nss")
+        os.system("hg clone https://hg.mozilla.org/projects/nspr")
+        os.chdir("nss")
+        os.system("hg update NSS_3_110_RTM")
+        os.chdir("../nspr")
+        os.system("hg update NSPR_4_36_RTM")
+        os.chdir("..")
+        
+        # install GYP and Ninja, which NSS depends on
+        os.system("sudo apt install -y gyp ninja-build")
+
+        # build NSS
+        os.system("sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1")
+        os.system("bash ./nss/build.sh")
+
+        # install Rust
+        os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y")
+        
+        
+        # set necessary env variables (NSS_DIR and LD_LIBRARY_PATH) and install Neqo
+        os.system("sudo apt install clang") # clang is required
+        os.system("export NSS_DIR=\"$(realpath ./nss)\"; export LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\"; $HOME/.cargo/bin/cargo build")
+
+        # run Neqo's test server
+        os.system("sudo ./target/debug/neqo-server 0.0.0.0:443 -v")
+
+
         
 
 
@@ -224,7 +265,8 @@ if __name__ == '__main__':
     "- ols (openlitespeed)\n"
     "- quiche\n"
     "- quic-go\n"
-    "- msquic-kestrel"
+    "- msquic-kestrel\n"
+    "- neqo\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -234,7 +276,8 @@ if __name__ == '__main__':
     "- 1.7.15 or 1.8.1\t(for ols)\n"
     "- 0.23.5 \t(for quiche)\n"
     "- 0.50.1 \t (for quic-go)\n"
-    "- 2.4.8 \t (for msquic-kestrel)"
+    "- 2.4.8 \t (for msquic-kestrel)\n"
+    "- 0.13.1 \t (for neqo)\n"
     )
     args = parser.parse_args()
     server = args.server
@@ -262,5 +305,7 @@ if __name__ == '__main__':
         install_quic_go(version)
     elif server == "msquic-kestrel":
         install_msquic_kestrel(version)
+    elif server == "neqo":
+        install_neqo(version)
 
 
