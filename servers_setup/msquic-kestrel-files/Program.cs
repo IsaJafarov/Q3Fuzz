@@ -10,5 +10,6 @@ builder.WebHost.ConfigureKestrel((context, options) =>
 });
 
 var app = builder.Build();
+app.UseDefaultFiles(); // serve index.html under /
 app.UseStaticFiles();
 app.Run();

@@ -41,10 +41,59 @@ def run_h2o(version):
     os.chdir("build")
     os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
 
+    
+def run_quiche(version):
+    if version == '0.23.5':
+        os.chdir("quiche")
+        os.system("sudo ./target/debug/quiche-server --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --name prett3.com")
+
+def run_quic_go(version):
+    if version == '0.50.1':
+        os.chdir("quic-go")
+        os.system("sudo /usr/local/go/bin/go run example/main.go -bind 0.0.0.0:443 -www /usr/local/nginx/html/ -cert ../certs/prett3.com.crt -key ../certs/prett3.com.key")
+
+def run_msquic_kestrel(version):
+    if version == '2.4.8':    
+        os.chdir("msquic_kestrel")
+        os.system("sudo dotnet run")
+        
+def run_neqo(version):
+    if version == '0.13.1':
+        os.chdir("neqo")
+        os.system("sudo ./target/debug/neqo-server 0.0.0.0:443 -v")
+
+def run_aioquic(version):
+    if version == '1.2.0':
+        os.chdir("aioquic")
+        os.system("sudo python3 ./examples/http3_server.py -c ../certs/prett3.com.pem -k ../certs/prett3.com.key --port 443 -v")
+        
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HTTP/3 web servers runner')
-    parser.add_argument("server", help="Server name (nginx, caddy, h2o, ols)")
-    parser.add_argument("version", help="corresponding version(s) \n\t- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n\t- 2.4.6, 2.7.6, 2.8.4\t(for caddy)\n\t- a429117, 222b36d or 16b13ee\t(for h2o)\n\t- 1.7.15 or 1.8.1\t(for ols)")
+    parser.add_argument("server", help="supported servers \n\t"
+    "- nginx\n"
+    "- caddy\n"
+    "- h2o\n"
+    "- ols (openlitespeed)\n"
+    "- quiche\n"
+    "- quic-go\n"
+    "- msquic-kestrel\n"
+    "- neqo\n"
+    "- aioquic\n"
+    )
+
+    parser.add_argument("version", help="corresponding version(s) \n\t"
+    "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n"
+    "- 2.4.6, 2.7.6, 2.8.4\t(for caddy) \n"
+    "- a429117, 222b36d or 16b13ee\t(for h2o) \n"
+    "- 1.7.15 or 1.8.1\t(for ols)\n"
+    "- 0.23.5 \t(for quiche)\n"
+    "- 0.50.1 \t (for quic-go)\n"
+    "- 2.4.8 \t (for msquic-kestrel)\n"
+    "- 0.13.1 \t (for neqo)\n"
+    "- 1.2.0 \t (for aioquic)\n"
+    )
+
     args = parser.parse_args()
     server = args.server
     version = args.version
@@ -65,5 +114,15 @@ if __name__ == '__main__':
         run_openlitespeed(version)
     elif server == 'h2o':
         run_h2o(version)
+    elif server == "quiche":
+        run_quiche(version)
+    elif server == "quic-go":
+        run_quic_go(version)
+    elif server == "msquic-kestrel":
+        run_msquic_kestrel(version)
+    elif server == "neqo":
+        run_neqo(version)
+    elif server == "aioquic":
+        run_aioquic(version)
 
     print("[+] Done.")

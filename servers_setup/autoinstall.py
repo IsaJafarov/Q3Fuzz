@@ -166,29 +166,38 @@ def install_h2o(version):
     
 def install_quiche(version):
     if version == '0.23.5':
-        os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo sh -s -- -y") # install rustub https://rustup.rs/
+        os.system("sudo rm -r ./quiche")
+
+        # install dependencies: rust and cmake
+        os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo sh -s -- -y") 
         os.system("sudo apt install -y cmake")
-        os.system("sudo rm -r ./quiche-0.23.5; mkdir ./quiche-0.23.5")
-        os.chdir("quiche-0.23.5")
-        os.system("cp ../quiche-files/v0.23.5/quiche_0.23.5.tar.gz ./")
-        os.system("tar -zxf quiche_0.23.5.tar.gz")
-        os.system("cp ../quiche-files/v0.23.5/boringssl.tar.gz ./quiche-0.23.5/quiche/deps/boringssl")
-        os.system("tar -zxf ./quiche-0.23.5/quiche/deps/boringssl/boringssl.tar.gz -C ./quiche-0.23.5/quiche/deps/boringssl/")
-        os.system("mv ./quiche-0.23.5/quiche/deps/boringssl/boringssl-0.20250311.0/* ./quiche-0.23.5/quiche/deps/boringssl/")
-        os.chdir("quiche-0.23.5")
-        #os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo build --examples")
-        os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo run --bin quiche-server -- --listen 0.0.0.0:443 --cert ../../certs/prett3.com.crt --key ../../certs/prett3.com.key --root /usr/local/nginx/html/ --name prett3.com")
+        
+        # clone Quiche
+        os.system("git clone https://github.com/cloudflare/quiche.git")
+        os.chdir("quiche")
+        os.system("git checkout tags/0.23.5")
+        os.system("git submodule update --init --recursive") # retrieve submodules, such as boringssl
+
+        # build and run
+        os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo run --bin quiche-server -- --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --name prett3.com")
+        
 
 def install_quic_go(version):
     if version == '0.50.1':
-        os.system("sudo rm -r ./quic-go-0.50.1; mkdir ./quic-go-0.50.1")
-        os.chdir("quic-go-0.50.1")
+        os.system("sudo rm -r ./quic-go")
+        
+        # install go https://go.dev/doc/install
         os.system("wget https://go.dev/dl/go1.24.2.linux-amd64.tar.gz")
-        os.system("sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz") # https://go.dev/doc/install
-        os.system("cp ../quic-go-files/v0.50.1/v0.50.1.tar.gz ./")
-        os.system("tar -zxf v0.50.1.tar.gz")
-        os.chdir("quic-go-0.50.1")
-        os.system("sudo /usr/local/go/bin/go run example/main.go -bind 0.0.0.0:443 -www /usr/local/nginx/html/ -cert ../../certs/prett3.com.crt -key ../../certs/prett3.com.key")
+        os.system("sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz")
+        os.system("sudo rm go1.24.2.linux-amd64.tar.gz")
+
+        # clone Quic-Go
+        os.system("git clone https://github.com/quic-go/quic-go.git")
+        os.chdir("quic-go")
+        os.system("git checkout tags/v0.50.1")
+
+        # run
+        os.system("sudo /usr/local/go/bin/go run example/main.go -bind 0.0.0.0:443 -www /usr/local/nginx/html/ -cert ../certs/prett3.com.crt -key ../certs/prett3.com.key")
 
 def install_msquic_kestrel(version):
     if version == '2.4.8':
@@ -196,16 +205,16 @@ def install_msquic_kestrel(version):
 
         # install msquic library
         os.system("wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | sudo apt-key add -")
-        os.system("sudo add-apt-repository \"deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-$(lsb_release -cs)-prod $(lsb_release -cs) main\"")
+        os.system("sudo add-apt-repository -y \"deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-$(lsb_release -cs)-prod $(lsb_release -cs) main\"")
         os.system("sudo apt update")
-        # install the latest (2.4.8) libmsquic. Previous versions causes problems https://github.com/dotnet/runtime/issues/105788
+        # install the latest (2.4.8) libmsquic. Previous versions cause problems https://github.com/dotnet/runtime/issues/105788
         os.system("sudo apt install -y libmsquic=2.4.8")
 
         # install .NET SDK. msquic needs it https://github.com/microsoft/msquic/blob/main/docs/BUILD.md
         # https://learn.microsoft.com/en-us/dotnet/core/install/linux-ubuntu-install
-        os.system("sudo add-apt-repository ppa:dotnet/backports")
+        os.system("sudo add-apt-repository ppa:dotnet/backports -y")
         os.system("sudo apt update")
-        os.system("sudo apt install -y dotnet-sdk-9.0=9.0.203-1")
+        os.system("sudo apt install dotnet-sdk-9.0=9.0.203-1 -y")
 
         # create and run .NET project
         os.system("dotnet new web -n msquic_kestrel")
