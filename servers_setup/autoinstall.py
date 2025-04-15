@@ -251,7 +251,25 @@ def install_neqo(version):
         # run Neqo's test server
         os.system("sudo ./target/debug/neqo-server 0.0.0.0:443 -v")
 
+def install_aioquic(version):
+    if version == '1.2.0':
+        os.system("sudo rm -rf ./aioquic")
 
+        # install dependencies
+        os.system("sudo apt install -y python3-pip")
+        os.system("sudo pip3 install aioquic==1.2.0 wsproto==1.2.0 starlette==0.46.2 jinja2==3.1.6")
+
+        # clone aioquic test server
+        os.system("git clone https://github.com/aiortc/aioquic.git")
+        os.chdir("aioquic")
+        os.system("git checkout tags/1.2.0")
+
+        # backup the default index.html and replace with the one we always use
+        os.system("cp ./examples/templates/index.html ./examples/templates/index.html.bak")
+        os.system("cp /usr/local/nginx/html/index.html ./examples/templates/index.html")
+
+        # run
+        os.system("sudo python3 ./examples/http3_server.py -c ../certs/prett3.com.pem -k ../certs/prett3.com.key --port 443 -v")
         
 
 
@@ -267,6 +285,7 @@ if __name__ == '__main__':
     "- quic-go\n"
     "- msquic-kestrel\n"
     "- neqo\n"
+    "- aioquic\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -278,6 +297,7 @@ if __name__ == '__main__':
     "- 0.50.1 \t (for quic-go)\n"
     "- 2.4.8 \t (for msquic-kestrel)\n"
     "- 0.13.1 \t (for neqo)\n"
+    "- 1.2.0 \t (for aioquic)\n"
     )
     args = parser.parse_args()
     server = args.server
@@ -307,5 +327,7 @@ if __name__ == '__main__':
         install_msquic_kestrel(version)
     elif server == "neqo":
         install_neqo(version)
-
+    elif server == "aioquic":
+        install_aioquic(version)
+    
 
