@@ -5,7 +5,7 @@ from aioquic.h3.connection import FrameType, StreamType
 from aioquic.quic.rangeset import RangeSet
 from aioquic.buffer import Buffer
 import util
-from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
+from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS, GREASE_ABBREVIATION
 
 @dataclass
 class Stream():
@@ -108,7 +108,8 @@ class MSGHandler():
                 
                 msg_per_layer += f'{QUIC_FRAME_ABBREVIATIONS[frame_type]}({stream.stream_id})'
                 
-                http3_stream_msg = self.process_http3_payload(stream)    
+                http3_stream_msg = self.process_http3_payload(stream) 
+                print("http3_stream_msg = {}".format(http3_stream_msg))   
                 msg_per_layer += "[{}],".format(http3_stream_msg)
                 #print(">>> {}".format(http3_stream_msg))
                 
@@ -159,6 +160,7 @@ class MSGHandler():
             
         self.previous_quic_payloads.append( plain )
 
+        print("final = {}".format( util.beautify_message_string(msg_per_layer, exclude_opt_server_frames=True) ))
         return util.beautify_message_string(msg_per_layer, exclude_opt_server_frames=True)
     
 
@@ -187,6 +189,10 @@ class MSGHandler():
             # if stream offset is not 0, the stream has already been initiated, and therefore the first byte does not indicate the stream type
             if received_stream.offset == 0:
                 stream.uni_stream_type = buf.pull_uint_var()
+
+                # if stream type is random/unknown, it is GREASE
+                if stream.uni_stream_type > 1000:
+                    return GREASE_ABBREVIATION
             else:
                 pass
 
@@ -209,7 +215,9 @@ class MSGHandler():
             if stream.unfinished_h3_frame_type is None:
                 frame_type = buf.pull_uint_var()
                 frame_len = buf.pull_uint_var()
-                msg_http3 += H3_FRAME_ABBREVIATIONS[frame_type]+","
+
+                # if frame type is unknown, it is GREASE
+                msg_http3 += H3_FRAME_ABBREVIATIONS.get( frame_type, GREASE_ABBREVIATION ) + ","
             else:
                 frame_type = stream.unfinished_h3_frame_type
                 frame_len = stream.unfinished_h3_frame_len_to_read
@@ -233,7 +241,6 @@ class MSGHandler():
                 stream.unfinished_h3_frame_len_to_read = frame_len - left_data
                 #print("Frame data length to read in the next stream {}".format( stream.unfinished_h3_frame_len_to_read ))
                 
-            
         return util.beautify_message_string(msg_http3, exclude_opt_server_frames=True) if msg_http3 != '' else "\u2298"
       
     def handle_padding_frame(

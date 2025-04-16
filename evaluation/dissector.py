@@ -81,7 +81,7 @@ class MSGDissector():
                 #print(layer)
                 
                 for field in layer.frame.fields:
-                   
+                    print(field)
                     if 'STREAM' in field.showname:
                         self.quic_frames.append( self._dissect_stream_frame(field.showname) )
                     elif 'ACK' in field.showname:
@@ -91,6 +91,8 @@ class MSGDissector():
                     elif 'PADDING' in field.showname:
                         pass
                     elif 'CRYPTO' in field.showname or 'PING' in field.showname:
+                        pass
+                    elif 'CONNECTION_CLOSE' in field.showname:
                         pass
                     else:
                         print(field)

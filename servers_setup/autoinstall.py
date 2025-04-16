@@ -179,7 +179,7 @@ def install_quiche(version):
         os.system("git submodule update --init --recursive") # retrieve submodules, such as boringssl
 
         # build and run
-        os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo run --bin quiche-server -- --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --name prett3.com")
+        os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo run --bin quiche-server -- --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
         
 
 def install_quic_go(version):

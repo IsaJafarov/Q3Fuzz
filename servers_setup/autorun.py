@@ -45,7 +45,7 @@ def run_h2o(version):
 def run_quiche(version):
     if version == '0.23.5':
         os.chdir("quiche")
-        os.system("sudo ./target/debug/quiche-server --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --name prett3.com")
+        os.system("sudo ./target/debug/quiche-server --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
 
 def run_quic_go(version):
     if version == '0.50.1':
@@ -69,7 +69,7 @@ def run_aioquic(version):
         
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='HTTP/3 web servers runner')
+    parser = argparse.ArgumentParser(description='HTTP/3 web servers runner', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("server", help="supported servers \n\t"
     "- nginx\n"
     "- caddy\n"
