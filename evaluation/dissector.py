@@ -81,7 +81,6 @@ class MSGDissector():
                 #print(layer)
                 
                 for field in layer.frame.fields:
-                    print(field)
                     if 'STREAM' in field.showname:
                         self.quic_frames.append( self._dissect_stream_frame(field.showname) )
                     elif 'ACK' in field.showname:

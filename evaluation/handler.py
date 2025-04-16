@@ -109,7 +109,6 @@ class MSGHandler():
                 msg_per_layer += f'{QUIC_FRAME_ABBREVIATIONS[frame_type]}({stream.stream_id})'
                 
                 http3_stream_msg = self.process_http3_payload(stream) 
-                print("http3_stream_msg = {}".format(http3_stream_msg))   
                 msg_per_layer += "[{}],".format(http3_stream_msg)
                 #print(">>> {}".format(http3_stream_msg))
                 
@@ -160,7 +159,6 @@ class MSGHandler():
             
         self.previous_quic_payloads.append( plain )
 
-        print("final = {}".format( util.beautify_message_string(msg_per_layer, exclude_opt_server_frames=True) ))
         return util.beautify_message_string(msg_per_layer, exclude_opt_server_frames=True)
     
 

@@ -112,9 +112,8 @@ H3_FRAME_ABBREVIATIONS = {
     "GOAWAY": "GO",
     "MAX_PUSH_ID": "MPI",
     "RESERVED": "RE",
-    "PRIORITY_UPDATE": "PU",
-    "GREASE": "GR"
-}
+    "PRIORITY_UPDATE": "PU"
+    }
 
 GREASE_ABBREVIATION = "GR"
 
