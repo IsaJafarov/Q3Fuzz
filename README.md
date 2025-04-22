@@ -12,4 +12,7 @@ $ pip3 install aioquic==1.2.0
 $ pip3 install networkx==3.1
 $ pip3 install hypothesis==6.113.0
 $ pip3 install rich
+$ pip3 install transitions[diagrams]
 ```
+
+- To communicate with the web servers, import root-ca.crt in your browser.
