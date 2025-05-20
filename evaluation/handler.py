@@ -79,7 +79,10 @@ class MSGHandler():
 
 
             if frame_type < 0x08 or frame_type > 0x0F: # not STREAM frame
-                msg_per_layer += QUIC_FRAME_ABBREVIATIONS[frame_type]+","
+                if frame_type == 0x05: # Record STOP_SENDING stream ID after handle_stop_sending_frame()
+                    pass
+                else:
+                    msg_per_layer += QUIC_FRAME_ABBREVIATIONS[frame_type]+","
            
             # a condition for each frame type can be added
             if frame_type==0x00: # PADDING frame
@@ -95,7 +98,8 @@ class MSGHandler():
                 self.handle_reset_stream_frame(context, frame_type, buf)
                 
             elif frame_type==0x05:
-                self.handle_stop_sending_frame(context, frame_type, buf)
+                stream_id, error_code = self.handle_stop_sending_frame(context, frame_type, buf)
+                msg_per_layer += f'{QUIC_FRAME_ABBREVIATIONS[frame_type]}({stream_id})'+","
                 
             elif frame_type==0x06: # CRYPTO frame
                 self.handle_crypto(context, frame_type, buf)
@@ -489,6 +493,8 @@ class MSGHandler():
         """
         stream_id = buf.pull_uint_var()
         error_code = buf.pull_uint_var()  # application error code
+
+        return stream_id, error_code
 
         # print("\033[31m\nSTOP_SENDING frame received. Stream ID={}, Error Code={}\033[0m"
         #       .format(stream_id, error_code))
