@@ -287,8 +287,8 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
 def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData) -> None:
     # Mergable
     if md.src_s is not None and md.dst_s is not None:
-        if len(sm.get_transitions(trigger=md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name)) > 0:
-            return
+        # if len(sm.get_transitions(trigger=md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name)) > 0:
+        #     return
         sm.add_transition(md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name, conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
     # Unique
     else:
@@ -300,11 +300,17 @@ def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData)
             sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest='FINISH', conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
         # Non-finished
         else:
+            if cand_s.msg_rcvd_str:
+                ss_stream_ids = util.extract_stop_sending_stream_ids(cand_s.msg_rcvd_str)
+                for ss_id in ss_stream_ids:
+                    cand_s.blocked_stream_ids.add(ss_id)
+                    print(f"\033[31m[DEBUG] Unique state {cand_s.name}: Detected STOP_SENDING for stream {ss_id}, now blocked in this state.\033[0m")
+
             pm.state_list.add_state(cand_s)
             sm.add_state(cand_s.name)
             sm.add_transition(md.t_label + "\n", source=cand_s.parent_state.name, dest=cand_s.name, conditions="packet_number:{}".format(cand_s.msg_sent.quic.packet_number))
             # Explicitly add finishing transition
-            sm.add_transition("CLOSE", source=cand_s.name, dest='FINISH')
+            sm.add_transition("CC", source=cand_s.name, dest='FINISH')
 
 def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) -> None:
     # Find candidate states in the next level from leaf states found in the current level.
@@ -322,7 +328,18 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
         skipped_messages = 0
         for msg_sent in pm.testmsgs:
             msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
+
+            ## SKIP TEST 1 (connection establishment?)
             if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
+                skipped_messages += 1
+                continue
+
+            ## SKIP TEST 2 (blocked stream ID?)
+            # Extract stream IDs from the test message string
+            stream_ids_in_msg = util.extract_stream_ids_from_msg_str(msg_sent_str)
+            # If any stream ID in the message is blocked for the current state, skip this test message
+            if any(sid in leaf_state.blocked_stream_ids for sid in stream_ids_in_msg):
+                print(f"\033[31m[SKIP] Testmsg for state '{leaf_state.name}' contains blocked stream ID(s): {stream_ids_in_msg & leaf_state.blocked_stream_ids}\033[0m")
                 skipped_messages += 1
                 continue
 
@@ -377,7 +394,17 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
 
             for msg_sent in pm.testmsgs:
                 msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
+
+                ## SKIP TEST 1 (connection establishment?)
                 if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
+                    continue
+
+                ## SKIP TEST 1 (blocked stream ID?)
+                # Extract stream IDs from the test message string
+                stream_ids_in_msg = util.extract_stream_ids_from_msg_str(msg_sent_str)
+                # If any stream ID in the message is blocked for the current candidate state, skip this test message
+                if any(sid in cand_s.blocked_stream_ids for sid in stream_ids_in_msg):
+                    print(f"\033[31m[SKIP] Testmsg for state '{cand_s.name}' contains blocked stream ID(s): {stream_ids_in_msg & cand_s.blocked_stream_ids}\033[0m")
                     continue
 
                 h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc)

@@ -10,6 +10,10 @@ class State:
 		self.msg_sent:Packet = msg_sent # Pyshark packet: Requested QUIC and HTTP/3 message to reach this state from its parent
 		self.msg_rcvd_str:str = msg_rcvd_str # Str: Responsed QUIC and HTTP/3 message to reach this state from its parent
 		self.child_sr_dict:dict = child_sr_dict
+		self.blocked_stream_ids:set = set()
+
+	def is_stream_id_blocked(self, stream_id: int) -> bool:
+		return stream_id in self.blocked_stream_ids
 
 class StateList:
 	def __init__(self, state_list:List[State]=[]):

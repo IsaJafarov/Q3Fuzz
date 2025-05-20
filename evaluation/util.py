@@ -2,6 +2,7 @@
 # Modules for HTTP3
 import pyshark
 import difflib
+import re
 from termcolor import colored
 from collections import OrderedDict
 from typing import List, Union
@@ -136,40 +137,57 @@ class Tee(object):
 def cmp(a, b):
     return (a > b) - (a < b)
 
+## LOOSE COMPARE
 def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict) -> bool:
-    """Compare two OrderedDicts for a given state and return True if all values are the same, otherwise return False.
-       If differences exist, print a report with the state name and highlight the changed values."""
-    
-    all_keys = dict1.keys()
-    unchanged_items = []
-    changed_items = []
+    """
+    Return True if for each key in dict2:
+      - If key exists in dict1: every frame in dict2[key] (comma-split) exists in dict1[key] (comma-split)
+      - If key missing in dict1: ignore
+    Otherwise, return False. 
+    """
+    subset = True
 
-    for key in all_keys:
-        val1 = str(dict1[key])
+    for key in dict2:
         val2 = str(dict2[key])
+        if key not in dict1:
+            # print(f"[DEBUG][{state_name}] Key '{key}' exists in dict2 but is missing in dict1 (IGNORED).")
+            continue  # Ignore missing keys in dict1
 
-        if val1 == val2:
-            unchanged_items.append((key, val1))
-        else:
-            changed_items.append((key, val1, val2))
+        val1 = str(dict1[key])
 
-    # If there are no changes, return True without printing anything
-    if not changed_items:
-        return True
+        # Split by comma, strip spaces
+        frames2 = set(f.strip() for f in val2.split(',') if f.strip())
+        frames1 = set(f.strip() for f in val1.split(',') if f.strip())
 
-    ### FOR DEBUGGING USE 
-    """
-    # Print only if there are differences
-    print(colored(f"\n[DIFFERENCE REPORT] - State: {state_name}", "cyan", attrs=["bold"]))
+        # If any frame in frames2 is missing from frames1 → not a subset!
+        missing = frames2 - frames1
+        if missing:
+            print(f"[DEBUG][{state_name}] Key '{key}' frames missing in dict1: {missing}")
+            subset = False
 
-    # Print changed items
-    print(colored("\n⚠️ Changed Items:", "yellow", attrs=["bold"]))
-    for key, val1, val2 in changed_items:
-        print(colored(f"  🔄 {key}:", "blue", attrs=["bold"]))
-        print(highlight_differences(val1, val2))
-    print('\n')
-    """
-    return False  # Return False if differences exist
+    return subset
+
+## STRICT COMPARE
+# def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict) -> bool:
+#     """
+#     Return True if all key-value pairs in dict2 that also exist in dict1 match in value.
+#     Keys in dict2 missing from dict1 are ignored (not considered mismatch).
+#     For debugging, prints differences where values differ.
+#     """
+#     subset = True
+
+#     for key in dict2:
+#         val2 = str(dict2[key])
+#         if key not in dict1:
+#             # Just debug print, but do not count as mismatch
+#             # print(f"[DEBUG][{state_name}] Key '{key}' exists in dict2 but is missing in dict1 (IGNORED).")
+#             continue  # Skip this key, do not mark as False
+
+#         if str(dict1[key]) != val2:
+#             print(f"[DEBUG][{state_name}] Key '{key}' has different values: dict1='{dict1[key]}', dict2='{val2}'")
+#             subset = False
+
+#     return subset
 
 def highlight_differences(str1: str, str2: str) -> str:
     """Generate a visual diff highlighting changes between two strings."""
@@ -199,6 +217,19 @@ def get_frames_of_layer(layer:XmlLayer) -> List[str]:
                 frame_names.append( H3_FRAME_ABBREVIATIONS[ field_value.upper() ] )
     
     return frame_names
+
+def extract_stop_sending_stream_ids(msg_rcvd_str: str) -> set:
+    """
+    Extract all stream IDs from STOP_SENDING (SS) frames in a message string.
+    Example matches: "SS(2)", "SS(10)", etc.
+    """
+    return set(int(m.group(1)) for m in re.finditer(r'SS\((\d+)\)', msg_rcvd_str))
+
+def extract_stream_ids_from_msg_str(msg_sent_str: str) -> set:
+    """
+    Extract all stream IDs from ST(x) patterns in a message string.
+    """
+    return set(int(m.group(1)) for m in re.finditer(r'ST\((\d+)\)', msg_sent_str))
 
 
 def h3msg_from_pcap(file_path:str, keylog_file:str, client_only:bool=False) -> List[Packet]: # for HTTP3
