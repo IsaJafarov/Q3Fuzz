@@ -7,6 +7,7 @@ import argparse
 import ssl
 import pyshark.packet
 import pyshark.packet.fields
+from pathlib import Path
 from rich.traceback import install
 
 # aioquic module
@@ -31,27 +32,34 @@ from crafter import MSGCrafter
 import util
 import statemachine as stma
 
+EVALUATION_DIR = Path(__file__).parent.resolve()
 
-
-
-def init(args) -> str:
+def init(args) -> Path:
     print("\n[STEP 1] Initializing...")
-    os.system("rm -r __pycache__")
-    
-    # Create result directory, if it doesn't already exist
-    output_dir = "result"
-    
-    # write it in try block, in case the pcap file has a weird name
-    try: 
-        output_dir += "/{}".format( args.pcap.split("/")[-1].split(".")[-2] )
-    except: pass
 
-    os.system( "mkdir -p {}".format(output_dir) )
+    # Remove __pycache__ directory if it exists
+    pycache_dir = EVALUATION_DIR / "__pycache__"
+    if pycache_dir.exists():
+        import shutil
+        shutil.rmtree(pycache_dir)
+
+    # Create the result directory based on script location
+    output_dir = EVALUATION_DIR / "result_new"
+
+    # If possible, append a name part from the pcap file to the output directory
+    try:
+        pcap_name = Path(args.pcap).stem  # e.g., 'traffic_x' from 'traffic_x.pcap'
+        output_dir = output_dir / pcap_name
+    except Exception:
+        pass
+
+    # Create the output directory (and parents) if it doesn't exist
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     SERVER_ADDR = args.url
     pcapfile = args.pcap
 
-    print("  [+] Initializing done!\n    => pcap : %s, SERVER_ADDR : %s" % (pcapfile, SERVER_ADDR))
+    print(f"  [+] Initializing done!\n    => pcap : {pcapfile}, SERVER_ADDR : {SERVER_ADDR}")
     return output_dir
 
 
@@ -105,15 +113,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "-dk",
         "--decrypt_keylog",
-        default="./sample_traffics/secrets.keylog",
+        default=str(EVALUATION_DIR / "secrets.keylog"),
         type=str,
-        help="SSLKEYLOG file to decrypt the traffic files (default ./sample_traffics/secrets.keylog)",
+        help="Path to SSLKEYLOGFIEL to decrypt the input pcap (default: ./sample_traffics/secrets.keylog)",
     )
     parser.add_argument(
         "-ok",
         "--output_keylog",
+        default=str(EVALUATION_DIR / "secrets.keylog"),
         type=str,
-        help="File path to log new traffic secrets",
+        help="Path to SSLKEYLOGFILE to decrypt the running conneciton (default=./secrets.keylog)",
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="increase logging verbosity"
