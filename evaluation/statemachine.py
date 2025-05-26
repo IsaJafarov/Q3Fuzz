@@ -399,7 +399,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
                 if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
                     continue
 
-                ## SKIP TEST 1 (blocked stream ID?)
+                ## SKIP TEST 2 (blocked stream ID?)
                 # Extract stream IDs from the test message string
                 stream_ids_in_msg = util.extract_stream_ids_from_msg_str(msg_sent_str)
                 # If any stream ID in the message is blocked for the current candidate state, skip this test message

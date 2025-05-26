@@ -19,7 +19,7 @@ DK_OPT="-dk sample_traffics/secrets.keylog"
 OK_OPT="-ok secrets.keylog"
 
 # 3) Define available server_version combinations
-server_versions=("cdy_n" "cdy_o" "h2o_n" "h2o_o" "ng_n" "ng_o" "ols_n" "ols_o")
+server_versions=("cdy_m" "cdy_o" "h2o_m" "h2o_o" "ng_m" "ng_o" "ols_m" "ols_o")
 
 ########################################
 # 0. Preliminary checks and setup
@@ -116,9 +116,9 @@ for SELECTED_PCAP in "${matching_files[@]}"; do
 
   sudo python3 prett3_syn.py \
     "${PRETT3_URL}" \
-    "${SELECTED_PCAP}" \
-    ${DK_OPT} \
-    ${OK_OPT}
+    "${SELECTED_PCAP}"
+    # ${DK_OPT} \
+    # ${OK_OPT}
 
   # Move output files to the target directory
   mv "${RESULT_DIR}"/*.png "${TARGET_RESULT_DIR}" 2>/dev/null

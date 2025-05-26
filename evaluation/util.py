@@ -138,56 +138,56 @@ def cmp(a, b):
     return (a > b) - (a < b)
 
 ## LOOSE COMPARE
-def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict) -> bool:
-    """
-    Return True if for each key in dict2:
-      - If key exists in dict1: every frame in dict2[key] (comma-split) exists in dict1[key] (comma-split)
-      - If key missing in dict1: ignore
-    Otherwise, return False. 
-    """
-    subset = True
-
-    for key in dict2:
-        val2 = str(dict2[key])
-        if key not in dict1:
-            # print(f"[DEBUG][{state_name}] Key '{key}' exists in dict2 but is missing in dict1 (IGNORED).")
-            continue  # Ignore missing keys in dict1
-
-        val1 = str(dict1[key])
-
-        # Split by comma, strip spaces
-        frames2 = set(f.strip() for f in val2.split(',') if f.strip())
-        frames1 = set(f.strip() for f in val1.split(',') if f.strip())
-
-        # If any frame in frames2 is missing from frames1 → not a subset!
-        missing = frames2 - frames1
-        if missing:
-            print(f"[DEBUG][{state_name}] Key '{key}' frames missing in dict1: {missing}")
-            subset = False
-
-    return subset
-
-## STRICT COMPARE
 # def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict) -> bool:
 #     """
-#     Return True if all key-value pairs in dict2 that also exist in dict1 match in value.
-#     Keys in dict2 missing from dict1 are ignored (not considered mismatch).
-#     For debugging, prints differences where values differ.
+#     Return True if for each key in dict2:
+#       - If key exists in dict1: every frame in dict2[key] (comma-split) exists in dict1[key] (comma-split)
+#       - If key missing in dict1: ignore
+#     Otherwise, return False. 
 #     """
 #     subset = True
 
 #     for key in dict2:
 #         val2 = str(dict2[key])
 #         if key not in dict1:
-#             # Just debug print, but do not count as mismatch
 #             # print(f"[DEBUG][{state_name}] Key '{key}' exists in dict2 but is missing in dict1 (IGNORED).")
-#             continue  # Skip this key, do not mark as False
+#             continue  # Ignore missing keys in dict1
 
-#         if str(dict1[key]) != val2:
-#             print(f"[DEBUG][{state_name}] Key '{key}' has different values: dict1='{dict1[key]}', dict2='{val2}'")
+#         val1 = str(dict1[key])
+
+#         # Split by comma, strip spaces
+#         frames2 = set(f.strip() for f in val2.split(',') if f.strip())
+#         frames1 = set(f.strip() for f in val1.split(',') if f.strip())
+
+#         # If any frame in frames2 is missing from frames1 → not a subset!
+#         missing = frames2 - frames1
+#         if missing:
+#             print(f"[DEBUG][{state_name}] Key '{key}' frames missing in dict1: {missing}")
 #             subset = False
 
 #     return subset
+
+## STRICT COMPARE
+def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict) -> bool:
+    """
+    Return True if all key-value pairs in dict2 that also exist in dict1 match in value.
+    Keys in dict2 missing from dict1 are ignored (not considered mismatch).
+    For debugging, prints differences where values differ.
+    """
+    subset = True
+
+    for key in dict2:
+        val2 = str(dict2[key])
+        if key not in dict1:
+            # Just debug print, but do not count as mismatch
+            # print(f"[DEBUG][{state_name}] Key '{key}' exists in dict2 but is missing in dict1 (IGNORED).")
+            continue  # Skip this key, do not mark as False
+
+        if str(dict1[key]) != val2:
+            print(f"[DEBUG][{state_name}] Key '{key}' has different values: dict1='{dict1[key]}', dict2='{val2}'")
+            subset = False
+
+    return subset
 
 def highlight_differences(str1: str, str2: str) -> str:
     """Generate a visual diff highlighting changes between two strings."""
