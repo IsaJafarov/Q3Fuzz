@@ -137,55 +137,69 @@ class Tee(object):
 def cmp(a, b):
     return (a > b) - (a < b)
 
-## LOOSE COMPARE
-# def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict) -> bool:
-#     """
-#     Return True if for each key in dict2:
-#       - If key exists in dict1: every frame in dict2[key] (comma-split) exists in dict1[key] (comma-split)
-#       - If key missing in dict1: ignore
-#     Otherwise, return False. 
-#     """
-#     subset = True
+import re
+from collections import OrderedDict
 
-#     for key in dict2:
-#         val2 = str(dict2[key])
-#         if key not in dict1:
-#             # print(f"[DEBUG][{state_name}] Key '{key}' exists in dict2 but is missing in dict1 (IGNORED).")
-#             continue  # Ignore missing keys in dict1
-
-#         val1 = str(dict1[key])
-
-#         # Split by comma, strip spaces
-#         frames2 = set(f.strip() for f in val2.split(',') if f.strip())
-#         frames1 = set(f.strip() for f in val1.split(',') if f.strip())
-
-#         # If any frame in frames2 is missing from frames1 → not a subset!
-#         missing = frames2 - frames1
-#         if missing:
-#             print(f"[DEBUG][{state_name}] Key '{key}' frames missing in dict1: {missing}")
-#             subset = False
-
-#     return subset
-
-## STRICT COMPARE
-def compare_ordered_dict(state_name: str, dict1: OrderedDict, dict2: OrderedDict) -> bool:
+def compare_sr_pairs(state_name: str, dict1: OrderedDict, dict2: OrderedDict, mode: str = "nostrid") -> bool:
     """
-    Return True if all key-value pairs in dict2 that also exist in dict1 match in value.
-    Keys in dict2 missing from dict1 are ignored (not considered mismatch).
-    For debugging, prints differences where values differ.
+    Compare two OrderedDicts containing SR input-output pairs.
+
+    Parameters:
+        state_name (str): Debug label
+        dict1 (OrderedDict): Baseline state
+        dict2 (OrderedDict): New state to compare
+        mode (str): One of "strict", "nostrid", or "subset"
+
+    Returns:
+        bool: True if the states match under the given mode
     """
+
+    def extract_frames(s: str) -> set:
+        """
+        Parse a string like 'ST(4)[HE],ACK,CC' into set of frame types: {'HE', 'ACK', 'CC'}
+        """
+        tokens = [t.strip() for t in s.split(',') if t.strip()]
+        frames = set()
+        for t in tokens:
+            # Extract [TYPE] from ST(4)[TYPE]
+            m = re.search(r'\[(.*?)\]', t)
+            if m:
+                frames.add(m.group(1))
+            else:
+                frames.add(t)  # Includes ACK, CC, etc.
+        return frames
+
     subset = True
 
     for key in dict2:
         val2 = str(dict2[key])
         if key not in dict1:
-            # Just debug print, but do not count as mismatch
-            # print(f"[DEBUG][{state_name}] Key '{key}' exists in dict2 but is missing in dict1 (IGNORED).")
-            continue  # Skip this key, do not mark as False
+            continue
 
-        if str(dict1[key]) != val2:
-            print(f"[DEBUG][{state_name}] Key '{key}' has different values: dict1='{dict1[key]}', dict2='{val2}'")
-            subset = False
+        val1 = str(dict1[key])
+
+        if mode == "strict":
+            if val1 != val2:
+                print(f"[DEBUG][{state_name}] STRICT mismatch at key '{key}': '{val1}' != '{val2}'")
+                subset = False
+
+        elif mode == "nostrid":
+            frames1 = extract_frames(val1)
+            frames2 = extract_frames(val2)
+            if frames1 != frames2:
+                print(f"[DEBUG][{state_name}] NOSTRID mismatch at key '{key}': {frames1} != {frames2}")
+                subset = False
+
+        elif mode == "subset":
+            frames1 = extract_frames(val1)
+            frames2 = extract_frames(val2)
+            missing = frames2 - frames1
+            if missing:
+                print(f"[DEBUG][{state_name}] SUBSET missing frames at key '{key}': {missing}")
+                subset = False
+
+        else:
+            raise ValueError(f"Invalid comparison mode: {mode}")
 
     return subset
 

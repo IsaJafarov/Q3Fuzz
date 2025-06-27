@@ -245,7 +245,7 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
         # Case 1. Parent:
         # Compare its SR dict with that of its parent
         target_state = cand_s.parent_state.name + " (its parent)"
-        if util.compare_ordered_dict(target_state, cand_s.parent_state.child_sr_dict, cand_s.child_sr_dict):
+        if util.compare_sr_pairs(target_state, cand_s.parent_state.child_sr_dict, cand_s.child_sr_dict):
             md.src_s = cand_s.parent_state
             md.dst_s = cand_s.parent_state
             return True
@@ -259,7 +259,7 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
             if state_v.parent_state is not None and state_v.parent_state.name == cand_s.parent_state.name:  #
                 # siblings; same parent
                 target_state = state_v.name + " (its sibling)"
-                if util.compare_ordered_dict(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
+                if util.compare_sr_pairs(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
                     md.src_s = cand_s.parent_state
                     md.dst_s = state_v
                     return True
@@ -273,7 +273,7 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
                 continue
             if state_v.parent_state is None or state_v.parent_state.name != cand_s.parent_state.name:  # relative; different parent or ancestor
                 target_state = state_v.name + " (its relative)"
-                if util.compare_ordered_dict(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
+                if util.compare_sr_pairs(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
                     md.src_s = cand_s.parent_state
                     md.dst_s = state_v
                     return True

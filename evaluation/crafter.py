@@ -110,9 +110,11 @@ class MSGCrafter():
             stream_type |= 4  # Include OFF bit
         
 
-        # During SM generation, we will not include the FIN. So that one stream frame will not close the stream and all stream frames will freely carry data.
-        #if quic_frame.fin_bit:
-        #    stream_type |= 1  # Include FIN bit
+        # Comment out below so that one stream frame will not close the stream and all stream frames will freely carry data.
+        # (NOTE) In case of H2O, the unset fin_bit makes the server answer no HEADER or DATA to HEADER request.
+        if quic_frame.fin_bit:
+           stream_type |= 1  # Include FIN bit
+        
 
         # Combine all HTTP/3 frames into a single payload
         h3_frame_payload = None
