@@ -35,6 +35,11 @@ class H3Settings:
     blocked_streams:int = None
     h3_datagram:int = None
     webtransport:int = None
+
+@dataclass
+class QuicMaxStreams:
+    maximum_streams:int = None
+
     
 @dataclass
 class H3Headers:
@@ -79,9 +84,13 @@ class MSGDissector():
         for layer in message.layers:
             if layer.layer_name == 'quic':
                 #print(layer)
-                
+                #print(dir(layer))
+                                
                 for field in layer.frame.fields:
-                    if 'STREAM' in field.showname:
+                    
+                    if 'MAX_STREAMS' in field.showname:
+                        self.quic_frames.append( self._dissect_max_streams_frame(layer) )
+                    elif 'STREAM' in field.showname:
                         self.quic_frames.append( self._dissect_stream_frame(field.showname) )
                     elif 'ACK' in field.showname:
                         self.quic_frames.append( self._dissect_ack_frame(layer) )
@@ -319,3 +328,10 @@ class MSGDissector():
 
         return qpack_decoder
 
+    def _dissect_max_streams_frame(self, layer:XmlLayer) -> QuicMaxStreams:
+        
+        max_streams = QuicMaxStreams()
+        
+        max_streams.maximum_streams = layer.ms_max_streams
+        
+        return max_streams
