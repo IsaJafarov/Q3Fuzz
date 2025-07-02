@@ -11,6 +11,8 @@ def run_caddy(version):
         os.chdir("caddy-2.7.6")
     elif version=='2.8.4':
         os.chdir("caddy-2.8.4")
+    elif version=='2.10.0':
+        os.chdir("caddy-2.10.0")
     os.system("sudo ./caddy run")
 
 def run_nginx(version):
@@ -84,7 +86,7 @@ if __name__ == '__main__':
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
     "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n"
-    "- 2.4.6, 2.7.6, 2.8.4\t(for caddy) \n"
+    "- 2.4.6, 2.7.6, 2.8.4, 2.10.0\t(for caddy) \n"
     "- a429117, 222b36d or 16b13ee\t(for h2o) \n"
     "- 1.7.15 or 1.8.1\t(for ols)\n"
     "- 0.23.5 \t(for quiche)\n"
