@@ -37,7 +37,7 @@
     {
       "source": "CONNECTED",
       "dest": "2",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]

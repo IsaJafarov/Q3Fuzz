@@ -36,8 +36,8 @@
       ]
     },
     {
-      "source": "5",
-      "dest": "5",
+      "source": "6",
+      "dest": "6",
       "trigger": "ST(2)[SE] => ACK\n",
       "conditions": [
         "packet_number:11"
@@ -46,15 +46,15 @@
     {
       "source": "CONNECTED",
       "dest": "2",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS(0),ST(0)[HE,DA]\n",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
       "conditions": [
         "packet_number:12"
       ]
     },
     {
       "source": "3",
-      "dest": "5",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS(0),ST(0)[HE,DA]\n",
+      "dest": "6",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
       "conditions": [
         "packet_number:12"
       ]
@@ -70,32 +70,56 @@
       "trigger": "CC"
     },
     {
-      "source": "5",
+      "source": "6",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
       "source": "CONNECTED",
       "dest": "3",
-      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,SS(4),ST(4)[HE]\n",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,ST(4)[HE]\n",
       "conditions": [
         "packet_number:16"
       ]
     },
     {
       "source": "2",
-      "dest": "5",
-      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,SS(4),ST(4)[HE]\n",
+      "dest": "6",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,ST(4)[HE]\n",
       "conditions": [
         "packet_number:16"
       ]
     },
     {
-      "source": "5",
-      "dest": "5",
+      "source": "2",
+      "dest": "2",
       "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
       "conditions": [
         "packet_number:12"
+      ]
+    },
+    {
+      "source": "6",
+      "dest": "6",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:12"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "3",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:16"
+      ]
+    },
+    {
+      "source": "6",
+      "dest": "6",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:16"
       ]
     }
   ],
@@ -119,7 +143,7 @@
       "name": "3"
     },
     {
-      "name": "5"
+      "name": "6"
     }
   ],
   "before_state_change": [],

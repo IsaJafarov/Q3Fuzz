@@ -36,24 +36,24 @@
       ]
     },
     {
-      "source": "10",
-      "dest": "17",
+      "source": "11",
+      "dest": "19",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
       "conditions": [
         "packet_number:1"
       ]
     },
     {
-      "source": "15",
-      "dest": "22",
+      "source": "16",
+      "dest": "24",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
       "conditions": [
         "packet_number:1"
       ]
     },
     {
-      "source": "26",
-      "dest": "33",
+      "source": "28",
+      "dest": "36",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
       "conditions": [
         "packet_number:1"
@@ -85,39 +85,39 @@
       "trigger": "CC"
     },
     {
-      "source": "10",
+      "source": "11",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
-      "source": "15",
+      "source": "16",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
-      "source": "17",
+      "source": "19",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
-      "source": "22",
+      "source": "24",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
-      "source": "26",
+      "source": "28",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
-      "source": "33",
+      "source": "36",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
       "source": "CONNECTED",
       "dest": "2",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]
@@ -125,39 +125,39 @@
     {
       "source": "1",
       "dest": "6",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]
     },
     {
       "source": "3",
-      "dest": "10",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "dest": "11",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]
     },
     {
       "source": "7",
-      "dest": "17",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "dest": "19",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]
     },
     {
-      "source": "15",
-      "dest": "26",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "source": "16",
+      "dest": "28",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]
     },
     {
-      "source": "22",
-      "dest": "33",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "source": "24",
+      "dest": "36",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]
@@ -180,7 +180,7 @@
     },
     {
       "source": "2",
-      "dest": "10",
+      "dest": "11",
       "trigger": "ST(6)[Enc] => ACK\n",
       "conditions": [
         "packet_number:3"
@@ -196,7 +196,7 @@
     },
     {
       "source": "6",
-      "dest": "17",
+      "dest": "19",
       "trigger": "ST(6)[Enc] => ACK\n",
       "conditions": [
         "packet_number:3"
@@ -211,40 +211,40 @@
       ]
     },
     {
-      "source": "10",
-      "dest": "10",
+      "source": "11",
+      "dest": "11",
       "trigger": "ST(6)[Enc] => ACK\n",
       "conditions": [
         "packet_number:3"
       ]
     },
     {
-      "source": "15",
-      "dest": "15",
+      "source": "16",
+      "dest": "16",
       "trigger": "ST(6)[Enc] => ACK\n",
       "conditions": [
         "packet_number:3"
       ]
     },
     {
-      "source": "17",
-      "dest": "17",
+      "source": "19",
+      "dest": "19",
       "trigger": "ST(6)[Enc] => ACK\n",
       "conditions": [
         "packet_number:3"
       ]
     },
     {
-      "source": "22",
-      "dest": "22",
+      "source": "24",
+      "dest": "24",
       "trigger": "ST(6)[Enc] => ACK\n",
       "conditions": [
         "packet_number:3"
       ]
     },
     {
-      "source": "26",
-      "dest": "26",
+      "source": "28",
+      "dest": "28",
       "trigger": "ST(6)[Enc] => ACK\n",
       "conditions": [
         "packet_number:3"
@@ -307,7 +307,7 @@
       ]
     },
     {
-      "source": "17",
+      "source": "19",
       "dest": "FINISH",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,SS(2),CC\n",
       "conditions": [
@@ -315,67 +315,107 @@
       ]
     },
     {
-      "source": "22",
+      "source": "24",
       "dest": "FINISH",
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,SS(2),CC\n",
       "conditions": [
         "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "6",
+      "dest": "6",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "11",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "19",
+      "dest": "19",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "28",
+      "dest": "28",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
       ]
     },
     {
       "source": "3",
-      "dest": "15",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4)\n",
+      "dest": "16",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:8"
       ]
     },
     {
       "source": "7",
-      "dest": "22",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4)\n",
+      "dest": "24",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:8"
       ]
     },
     {
-      "source": "10",
-      "dest": "26",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4)\n",
+      "source": "11",
+      "dest": "28",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:8"
       ]
     },
     {
-      "source": "17",
-      "dest": "33",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4)\n",
+      "source": "19",
+      "dest": "36",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:8"
       ]
     },
     {
-      "source": "10",
-      "dest": "10",
-      "trigger": "ST(0)[HE] => ACK\n",
+      "source": "16",
+      "dest": "16",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
       "conditions": [
-        "packet_number:2"
+        "packet_number:8"
       ]
     },
     {
-      "source": "17",
-      "dest": "17",
-      "trigger": "ST(0)[HE] => ACK\n",
+      "source": "24",
+      "dest": "24",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
       "conditions": [
-        "packet_number:2"
+        "packet_number:8"
       ]
     },
     {
-      "source": "26",
-      "dest": "26",
-      "trigger": "ST(0)[HE] => ACK\n",
+      "source": "28",
+      "dest": "28",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
       "conditions": [
-        "packet_number:2"
+        "packet_number:8"
       ]
     }
   ],
@@ -408,22 +448,22 @@
       "name": "7"
     },
     {
-      "name": "10"
+      "name": "11"
     },
     {
-      "name": "15"
+      "name": "16"
     },
     {
-      "name": "17"
+      "name": "19"
     },
     {
-      "name": "22"
+      "name": "24"
     },
     {
-      "name": "26"
+      "name": "28"
     },
     {
-      "name": "33"
+      "name": "36"
     }
   ],
   "before_state_change": [],

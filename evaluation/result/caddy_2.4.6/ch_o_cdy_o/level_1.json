@@ -22,7 +22,7 @@
     {
       "source": "CONNECTED",
       "dest": "2",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS(0),ST(0)[HE,DA]\n",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
       "conditions": [
         "packet_number:6"
       ]
@@ -40,7 +40,7 @@
     {
       "source": "CONNECTED",
       "dest": "3",
-      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,SS(4),ST(4)[HE]\n",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ACK,ST(4)[HE]\n",
       "conditions": [
         "packet_number:11"
       ]

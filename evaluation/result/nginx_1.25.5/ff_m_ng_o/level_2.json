@@ -61,19 +61,19 @@
       "trigger": "CC"
     },
     {
-      "source": "10",
+      "source": "11",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
-      "source": "15",
+      "source": "16",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
       "source": "CONNECTED",
       "dest": "2",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]
@@ -81,15 +81,15 @@
     {
       "source": "1",
       "dest": "6",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]
     },
     {
       "source": "3",
-      "dest": "10",
-      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "dest": "11",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:2"
       ]
@@ -112,7 +112,7 @@
     },
     {
       "source": "2",
-      "dest": "10",
+      "dest": "11",
       "trigger": "ST(6)[Enc] => ACK\n",
       "conditions": [
         "packet_number:3"
@@ -159,9 +159,17 @@
       ]
     },
     {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
       "source": "3",
-      "dest": "15",
-      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4)\n",
+      "dest": "16",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:5"
       ]
@@ -196,10 +204,10 @@
       "name": "7"
     },
     {
-      "name": "10"
+      "name": "11"
     },
     {
-      "name": "15"
+      "name": "16"
     }
   ],
   "before_state_change": [],

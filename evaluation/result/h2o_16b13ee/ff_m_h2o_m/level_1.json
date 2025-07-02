@@ -25,17 +25,27 @@
       "trigger": "CC"
     },
     {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "3",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
       "source": "CONNECTED",
-      "dest": "CONNECTED",
-      "trigger": "ST(0)[HE] => ACK\n",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ST(0)[HE,DA],ACK\n",
       "conditions": [
         "packet_number:2"
       ]
     },
     {
       "source": "CONNECTED",
-      "dest": "CONNECTED",
-      "trigger": "ST(4)[HE] => ACK\n",
+      "dest": "3",
+      "trigger": "ST(4)[HE] => ST(4)[HE,DA],ACK\n",
       "conditions": [
         "packet_number:5"
       ]
@@ -56,6 +66,12 @@
     },
     {
       "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "3"
     }
   ],
   "before_state_change": [],

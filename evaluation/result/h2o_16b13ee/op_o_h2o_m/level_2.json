@@ -25,6 +25,16 @@
       "trigger": "CC"
     },
     {
+      "source": "5",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "6",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
       "source": "CONNECTED",
       "dest": "FINISH",
       "trigger": "ST(2)[PU],ST(0)[HE] => CC\n",
@@ -50,16 +60,16 @@
     },
     {
       "source": "1",
-      "dest": "1",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
+      "dest": "5",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ST(0)[HE,DA],ACK\n",
       "conditions": [
         "packet_number:5"
       ]
     },
     {
       "source": "1",
-      "dest": "1",
-      "trigger": "ST(2)[PU],ST(4)[HE] => ACK\n",
+      "dest": "6",
+      "trigger": "ST(2)[PU],ST(4)[HE] => ST(4)[HE,DA],ACK\n",
       "conditions": [
         "packet_number:7"
       ]
@@ -80,6 +90,12 @@
     },
     {
       "name": "1"
+    },
+    {
+      "name": "5"
+    },
+    {
+      "name": "6"
     }
   ],
   "before_state_change": [],

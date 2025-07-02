@@ -27,7 +27,7 @@
     {
       "source": "CONNECTED",
       "dest": "FINISH",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS(2),ST(0)[HE,DA],ST(7)[Dec],ST(7)[Dec],ST(0)[\u2298],SS(0),CC\n",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS(2),ST(0)[HE,DA],ST(0)[\u2298],CC\n",
       "conditions": [
         "packet_number:5"
       ]
@@ -35,7 +35,7 @@
     {
       "source": "CONNECTED",
       "dest": "FINISH",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,SS(2),ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4),CC\n",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,SS(2),ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298],CC\n",
       "conditions": [
         "packet_number:8"
       ]

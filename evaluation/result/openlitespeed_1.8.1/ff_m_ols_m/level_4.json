@@ -1,0 +1,516 @@
+{
+  "initial": "START",
+  "transitions": [
+    {
+      "source": "START",
+      "dest": "HANDSHAKING",
+      "trigger": "INITIAL => CRY,CRY,CRY,ACK,ACK,ACK"
+    },
+    {
+      "source": "HANDSHAKING",
+      "dest": "CONNECTED",
+      "trigger": "HANDSHAKE => ACK,HD,ST(7)[Dec],ST(3)[SE]"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "1",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "11",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "16",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "24",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "4",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "7",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "9",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "11",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "14",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "16",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "24",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "7",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "14",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "16",
+      "dest": "24",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "1",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "4",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "7",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "9",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "11",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "16",
+      "dest": "16",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "24",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "4",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "9",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "14",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "24",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "1",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "4",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "7",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "9",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "11",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "16",
+      "dest": "16",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "24",
+      "trigger": "ST(10)[\u2298] => ACK\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "16",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "7",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "11",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "24",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "4",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "9",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "16",
+      "dest": "16",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "24",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "24",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:6"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "24",
+      "trigger": "ST(0)[HE] => ACK,ST(11)[Enc],ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    }
+  ],
+  "states": [
+    {
+      "name": "START"
+    },
+    {
+      "name": "FINISH"
+    },
+    {
+      "name": "HANDSHAKING"
+    },
+    {
+      "name": "CONNECTED"
+    },
+    {
+      "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "4"
+    },
+    {
+      "name": "7"
+    },
+    {
+      "name": "9"
+    },
+    {
+      "name": "11"
+    },
+    {
+      "name": "14"
+    },
+    {
+      "name": "16"
+    },
+    {
+      "name": "24"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "START",
+      "name": "HTTP/3 State Machine",
+      "class-name": "statemachine.ProtoModel"
+    }
+  ]
+}

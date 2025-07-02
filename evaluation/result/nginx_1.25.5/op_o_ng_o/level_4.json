@@ -35,14 +35,14 @@
       "trigger": "CC"
     },
     {
-      "source": "8",
+      "source": "9",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
       "source": "CONNECTED",
       "dest": "FINISH",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS(2),ST(0)[HE,DA],ST(7)[Dec],ST(7)[Dec],ST(0)[\u2298],SS(0),CC\n",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS(2),ST(0)[HE,DA],ST(0)[\u2298],CC\n",
       "conditions": [
         "packet_number:7"
       ]
@@ -50,7 +50,7 @@
     {
       "source": "CONNECTED",
       "dest": "FINISH",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,SS(2),ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4),CC\n",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,SS(2),ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298],CC\n",
       "conditions": [
         "packet_number:10"
       ]
@@ -80,7 +80,7 @@
       ]
     },
     {
-      "source": "8",
+      "source": "9",
       "dest": "FINISH",
       "trigger": "ST(2)[SE] => ACK,SS(2),CC\n",
       "conditions": [
@@ -90,7 +90,15 @@
     {
       "source": "1",
       "dest": "5",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
+      "conditions": [
+        "packet_number:7"
+      ]
+    },
+    {
+      "source": "6",
+      "dest": "9",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:7"
       ]
@@ -98,33 +106,49 @@
     {
       "source": "1",
       "dest": "6",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4)\n",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:10"
       ]
     },
     {
       "source": "5",
-      "dest": "8",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4)\n",
+      "dest": "9",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:10"
       ]
     },
     {
-      "source": "6",
-      "dest": "8",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "source": "5",
+      "dest": "5",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
       "conditions": [
         "packet_number:7"
       ]
     },
     {
-      "source": "8",
-      "dest": "8",
+      "source": "9",
+      "dest": "9",
       "trigger": "ST(2)[PU],ST(0)[HE] => ACK\n",
       "conditions": [
         "packet_number:7"
+      ]
+    },
+    {
+      "source": "6",
+      "dest": "6",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:10"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "9",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:10"
       ]
     }
   ],
@@ -151,7 +175,7 @@
       "name": "6"
     },
     {
-      "name": "8"
+      "name": "9"
     }
   ],
   "before_state_change": [],

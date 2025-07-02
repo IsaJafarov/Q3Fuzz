@@ -20,38 +20,95 @@
       ]
     },
     {
+      "source": "2",
+      "dest": "5",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "6",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
       "source": "1",
       "dest": "FINISH",
       "trigger": "CC"
     },
     {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "3",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "5",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "6",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "9",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
       "source": "CONNECTED",
-      "dest": "CONNECTED",
-      "trigger": "ST(0)[HE] => ACK\n",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ST(0)[HE,DA],ACK\n",
       "conditions": [
         "packet_number:2"
       ]
     },
     {
       "source": "1",
-      "dest": "1",
-      "trigger": "ST(0)[HE] => ACK\n",
+      "dest": "5",
+      "trigger": "ST(0)[HE] => ST(0)[HE,DA],ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "9",
+      "trigger": "ST(0)[HE] => ST(0)[HE,DA],ACK\n",
       "conditions": [
         "packet_number:2"
       ]
     },
     {
       "source": "CONNECTED",
-      "dest": "CONNECTED",
-      "trigger": "ST(4)[HE] => ACK\n",
+      "dest": "3",
+      "trigger": "ST(4)[HE] => ST(4)[HE,DA],ACK\n",
       "conditions": [
         "packet_number:4"
       ]
     },
     {
       "source": "1",
-      "dest": "1",
-      "trigger": "ST(4)[HE] => ACK\n",
+      "dest": "6",
+      "trigger": "ST(4)[HE] => ST(4)[HE,DA],ACK\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "9",
+      "trigger": "ST(4)[HE] => ST(4)[HE,DA],ACK\n",
       "conditions": [
         "packet_number:4"
       ]
@@ -62,6 +119,22 @@
       "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
       "conditions": [
         "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "3",
+      "trigger": "ST(4)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:4"
       ]
     }
   ],
@@ -80,6 +153,21 @@
     },
     {
       "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "3"
+    },
+    {
+      "name": "5"
+    },
+    {
+      "name": "6"
+    },
+    {
+      "name": "9"
     }
   ],
   "before_state_change": [],

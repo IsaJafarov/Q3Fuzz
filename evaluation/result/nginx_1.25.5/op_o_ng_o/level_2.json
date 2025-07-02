@@ -37,7 +37,7 @@
     {
       "source": "CONNECTED",
       "dest": "FINISH",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS(2),ST(0)[HE,DA],ST(7)[Dec],ST(7)[Dec],ST(0)[\u2298],SS(0),CC\n",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,SS(2),ST(0)[HE,DA],ST(0)[\u2298],CC\n",
       "conditions": [
         "packet_number:7"
       ]
@@ -45,7 +45,7 @@
     {
       "source": "CONNECTED",
       "dest": "FINISH",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,SS(2),ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4),CC\n",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,SS(2),ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298],CC\n",
       "conditions": [
         "packet_number:10"
       ]
@@ -61,7 +61,7 @@
     {
       "source": "1",
       "dest": "5",
-      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(7)[Dec],ST(7)[Dec],ST(0)[\u2298],SS(0)\n",
+      "trigger": "ST(2)[PU],ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
       "conditions": [
         "packet_number:7"
       ]
@@ -69,7 +69,7 @@
     {
       "source": "1",
       "dest": "6",
-      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(7)[Dec],ST(4)[\u2298],SS(4)\n",
+      "trigger": "ST(2)[PU],ST(10)[Enc],ST(4)[HE] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
       "conditions": [
         "packet_number:10"
       ]
