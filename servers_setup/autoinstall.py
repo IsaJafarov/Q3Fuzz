@@ -288,6 +288,20 @@ def install_aioquic(version):
         os.system("sudo python3 ./examples/http3_server.py -c ../certs/prett3.com.pem -k ../certs/prett3.com.key --port 443 -v")
         
 
+def install_quinn_h3(version):
+    if version == '0.0.9':
+        os.system("sudo rm -r ./quinn")
+
+        # install dependencies: rust and cmake
+        os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo sh -s -- -y") 
+        os.system("sudo apt install -y cmake")
+
+        # clone H3 (Quinn)
+        os.system("git clone https://github.com/hyperium/h3.git")
+        os.chdir("h3")
+        os.system("git checkout tags/h3-quinn-v0.0.9")
+
+        os.system("sudo /root/.cargo/bin/cargo run --example server -- -d /usr/local/nginx/html/ -l 0.0.0.0:443 -c ../certs/prett3.com.cert.der -k ../certs/prett3.com.key.der")
 
 if __name__ == '__main__':
     
@@ -302,6 +316,7 @@ if __name__ == '__main__':
     "- msquic-kestrel\n"
     "- neqo\n"
     "- aioquic\n"
+    "- quinn\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -314,6 +329,7 @@ if __name__ == '__main__':
     "- 2.4.8 \t (for msquic-kestrel)\n"
     "- 0.13.1 \t (for neqo)\n"
     "- 1.2.0 \t (for aioquic)\n"
+    "- 0.0.9 \t (for quinn & h3)"
     )
     args = parser.parse_args()
     server = args.server
@@ -345,5 +361,6 @@ if __name__ == '__main__':
         install_neqo(version)
     elif server == "aioquic":
         install_aioquic(version)
-    
+    elif server == "quinn":
+        install_quinn_h3(version)
 

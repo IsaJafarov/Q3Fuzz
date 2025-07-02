@@ -44,7 +44,7 @@ def init(args) -> Path:
         shutil.rmtree(pycache_dir)
 
     # Create the result directory based on script location
-    output_dir = EVALUATION_DIR / "result_new"
+    output_dir = EVALUATION_DIR / "result"
 
     # If possible, append a name part from the pcap file to the output directory
     try:

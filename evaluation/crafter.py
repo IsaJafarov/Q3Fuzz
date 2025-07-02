@@ -40,6 +40,8 @@ class MSGCrafter():
             self.add_ack_frame(quic_frame, builder)
         elif isinstance(quic_frame, QuicNewConnectionId):
             self.add_nci_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicMaxStreams):
+            self
         elif isinstance(quic_frame, QuicStream):
             self.add_stream_frame(quic_frame, builder)
         else:
@@ -110,9 +112,11 @@ class MSGCrafter():
             stream_type |= 4  # Include OFF bit
         
 
-        # During SM generation, we will not include the FIN. So that one stream frame will not close the stream and all stream frames will freely carry data.
-        #if quic_frame.fin_bit:
-        #    stream_type |= 1  # Include FIN bit
+        # Comment out below so that one stream frame will not close the stream and all stream frames will freely carry data.
+        # (NOTE) In case of H2O, the unset fin_bit makes the server answer no HEADER or DATA to HEADER request.
+        if quic_frame.fin_bit:
+           stream_type |= 1  # Include FIN bit
+        
 
         # Combine all HTTP/3 frames into a single payload
         h3_frame_payload = None
@@ -155,6 +159,17 @@ class MSGCrafter():
 
         self.stream_offsets[quic_frame.stream_id] = current_offset + len(h3_frame_payload)
 
+    def add_max_streams_frame(self, quic_frame:QuicMaxStreams, builder:QuicPacketBuilder) -> None:
+        '''
+        @dataclass
+        class QuicMaxStreams:
+        maximum_streams:int = None
+        '''
+        buf = builder.start_frame(
+            QuicFrameType.MAX_STREAMS_UNI,
+            capacity=MAX_STREAM_DATA_FRAME_CAPACITY
+        )
+        buf.push_uint_var( quic_frame.maximum_streams ) # Maximum Streams
         
 
     def generate_h3_settings_frame(self, h3_frame:H3Settings) -> bytes:
