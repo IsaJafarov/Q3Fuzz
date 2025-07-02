@@ -72,14 +72,10 @@ class MSGDissector():
         self.quic_frames:list = []
 
     def dissect_msg(self, message:Packet) -> List[Union[QuicAck,QuicNewConnectionId,QuicStream]]:
-
         h3_frames = []
-
         # Parse layers in the h3msg
         for layer in message.layers:
             if layer.layer_name == 'quic':
-                #print(layer)
-                
                 for field in layer.frame.fields:
                     if 'STREAM' in field.showname:
                         self.quic_frames.append( self._dissect_stream_frame(field.showname) )
@@ -97,10 +93,7 @@ class MSGDissector():
                         print(field)
                         raise Exception("[-] Unsupported QUIC Frame: {}".format(field.showname))
                     
-            
             elif layer.layer_name == 'http3':
-                #print(layer)
-
                 # This HTTP/3 layer has HTTP/3 frames
                 if layer.has_field("frame_type"):
                     # Obtain safe value of frame type.
@@ -148,7 +141,6 @@ class MSGDissector():
 
     def _dissect_stream_frame(self, showname:str) -> QuicStream:
         quic_stream = QuicStream()
-
         quic_stream.stream_id = int(showname.split('id=')[1].split()[0])
         quic_stream.fin_bit = int(showname.split('fin=')[1].split()[0])
         quic_stream.offset = int(showname.split('off=')[1].split()[0])
@@ -157,9 +149,7 @@ class MSGDissector():
         return quic_stream
 
     def _dissect_ack_frame(self, layer: XmlLayer) -> QuicAck:
-
         ack_contents = QuicAck()
-
         # Extract ACK frame details from the layer
         ack_contents.largest_acknowledged = int(layer.ack_largest_acknowledged)
         ack_contents.ack_delay = int(layer.ack_ack_delay)
@@ -177,9 +167,7 @@ class MSGDissector():
         return ack_contents
 
     def _dissect_nci_frame(self, layer:XmlLayer) -> QuicNewConnectionId:
-        
         nci_contents = QuicNewConnectionId()
-
         nci_contents.sequence_number = int(layer.nci_sequence)
         nci_contents.retire_prior_to = int(layer.nci_retire_prior_to)
         nci_contents.length = int(layer.nci_connection_id_length)
@@ -198,9 +186,7 @@ class MSGDissector():
         Returns:
             Encoded HTTP/3 SETTINGS frame data.
         """
-        
         h3_settings = H3Settings()
-
         # Extract SETTINGS fields from the HTTP/3 layer
         fields = layer._all_fields
         for key, value in fields.items():
