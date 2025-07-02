@@ -312,6 +312,8 @@ def h3msg_to_str(h3msg:Union[list, Packet], exclude_opt_client_frames:bool = Fal
                 msginfo += QUIC_FRAME_ABBREVIATIONS['ACK']
             elif isinstance(quic_frame, QuicNewConnectionId):
                 msginfo += QUIC_FRAME_ABBREVIATIONS['NEW_CONNECTION_ID']
+            elif isinstance(quic_frame, QuicMaxStreams):
+                msginfo += QUIC_FRAME_ABBREVIATIONS['MAX_STREAMS']
             elif isinstance(quic_frame, QuicStream):
                 h3_frame_str = ''
 
