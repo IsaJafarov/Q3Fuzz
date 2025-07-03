@@ -96,36 +96,61 @@ def install_openlitespeed(version):
     if version=='1.7.15':
         os.system("sudo rm -r ./ols-1.7.15 /usr/local/lsws/; mkdir ./ols-1.7.15")
         os.chdir("ols-1.7.15")
-        os.system("cp ../ols-files/v1.7.15/openlitespeed-1.7.15.tgz ./")
+        os.system("cp ../ols-files/openlitespeed-1.7.15.tgz ./")
         os.system("tar -zxf openlitespeed-1.7.15.tgz")
         os.chdir("openlitespeed")
         os.system("sudo bash install.sh")
 
-        os.system("sudo cp ../../ols-files/v1.7.15/httpd_config.conf /usr/local/lsws/conf/httpd_config.conf")
-        
+        os.system("sudo cp ../../ols-files/httpd_config.conf /usr/local/lsws/conf/httpd_config.conf")
         # Configuration with relative path to the SSL certs didn't work. Put absolute path.
-        os.system("sudo sed -i -e s+ssl_cert_path+{}/certs/prett3.com.crt+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
-        os.system("sudo sed -i -e s+ssl_key_path+{}/certs/prett3.com.key+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        os.system("sudo sed -i -e s+SSL_CERT_PATH+{}/certs/prett3.com.crt+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        os.system("sudo sed -i -e s+SSL_KEY_PATH+{}/certs/prett3.com.key+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
         
+        # Update chconf.conf
+        os.system("sudo cp ../../ols-files/vhconf.conf /usr/local/lsws/conf/vhosts/Example/vhconf.conf")
         os.system("sudo sed -i -e s+'$VH_ROOT/html/'+/usr/local/nginx/html/+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf")
+        os.system("sudo sed -i -e s+VERSION+LiteSpeed\ {}+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf".format(version))
 
         os.system("sudo /usr/local/lsws/bin/lswsctrl start")
 
-    if version=='1.8.1':
+    elif version=='1.8.1':
         os.system("sudo rm -r ./ols-1.8.1 /usr/local/lsws/; mkdir ./ols-1.8.1")
         os.chdir("ols-1.8.1")
-        os.system("cp ../ols-files/v1.8.1/openlitespeed-1.8.1.tgz ./")
+        os.system("cp ../ols-files/openlitespeed-1.8.1.tgz ./")
         os.system("tar -zxf openlitespeed-1.8.1.tgz")
         os.chdir("openlitespeed")
         os.system("sudo bash install.sh")
 
-        os.system("sudo cp ../../ols-files/v1.8.1/httpd_config.conf /usr/local/lsws/conf/httpd_config.conf")
-        
+        os.system("sudo cp ../../ols-files/httpd_config.conf /usr/local/lsws/conf/httpd_config.conf")
         # Configuration with relative path to the SSL certs didn't work. Put absolute path.
-        os.system("sudo sed -i -e s+ssl_cert_path+{}/certs/prett3.com.crt+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
-        os.system("sudo sed -i -e s+ssl_key_path+{}/certs/prett3.com.key+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        os.system("sudo sed -i -e s+SSL_CERT_PATH+{}/certs/prett3.com.crt+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        os.system("sudo sed -i -e s+SSL_KEY_PATH+{}/certs/prett3.com.key+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
         
+        # Update chconf.conf
+        os.system("sudo cp ../../ols-files/vhconf.conf /usr/local/lsws/conf/vhosts/Example/vhconf.conf")
         os.system("sudo sed -i -e s+'$VH_ROOT/html/'+/usr/local/nginx/html/+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf")
+        os.system("sudo sed -i -e s+VERSION+LiteSpeed\ {}+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf".format(version))
+
+        os.system("sudo /usr/local/lsws/bin/lswsctrl start")
+
+    elif version=='1.8.3.1':
+        os.system("sudo rm -r ./ols-1.8.3.1 /usr/local/lsws/; mkdir ./ols-1.8.3.1")
+        os.chdir("ols-1.8.3.1")
+        os.system("wget https://github.com/litespeedtech/openlitespeed/releases/download/v1.8.3.1/openlitespeed-1.8.3-x86_64-linux.tgz")
+
+        os.system("tar -zxf openlitespeed-1.8.3-x86_64-linux.tgz")
+        os.chdir("openlitespeed")
+        os.system("sudo bash install.sh")
+
+        os.system("sudo cp ../../ols-files/httpd_config.conf /usr/local/lsws/conf/httpd_config.conf")
+        # Configuration with relative path to the SSL certs didn't work. Put absolute path.
+        os.system("sudo sed -i -e s+SSL_CERT_PATH+{}/certs/prett3.com.crt+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        os.system("sudo sed -i -e s+SSL_KEY_PATH+{}/certs/prett3.com.key+g /usr/local/lsws/conf/httpd_config.conf".format(current_folder))
+        
+        # Update chconf.conf
+        os.system("sudo cp ../../ols-files/vhconf.conf /usr/local/lsws/conf/vhosts/Example/vhconf.conf")
+        os.system("sudo sed -i -e s+'$VH_ROOT/html/'+/usr/local/nginx/html/+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf")
+        os.system("sudo sed -i -e s+VERSION+LiteSpeed\ {}+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf".format(version))
 
         os.system("sudo /usr/local/lsws/bin/lswsctrl start")
 
@@ -310,37 +335,37 @@ if __name__ == '__main__':
     "- nginx\n"
     "- caddy\n"
     "- h2o\n"
-    "- ols (openlitespeed)\n"
+    "- ols (lsquic + openlitespeed)\n"
     "- quiche\n"
     "- quic-go\n"
     "- msquic-kestrel\n"
     "- neqo\n"
     "- aioquic\n"
-    "- quinn\n"
+    "- quinn-h3\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
     "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n"
     "- 2.4.6, 2.7.6, 2.8.4, 2.10.0\t(for caddy) \n"
     "- a429117, 222b36d or 16b13ee\t(for h2o) \n"
-    "- 1.7.15 or 1.8.1\t(for ols)\n"
+    "- 1.7.15, 1.8.1, 1.8.3.1\t(for ols)\n"
     "- 0.23.5 \t(for quiche)\n"
     "- 0.50.1 \t (for quic-go)\n"
     "- 2.4.8 \t (for msquic-kestrel)\n"
     "- 0.13.1 \t (for neqo)\n"
     "- 1.2.0 \t (for aioquic)\n"
-    "- 0.0.9 \t (for quinn & h3)"
+    "- 0.0.9 \t (for quinn-h3)"
     )
     args = parser.parse_args()
     server = args.server
     version = args.version
     
     # kill the running webserver processes
-    #os.system("sudo pkill -9 nginx")
-    #os.system("sudo pkill -9 caddy")
-    #os.system("sudo pkill -9 h2o")
-    #os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
-    # TODO add ll servers
+    os.system("sudo pkill -9 nginx")
+    os.system("sudo pkill -9 caddy")
+    os.system("sudo pkill -9 h2o")
+    os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
+    # TODO add all servers
     os.system("sudo pkill -9 dotnet")    
 
     if server == 'caddy':
