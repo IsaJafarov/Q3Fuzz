@@ -45,30 +45,45 @@ def run_h2o(version):
 
     
 def run_quiche(version):
+    print("[+] Running quiche %s..." % version)
     if version == '0.23.5':
         os.chdir("quiche")
         os.system("sudo ./target/debug/quiche-server --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
 
 def run_quic_go(version):
+    print("[+] Running quic_go %s..." % version)
     if version == '0.50.1':
         os.chdir("quic-go")
         os.system("sudo /usr/local/go/bin/go run example/main.go -bind 0.0.0.0:443 -www /usr/local/nginx/html/ -cert ../certs/prett3.com.crt -key ../certs/prett3.com.key")
 
 def run_msquic_kestrel(version):
+    print("[+] Running msquic + kestrel %s..." % version)
     if version == '2.4.8':    
         os.chdir("msquic_kestrel")
         os.system("sudo dotnet run")
         
 def run_neqo(version):
+    print("[+] Running neqo %s..." % version)
     if version == '0.13.1':
         os.chdir("neqo")
         os.system("sudo ./target/debug/neqo-server 0.0.0.0:443 -v")
 
 def run_aioquic(version):
+    print("[+] Running aioquic %s..." % version)
     if version == '1.2.0':
         os.chdir("aioquic")
         os.system("sudo python3 ./examples/http3_server.py -c ../certs/prett3.com.pem -k ../certs/prett3.com.key --port 443 -v")
         
+def install_quinn_h3(version):
+    print("[+] Running quinn + h3 %s..." % version)
+    if version == '0.0.9':
+        os.chdir("quinn")
+        os.system("sudo /root/.cargo/bin/cargo run --example server -- -d /usr/local/nginx/html/ -l 0.0.0.0:443 -c ../certs/prett3.com.cert.der -k ../certs/prett3.com.key.der")
+
+def install_ngtcp2(version):
+    print("[+] Running ngtcp2 + nghttp3 %s..." % version)
+    if version == "1.12.0":
+        os.system("sudo ./ngtcp2/examples/bsslserver 0.0.0.0 443 ./certs/prett3.com.key ./certs/prett3.com.crt -d /usr/local/nginx/html/")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HTTP/3 web servers runner', formatter_class=argparse.RawTextHelpFormatter)
@@ -76,12 +91,14 @@ if __name__ == '__main__':
     "- nginx\n"
     "- caddy\n"
     "- h2o\n"
-    "- ols (openlitespeed)\n"
+    "- ols (lsquic + openlitespeed)\n"
     "- quiche\n"
     "- quic-go\n"
     "- msquic-kestrel\n"
     "- neqo\n"
     "- aioquic\n"
+    "- quinn-h3\n"
+    "- ngtcp2-nghttp3\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -94,6 +111,8 @@ if __name__ == '__main__':
     "- 2.4.8 \t (for msquic-kestrel)\n"
     "- 0.13.1 \t (for neqo)\n"
     "- 1.2.0 \t (for aioquic)\n"
+    "- 0.0.9 \t (for quinn-h3)\n"
+    "- 1.12.0 \t (for ngtcp2-nghttp3)"
     )
 
     args = parser.parse_args()
@@ -126,5 +145,9 @@ if __name__ == '__main__':
         run_neqo(version)
     elif server == "aioquic":
         run_aioquic(version)
+    elif server == "quinn":
+        install_quinn_h3(version)
+    elif server == "ngtcp2-nghttp3":
+        install_ngtcp2(version)
 
     print("[+] Done.")

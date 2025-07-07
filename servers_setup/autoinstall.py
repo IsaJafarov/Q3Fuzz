@@ -328,6 +328,42 @@ def install_quinn_h3(version):
 
         os.system("sudo /root/.cargo/bin/cargo run --example server -- -d /usr/local/nginx/html/ -l 0.0.0.0:443 -c ../certs/prett3.com.cert.der -k ../certs/prett3.com.key.der")
 
+def install_ngtcp2(version):
+    if version == "1.12.0":
+        os.system("sudo rm -r ./ngtcp2")
+
+        # install dependencies
+        os.system("sudo apt install libbrotli-dev libev-dev pkg-config autoconf automake autotools-dev libtool -y")
+        
+        # set up boringssl
+        os.system("git clone https://boringssl.googlesource.com/boringssl")
+        os.chdir("boringssl")
+        os.system("git checkout 9295969e1dad2c31d0d99481734c1c68dcbc6403")
+        os.system("cmake -B build -DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+        os.system("make -j$(nproc) -C build")
+        os.chdir("..")
+
+        # set up nghttp3
+        os.system("git clone --recursive https://github.com/ngtcp2/nghttp3")
+        os.chdir("nghttp3")
+        os.system("git checkout tags/v1.9.0")
+        os.system("autoreconf -i")
+        os.system("./configure --prefix=$PWD/build --enable-lib-only")
+        os.system("make -j$(nproc) check")
+        os.system("make install")
+        os.chdir("..")
+
+        # set up ngtcp2
+        os.system("git clone --recursive  https://github.com/ngtcp2/ngtcp2")
+        os.chdir("ngtcp2")
+        os.system("git checkout tags/v1.12.0")
+        os.system("autoreconf -i")
+        os.system("./configure PKG_CONFIG_PATH=$PWD/../nghttp3/build/lib/pkgconfig BORINGSSL_LIBS=\"-L$PWD/../boringssl/build -lssl -lcrypto\" BORINGSSL_CFLAGS=\"-I$PWD/../boringssl/include\" --with-boringssl")
+        os.system("make -j$(nproc) check")
+        
+        # run
+        os.system("sudo ./examples/bsslserver 0.0.0.0 443 ../certs/prett3.com.key ../certs/prett3.com.crt -d /usr/local/nginx/html/")
+
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation', formatter_class=argparse.RawTextHelpFormatter)
@@ -342,6 +378,7 @@ if __name__ == '__main__':
     "- neqo\n"
     "- aioquic\n"
     "- quinn-h3\n"
+    "- ngtcp2-nghttp3\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -354,7 +391,8 @@ if __name__ == '__main__':
     "- 2.4.8 \t (for msquic-kestrel)\n"
     "- 0.13.1 \t (for neqo)\n"
     "- 1.2.0 \t (for aioquic)\n"
-    "- 0.0.9 \t (for quinn-h3)"
+    "- 0.0.9 \t (for quinn-h3)\n"
+    "- 1.12.0 \t (for ngtcp2-nghttp3)"
     )
     args = parser.parse_args()
     server = args.server
@@ -388,4 +426,6 @@ if __name__ == '__main__':
         install_aioquic(version)
     elif server == "quinn":
         install_quinn_h3(version)
+    elif server == "ngtcp2-nghttp3":
+        install_ngtcp2(version)
 
