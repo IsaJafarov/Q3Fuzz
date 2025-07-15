@@ -85,6 +85,11 @@ def install_ngtcp2(version):
     if version == "1.12.0":
         os.system("sudo ./ngtcp2/examples/bsslserver 0.0.0.0 443 ./certs/prett3.com.key ./certs/prett3.com.crt -d /usr/local/nginx/html/")
 
+def install_xquic(version):
+    if version == "1.8.3":
+        os.chdir("xquic")
+        os.system("sudo ./build/demo/demo_server -p 443")
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HTTP/3 web servers runner', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("server", help="supported servers \n\t"
@@ -99,6 +104,7 @@ if __name__ == '__main__':
     "- aioquic\n"
     "- quinn-h3\n"
     "- ngtcp2-nghttp3\n"
+    "- xquic\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -112,7 +118,8 @@ if __name__ == '__main__':
     "- 0.13.1 \t (for neqo)\n"
     "- 1.2.0 \t (for aioquic)\n"
     "- 0.0.9 \t (for quinn-h3)\n"
-    "- 1.12.0 \t (for ngtcp2-nghttp3)"
+    "- 1.12.0 \t (for ngtcp2-nghttp3)\n"
+    "- 1.8.3 \t (for xquic)\n"
     )
 
     args = parser.parse_args()
@@ -149,5 +156,7 @@ if __name__ == '__main__':
         install_quinn_h3(version)
     elif server == "ngtcp2-nghttp3":
         install_ngtcp2(version)
+    elif server == "xquic":
+        install_xquic(version)
 
     print("[+] Done.")

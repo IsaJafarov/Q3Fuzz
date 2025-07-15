@@ -364,6 +364,60 @@ def install_ngtcp2(version):
         # run
         os.system("sudo ./examples/bsslserver 0.0.0.0 443 ../certs/prett3.com.key ../certs/prett3.com.crt -d /usr/local/nginx/html/")
 
+
+def install_xquic(version):
+    if version == "1.8.3":
+        os.system("sudo apt install -y build-essential libevent-dev")
+
+        
+        print(">>> cloone Xquic")
+        os.system("git clone https://github.com/alibaba/xquic.git")
+        os.chdir("xquic")
+        os.system("git checkout tags/v1.8.3")
+
+        print(">>> cloone Boringssl")
+        os.system("git clone https://github.com/google/boringssl.git ./third_party/boringssl")
+        os.chdir("./third_party/boringssl")
+        os.system("mkdir -p build")
+        os.chdir("build")
+
+        print(">>> cmake boringssl")
+        os.system("sudo cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_C_FLAGS=\"-fPIC\" -DCMAKE_CXX_FLAGS=\"-fPIC\" ..")
+        print(">>> make boringssl")
+        os.system("make -j2 ssl crypto")
+        os.chdir("../../..")
+
+
+
+        os.system("git submodule update --init --recursive")
+        os.system("mkdir -p build")
+        os.chdir("build")
+
+        print(">>> cmake Xquic")
+        os.system("cmake -DGCOV=on -DCMAKE_BUILD_TYPE=Debug -DXQC_ENABLE_TESTING=1 -DXQC_SUPPORT_SENDMMSG_BUILD=1 -DXQC_ENABLE_EVENT_LOG=1 -DXQC_ENABLE_BBR2=1 -DXQC_ENABLE_RENO=1 -DSSL_TYPE=\"boringssl\" -DSSL_PATH=\"../third_party/boringssl\" ..")
+        print(">>> make Xquic")
+        os.system("make -j2")
+        os.chdir("../scripts")
+        
+        os.system("sed -i 's/make -j/make -j2/g' xquic_test.sh")
+        print(">>> Run tests")
+        os.system("sudo bash xquic_test.sh")
+        os.chdir("..")
+
+
+
+
+        os.system("cp /usr/local/nginx/html/index.html ./")
+        os.system("mv ./server.crt ./server.crt.bak")
+        os.system("mv ./server.key ./server.key.bak")
+        os.system("cp ../certs/prett3.com.crt ./server.crt")
+        os.system("cp ../certs/prett3.com.key ./server.key")
+
+        print(">>> run Xquic")
+        os.system("sudo ./build/demo/demo_server -p 443")
+            
+        
+
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation', formatter_class=argparse.RawTextHelpFormatter)
@@ -379,6 +433,7 @@ if __name__ == '__main__':
     "- aioquic\n"
     "- quinn-h3\n"
     "- ngtcp2-nghttp3\n"
+    "- xquic\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -392,7 +447,8 @@ if __name__ == '__main__':
     "- 0.13.1 \t (for neqo)\n"
     "- 1.2.0 \t (for aioquic)\n"
     "- 0.0.9 \t (for quinn-h3)\n"
-    "- 1.12.0 \t (for ngtcp2-nghttp3)"
+    "- 1.12.0 \t (for ngtcp2-nghttp3)\n"
+    "- 1.8.3 \t (for xquic)\n"
     )
     args = parser.parse_args()
     server = args.server
@@ -428,4 +484,6 @@ if __name__ == '__main__':
         install_quinn_h3(version)
     elif server == "ngtcp2-nghttp3":
         install_ngtcp2(version)
+    elif server == "xquic":
+        install_xquic(version)
 
