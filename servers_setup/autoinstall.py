@@ -411,19 +411,19 @@ def install_mvfst_proxygen(version):
         #os.system("sudo rm -r ./fast_float ./proxygen")
         
         # install fast float system wide
-        #os.system("git clone https://github.com/fastfloat/fast_float.git")
+        os.system("git clone https://github.com/fastfloat/fast_float.git")
         os.chdir("fast_float")
         os.system("cmake -B build -DFASTFLOAT_TEST=OFF")
         os.system("sudo cmake --build build --target install")
         
         # install proxygen
         os.chdir("..")
-        #os.system("git clone https://github.com/facebook/proxygen.git")
+        os.system("git clone https://github.com/facebook/proxygen.git")
         os.chdir("proxygen")
         os.system("git checkout tags/v2025.04.14.00")
         os.chdir("proxygen")
         os.system("bash ./build.sh")
-        #os.system("bash ./install.sh")
+        #os.system("bash ./install.sh") # we don't need to install system-wide
         
         # run proxygen
         os.system("sudo ./_build/bin/hq " \
