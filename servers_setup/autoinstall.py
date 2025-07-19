@@ -367,23 +367,20 @@ def install_ngtcp2(version):
 
 def install_xquic(version):
     if version == "1.8.3":
+        os.system("sudo rm -r ./xquic")
+
         os.system("sudo apt install -y build-essential libevent-dev")
 
-        
-        print(">>> cloone Xquic")
         os.system("git clone https://github.com/alibaba/xquic.git")
         os.chdir("xquic")
         os.system("git checkout tags/v1.8.3")
 
-        print(">>> cloone Boringssl")
         os.system("git clone https://github.com/google/boringssl.git ./third_party/boringssl")
         os.chdir("./third_party/boringssl")
         os.system("mkdir -p build")
         os.chdir("build")
 
-        print(">>> cmake boringssl")
         os.system("sudo cmake -DBUILD_SHARED_LIBS=0 -DCMAKE_C_FLAGS=\"-fPIC\" -DCMAKE_CXX_FLAGS=\"-fPIC\" ..")
-        print(">>> make boringssl")
         os.system("make -j2 ssl crypto")
         os.chdir("../../..")
 
@@ -393,19 +390,13 @@ def install_xquic(version):
         os.system("mkdir -p build")
         os.chdir("build")
 
-        print(">>> cmake Xquic")
         os.system("cmake -DGCOV=on -DCMAKE_BUILD_TYPE=Debug -DXQC_ENABLE_TESTING=1 -DXQC_SUPPORT_SENDMMSG_BUILD=1 -DXQC_ENABLE_EVENT_LOG=1 -DXQC_ENABLE_BBR2=1 -DXQC_ENABLE_RENO=1 -DSSL_TYPE=\"boringssl\" -DSSL_PATH=\"../third_party/boringssl\" ..")
-        print(">>> make Xquic")
         os.system("make -j2")
         os.chdir("../scripts")
         
         os.system("sed -i 's/make -j/make -j2/g' xquic_test.sh")
-        print(">>> Run tests")
         os.system("sudo bash xquic_test.sh")
         os.chdir("..")
-
-
-
 
         os.system("cp /usr/local/nginx/html/index.html ./")
         os.system("mv ./server.crt ./server.crt.bak")
@@ -413,9 +404,31 @@ def install_xquic(version):
         os.system("cp ../certs/prett3.com.crt ./server.crt")
         os.system("cp ../certs/prett3.com.key ./server.key")
 
-        print(">>> run Xquic")
         os.system("sudo ./build/demo/demo_server -p 443")
             
+def install_mvfst_proxygen(version):
+    if version == "2025.04.14.00":
+        #os.system("sudo rm -r ./fast_float ./proxygen")
+        
+        # install fast float system wide
+        #os.system("git clone https://github.com/fastfloat/fast_float.git")
+        os.chdir("fast_float")
+        os.system("cmake -B build -DFASTFLOAT_TEST=OFF")
+        os.system("sudo cmake --build build --target install")
+        
+        # install proxygen
+        os.chdir("..")
+        #os.system("git clone https://github.com/facebook/proxygen.git")
+        os.chdir("proxygen")
+        os.system("git checkout tags/v2025.04.14.00")
+        os.chdir("proxygen")
+        os.system("bash ./build.sh")
+        #os.system("bash ./install.sh")
+        
+        # run proxygen
+        os.system("sudo ./_build/bin/hq " \
+        "--mode=server --port=443 -host 0.0.0.0 -static_root=/usr/local/nginx/html " \
+        "-cert=../../certs/prett3.com.pem -key=../../certs/prett3.com.key")
         
 
 if __name__ == '__main__':
@@ -434,6 +447,7 @@ if __name__ == '__main__':
     "- quinn-h3\n"
     "- ngtcp2-nghttp3\n"
     "- xquic\n"
+    "- mvfst-proxygen\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -449,6 +463,7 @@ if __name__ == '__main__':
     "- 0.0.9 \t (for quinn-h3)\n"
     "- 1.12.0 \t (for ngtcp2-nghttp3)\n"
     "- 1.8.3 \t (for xquic)\n"
+    "- 2025.04.14.00 \t (for mvfst-proxygen)\n"
     )
     args = parser.parse_args()
     server = args.server
@@ -486,4 +501,7 @@ if __name__ == '__main__':
         install_ngtcp2(version)
     elif server == "xquic":
         install_xquic(version)
+    elif server == "mvfst-proxygen":
+        install_mvfst_proxygen(version)
+        
 

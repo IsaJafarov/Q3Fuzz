@@ -74,21 +74,29 @@ def run_aioquic(version):
         os.chdir("aioquic")
         os.system("sudo python3 ./examples/http3_server.py -c ../certs/prett3.com.pem -k ../certs/prett3.com.key --port 443 -v")
         
-def install_quinn_h3(version):
+def run_quinn_h3(version):
     print("[+] Running quinn + h3 %s..." % version)
     if version == '0.0.9':
         os.chdir("quinn")
         os.system("sudo /root/.cargo/bin/cargo run --example server -- -d /usr/local/nginx/html/ -l 0.0.0.0:443 -c ../certs/prett3.com.cert.der -k ../certs/prett3.com.key.der")
 
-def install_ngtcp2(version):
+def run_ngtcp2(version):
     print("[+] Running ngtcp2 + nghttp3 %s..." % version)
     if version == "1.12.0":
         os.system("sudo ./ngtcp2/examples/bsslserver 0.0.0.0 443 ./certs/prett3.com.key ./certs/prett3.com.crt -d /usr/local/nginx/html/")
 
-def install_xquic(version):
+def run_xquic(version):
     if version == "1.8.3":
         os.chdir("xquic")
         os.system("sudo ./build/demo/demo_server -p 443")
+
+def run_mvfst_proxygen(version):
+    if version == "2025.04.14.00":
+        os.chdir("proxygen/proxygen")
+        os.system("sudo ./_build/bin/hq " \
+        "--mode=server --port=443 -host 0.0.0.0 -static_root=/usr/local/nginx/html " \
+        "-cert=../../certs/prett3.com.pem -key=../../certs/prett3.com.key")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HTTP/3 web servers runner', formatter_class=argparse.RawTextHelpFormatter)
@@ -105,6 +113,7 @@ if __name__ == '__main__':
     "- quinn-h3\n"
     "- ngtcp2-nghttp3\n"
     "- xquic\n"
+    "- mvfst-proxygen\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -120,6 +129,7 @@ if __name__ == '__main__':
     "- 0.0.9 \t (for quinn-h3)\n"
     "- 1.12.0 \t (for ngtcp2-nghttp3)\n"
     "- 1.8.3 \t (for xquic)\n"
+    "- 2025.04.14.00 \t (for mvfst-proxygen)\n"
     )
 
     args = parser.parse_args()
@@ -153,10 +163,12 @@ if __name__ == '__main__':
     elif server == "aioquic":
         run_aioquic(version)
     elif server == "quinn":
-        install_quinn_h3(version)
+        run_quinn_h3(version)
     elif server == "ngtcp2-nghttp3":
-        install_ngtcp2(version)
+        run_ngtcp2(version)
     elif server == "xquic":
-        install_xquic(version)
+        run_xquic(version)
+    elif server == "mvfst-proxygen":
+        run_mvfst_proxygen(version)
 
     print("[+] Done.")
