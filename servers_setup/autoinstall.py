@@ -250,8 +250,7 @@ def install_msquic_kestrel(version):
 
         # it is possible that, apt installs dotnet into /usr/share/dotnet/sdk/
         # but dotnet searches for SDKs in /usr/lib/dotnet/sdk/
-        os.system("sudo mkdir -p /usr/lib/dotnet/sdk/")
-        os.system("sudo cp -r /usr/share/dotnet/sdk/9.0.203 /usr/lib/dotnet/sdk/")
+        os.system("sudo ln -s /usr/share/dotnet/sdk /usr/lib/dotnet/sdk")
 
         # create and run .NET project
         os.system("dotnet new web -n msquic_kestrel")
