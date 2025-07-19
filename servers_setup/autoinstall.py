@@ -411,6 +411,7 @@ def install_xquic(version):
         os.system("sudo ./build/demo/demo_server -p 443")
             
 def install_mvfst_proxygen(version):
+    # compiling proxygen requires a lot of computing resources. Compiling on a machine with a single CPU will fail. 
     if version == "2025.04.14.00":
         #os.system("sudo rm -r ./fast_float ./proxygen")
         
