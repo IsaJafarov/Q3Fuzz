@@ -268,6 +268,12 @@ def install_neqo(version):
         os.chdir("neqo")
         os.system("git checkout tags/v0.13.1")
 
+        # create NSS database with our ssl certs
+        os.system("mkdir certdb")
+        os.system("sudo apt install libnss3-tools -y")
+        os.system("pk12util -i ../certs/prett3.com.pfx -d ./certdb/ -W \"\" -K \"\"")
+
+
         # clone Neqo's dependencies: NSS v3.110 and NSPR v4.36
         os.system("sudo apt install -y mercurial")
         os.system("hg clone https://hg.mozilla.org/projects/nss")
@@ -294,7 +300,7 @@ def install_neqo(version):
         os.system("export NSS_DIR=\"$(realpath ./nss)\"; export LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\"; $HOME/.cargo/bin/cargo build")
 
         # run Neqo's test server
-        os.system("sudo ./target/debug/neqo-server 0.0.0.0:443 -v")
+        os.system("sudo ./target/debug/neqo-server 0.0.0.0:443 -v -d ./certdb/ -k \"prett3.com - CUNY\"")
 
 def install_aioquic(version):
     if version == '1.2.0':
