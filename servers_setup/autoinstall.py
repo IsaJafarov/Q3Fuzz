@@ -211,7 +211,7 @@ def install_quiche(version):
         os.system("git submodule update --init --recursive") # retrieve submodules, such as boringssl
 
         # build and run
-        os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" $HOME/.cargo/bin/cargo run --bin quiche-server -- --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
+        os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" /root/.cargo/bin/cargo run --bin quiche-server -- --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
         
 
 def install_quic_go(version):
@@ -262,6 +262,9 @@ def install_neqo(version):
     if version == '0.13.1':
         
         os.system("sudo rm -rf ./neqo")
+
+        # install dependencies
+        os.system("sudo apt install build-essential zlib1g-dev -y")
         
         # clone Neqo v0.13.1
         os.system("git clone https://github.com/mozilla/neqo.git")
@@ -300,7 +303,7 @@ def install_neqo(version):
         os.system("export NSS_DIR=\"$(realpath ./nss)\"; export LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\"; $HOME/.cargo/bin/cargo build")
 
         # run Neqo's test server
-        os.system("sudo ./target/debug/neqo-server 0.0.0.0:443 -v -d ./certdb/ -k \"prett3.com - CUNY\"")
+        os.system("sudo ./target/debug/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
 
 def install_aioquic(version):
     if version == '1.2.0':
@@ -340,10 +343,10 @@ def install_quinn_h3(version):
 
 def install_ngtcp2(version):
     if version == "1.12.0":
-        os.system("sudo rm -r ./ngtcp2")
+        os.system("sudo rm -r ./ngtcp2 ./boringssl ./nghttp3")
 
         # install dependencies
-        os.system("sudo apt install libbrotli-dev libev-dev pkg-config autoconf automake autotools-dev libtool -y")
+        os.system("sudo apt install cmake build-essential libssl-dev libbrotli-dev libev-dev pkg-config autoconf automake autotools-dev libtool -y")
         
         # set up boringssl
         os.system("git clone https://boringssl.googlesource.com/boringssl")
@@ -372,7 +375,7 @@ def install_ngtcp2(version):
         os.system("make -j$(nproc) check")
         
         # run
-        os.system("sudo ./examples/bsslserver 0.0.0.0 443 ../certs/prett3.com.key ../certs/prett3.com.crt -d /usr/local/nginx/html/")
+        os.system("sudo ./examples/bsslserver 0.0.0.0 443 ../certs/prett3.com.key ../certs/prett3.com.crt -d /usr/local/nginx/html/ -q")
 
 
 def install_xquic(version):
@@ -507,7 +510,7 @@ if __name__ == '__main__':
         install_neqo(version)
     elif server == "aioquic":
         install_aioquic(version)
-    elif server == "quinn":
+    elif server == "quinn-h3":
         install_quinn_h3(version)
     elif server == "ngtcp2-nghttp3":
         install_ngtcp2(version)
