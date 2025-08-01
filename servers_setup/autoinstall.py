@@ -485,12 +485,10 @@ if __name__ == '__main__':
     version = args.version
     
     # kill the running webserver processes
-    os.system("sudo pkill -9 nginx")
-    os.system("sudo pkill -9 caddy")
-    os.system("sudo pkill -9 h2o")
+    print("[+] Stopping the process running on UDP port 443 ...")
+    os.system("sudo kill -9 $(sudo lsof -i UDP:443 -t)")
     os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
-    # TODO add all servers
-    os.system("sudo pkill -9 dotnet")    
+    print("[+] All server killed.")
 
     if server == 'caddy':
         install_caddy(version)

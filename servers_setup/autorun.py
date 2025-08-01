@@ -77,7 +77,7 @@ def run_aioquic(version):
 def run_quinn_h3(version):
     print("[+] Running quinn + h3 %s..." % version)
     if version == '0.0.9':
-        os.chdir("quinn")
+        os.chdir("h3")
         os.system("sudo /root/.cargo/bin/cargo run --example server -- -d /usr/local/nginx/html/ -l 0.0.0.0:443 -c ../certs/prett3.com.cert.der -k ../certs/prett3.com.key.der")
 
 def run_ngtcp2(version):
@@ -137,10 +137,8 @@ if __name__ == '__main__':
     version = args.version
     
     # kill the running webserver processes
-    print("[+] Stopping nginx, litespeed ...")
-    os.system("sudo pkill -9 nginx")
-    os.system("sudo pkill -9 caddy")
-    os.system("sudo pkill -9 h2o")
+    print("[+] Stopping the process running on UDP port 443 ...")
+    os.system("sudo kill -9 $(sudo lsof -i UDP:443 -t)")
     os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
     print("[+] All server killed.")
     
