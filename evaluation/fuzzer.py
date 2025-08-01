@@ -30,6 +30,7 @@ import warnings
 
 
 from hypothesis import example, given, note, reproduce_failure, settings, Verbosity, Phase, strategies as st
+from hypothesis.database import DirectoryBasedExampleDatabase
 
 
 
@@ -105,7 +106,7 @@ class QuicStream:
 
 
 class Fuzzer():
-    def __init__(self, quic_conf:QuicConfiguration, hostname:str, keylog_file:str, mutations:int, parallel_requests:int, interval:int, duration:int, verbose:bool):
+    def __init__(self, quic_conf:QuicConfiguration, hostname:str, keylog_file:str, mutations:int, parallel_requests:int, interval:int, duration:int, verbose:bool, reproduce_failure:str):
         self.quic_conf:QuicConfiguration = quic_conf
         self.hostname:str = hostname
         self.keylog_file:str = keylog_file
@@ -116,6 +117,7 @@ class Fuzzer():
         self.interval:int = interval
         self.duration:int = duration
         self.verbose = verbose
+        self.reproduce_failure = reproduce_failure
     
     def set_up_graph(self, sm_file_path:str, traffic_file_path:str):
         with open(sm_file_path, 'r') as f:
@@ -219,10 +221,6 @@ class Fuzzer():
 
             self.fuzz_state_transition(moving_msgs, triggering_msg, following_msgs) 
 
-
-
-
-    
     def reach_source_state(self, h3client:HttpClient, moving_msgs:List[Packet]) -> None:
         
         h3client.connect()
@@ -281,12 +279,49 @@ class Fuzzer():
         """
         
         num=1
+        reproduce_tag = None
+        if self.reproduce_failure:
+            hypothesis_version, test_string = self.reproduce_failure.split(",")
+            print("hypothesis_version: ", hypothesis_version)
+            print("test_string: ", test_string)
+            reproduce_tag = reproduce_failure(hypothesis_version, test_string.encode())
+        else:
+            reproduce_tag = lambda f: f  # No-op decorator
+
+        import functools
+        def verify_hypothesis_failures(retries=2):
+            def decorator(test_func):
+                @functools.wraps(test_func)
+                def wrapper(*args, **kwargs):
+                    try:
+                        test_func(*args, **kwargs)
+                    except Exception as original_error:
+                        print(">>> Failed. Let's rerun twice." )
+                        # Test failed - verify it's consistent
+                        failures = 0
+                        for _ in range(retries):
+                            try:
+                                time.sleep(10)
+                                test_func(*args, **kwargs)
+                                print(">>> Passed this time :(")
+                            except Exception:             
+                                print(">>> Failed again!" )
+                                failures += 1
+                        # Only raise if it fails consistently
+                        if failures == retries:
+                            print(">>> Voila. Failed twice!".format() )
+                            raise original_error
+                return wrapper
+            return decorator
+
         @given( strategy )
         @settings(deadline=None, verbosity=Verbosity.normal, print_blob=True, 
                   # Exclude the Shrinking phase. We want to see the first example that caused the error.
                   phases=[Phase.explicit , Phase.reuse, Phase.generate, Phase.target], 
-                  max_examples=self.mutations)
-        #@reproduce_failure('6.113.0', b'AAQBAQE=')
+                  max_examples=self.mutations,
+                  database=DirectoryBasedExampleDatabase("/home/ubuntu/hypothesis-db"))
+        @reproduce_tag
+        @verify_hypothesis_failures()
         def fuzz_msg_with_strategy_innner(moving_msgs:List[Packet], 
                                           preceding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]], 
                                           succeeding_quic_frames:List[Union[QuicAck,QuicNewConnectionId,QuicStream]], 
@@ -299,11 +334,12 @@ class Fuzzer():
                 print("\nMutation #{}: {}".format(num, fuzzed_entity))
                 num += 1
             
-            if isinstance(fuzzed_entity, QuicStream) and isinstance(fuzzed_entity.h3_frame, H3Settings):
-                    print("Fuzzzzzzzz that SETTINGS!")
-                    if fuzzed_entity.h3_frame.max_table_capacity < 20 and fuzzed_entity.h3_frame.blocked_streams < 5:
-                        print("Hellllllllllllllllllllllll Yeah. Found that MF") # TODO temp
-                        print(fuzzed_entity)
+            # the following code is for reproducing Chatzoglou vulnerability
+            # if isinstance(fuzzed_entity, QuicStream) and isinstance(fuzzed_entity.h3_frame, H3Settings):
+            #         print("Fuzzzzzzzz that SETTINGS!")
+            #         if fuzzed_entity.h3_frame.max_table_capacity < 20 and fuzzed_entity.h3_frame.blocked_streams < 5:
+            #             print("Hellllllllllllllllllllllll Yeah. Found that MF") # TODO temp
+            #             print(fuzzed_entity)
 
             if self.does_msg_closes_connection(fuzzed_entity):
                 if self.verbose:
@@ -1144,7 +1180,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-p",
-        "--parallel-requests",
+        "--parallel_requests",
         type=int,
         default=20,
         help="The number of requests to send in parallel (default 20)"
@@ -1164,9 +1200,15 @@ if __name__ == "__main__":
         help="The length of attack (in sec.) (default 30)"
     )
     parser.add_argument(
+        "-rf",
+        "--reproduce_failure",
+        type=str,
+        default=None,
+        help="Comma seperated hypothesis version and test case string to reproduce a specific case (e.g. 6.113.0,AAMBAw==) to build @reproduce_failure('6.113.0', b'AAMBAw==')"
+    )
+    parser.add_argument(
         "-v", "--verbose", action="store_true", help="Verbose output"
     )
-    
     
 
 
@@ -1198,7 +1240,8 @@ if __name__ == "__main__":
         parallel_requests=args.parallel_requests,
         interval=args.interval,
         duration=args.duration,
-        verbose = args.verbose)
+        verbose = args.verbose,
+        reproduce_failure=args.reproduce_failure)
     
     
     fuzzer.set_up_graph(args.state_machine, args.pcap)
