@@ -243,25 +243,20 @@ class HttpClient():
         _update_traffic_key() (when called automatically) calls _push_crypto_data() to write data from HANDSHAKE's full buffer to its stream
         """
 
-        epoch = Epoch.HANDSHAKE
-
-        crypto_pair = self._http._quic._cryptos[epoch]
-        if not crypto_pair.send.is_valid():
-            self.close_local_socket()
-            raise Exception("The Encoding crypto is not valid to send data. Is your server up?")
+        self._wait_till_handshake_crypto_is_ready()  
         
-        builder = self.get_builder(epoch)
+        builder = self.get_builder(Epoch.HANDSHAKE)
 
         # CRYPTO
         crypto_streams = self._http._quic._crypto_streams[Epoch.HANDSHAKE]
         
         crypto_frame = None
         # Wait till the server finishes sending all the CRYPTO data
-        for i in range(30):
+        for _ in range(20):
             crypto_frame = crypto_streams.sender.get_frame(1135)  # TODO: calculate max_size dynamically instead of giving static number
             if crypto_frame is not None: 
                 break
-            # time.sleep(0.1)
+            #time.sleep(0.1)
         else:
             self.close_local_socket()
             raise Exception("The Server did not send crypto data. Try again.")
@@ -549,6 +544,8 @@ class HttpClient():
             if self.ack_needed and (epoch == tls.Epoch.ONE_RTT or epoch == tls.Epoch.HANDSHAKE):
                 # If "ST" or "CRY" is present, trigger ACK
                 if "ST" in res_per_packet or "CRY" in res_per_packet or "HD" in res_per_packet:
+                    if epoch==Epoch.HANDSHAKE:
+                        self._wait_till_handshake_crypto_is_ready()
                     self.send_ack_frame(context, packet_number)
 
         return util.beautify_message_string(res_per_packet, exclude_opt_server_frames=True)
@@ -581,6 +578,20 @@ class HttpClient():
         !!! This function MUST BE CALLED EVERY TIME we create HttpClient instance to DISABLE.
         """
         self.ack_needed = flag
+
+    def _wait_till_handshake_crypto_is_ready(self):
+
+        for _ in range(20):
+            crypto_pair = self._http._quic._cryptos[Epoch.HANDSHAKE]
+
+            if crypto_pair.send.is_valid():
+                break
+            else:
+                self.read_from_buffer()
+        else:
+            self.close_local_socket()
+            raise Exception("The Encoding crypto is not valid to send data. Is your server up?")            
+        
 
     def send_ack_frame(self, context: QuicReceiveContext, largest_acknowledged: int) -> None:
         """Constructs and sends an ACK frame in response to received QUIC packets."""

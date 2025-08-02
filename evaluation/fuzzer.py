@@ -358,9 +358,9 @@ class Fuzzer():
                     if self.verbose:
                         print("\nSend {} requests in parallel for {} sec. with {} sec. interval".format( self.parallel_requests, self.duration, self.interval ))
                     
-                    for i in range(int(self.duration/self.interval)):
+                    for _ in range(int(self.duration/self.interval)):
 
-                        for j in range(self.parallel_requests):
+                        for __ in range(self.parallel_requests):
 
                             # Submit each iteration as a separate task
                             futures.append(executor.submit(self.execute_attack, 
@@ -396,7 +396,6 @@ class Fuzzer():
 
             mutations_bar = progress.add_task("Fuzz "+self.extract_fuzzed_object_str_from_strategy(strategy), total=self.mutations, visible=not self.verbose)
 
-            
             fuzz_msg_with_strategy_innner(moving_msgs, preceding_quic_frames, succeeding_quic_frames, following_msgs)
             
 
@@ -1218,10 +1217,9 @@ if __name__ == "__main__":
     configuration = QuicConfiguration(
         is_client=True,
         alpn_protocols=H3_ALPN,
-        original_version=1
+        original_version=1,
+        verify_mode=ssl.CERT_NONE
     )
-
-    configuration.verify_mode = ssl.CERT_NONE
 
     if args.output_keylog:
         output_keylog_file = os.path.abspath(args.output_keylog) 
