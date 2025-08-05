@@ -11,9 +11,12 @@ from typing import List, Union
 
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
+@dataclass
+class QuicH3Frame:
+    pass
 
 @dataclass
-class QuicAck:
+class QuicAck(QuicH3Frame):
     largest_acknowledged:int=None
     ack_delay:int=None
     ack_range_count:int=None
@@ -21,7 +24,7 @@ class QuicAck:
     ack_ranges:List[Tuple[int,int]] = field(default_factory=list) # [gap, ack_range]
 
 @dataclass
-class QuicNewConnectionId:
+class QuicNewConnectionId(QuicH3Frame):
     sequence_number:int = None
     retire_prior_to:int = None
     length:int = None
@@ -29,7 +32,7 @@ class QuicNewConnectionId:
     stateless_reset_token:bytes = None
 
 @dataclass
-class H3Settings:
+class H3Settings(QuicH3Frame):
     max_table_capacity:int = None
     max_field_section_size:int = None
     blocked_streams:int = None
@@ -37,33 +40,33 @@ class H3Settings:
     webtransport:int = None
 
 @dataclass
-class QuicMaxStreams:
+class QuicMaxStreams(QuicH3Frame):
     maximum_streams:int = None
 
     
 @dataclass
-class H3Headers:
+class H3Headers(QuicH3Frame):
     payload:bytes = None
 
 @dataclass
-class H3Data:
+class H3Data(QuicH3Frame):
     payload:bytes = None
     
 @dataclass
-class H3PriorityUpdate:
+class H3PriorityUpdate(QuicH3Frame):
     element_id:int = None
     field_value:str = None
 
 @dataclass
-class QpackEncoder:
+class QpackEncoder(QuicH3Frame):
     payload:bytes = None
 
 @dataclass
-class QpackDecoder:
+class QpackDecoder(QuicH3Frame):
     payload:bytes = None
 
 @dataclass
-class QuicStream:
+class QuicStream(QuicH3Frame):
     stream_id:int = None
     fin_bit:bool = None
     # No need to play with the length field. We calculate length dynamically. Otherwise, the stream frame will be malformed most of the time.
@@ -76,7 +79,7 @@ class MSGDissector():
     def __init__(self):
         self.quic_frames:list = []
 
-    def dissect_msg(self, message:Packet) -> List[Union[QuicAck,QuicNewConnectionId,QuicStream]]:
+    def dissect_msg(self, message:Packet) -> List[QuicH3Frame]:
         h3_frames = []
         # Parse layers in the h3msg
         for layer in message.layers:

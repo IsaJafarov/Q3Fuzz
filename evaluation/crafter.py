@@ -41,7 +41,7 @@ class MSGCrafter():
         elif isinstance(quic_frame, QuicNewConnectionId):
             self.add_nci_frame(quic_frame, builder)
         elif isinstance(quic_frame, QuicMaxStreams):
-            self
+            self.add_max_streams_frame(quic_frame, builder)
         elif isinstance(quic_frame, QuicStream):
             self.add_stream_frame(quic_frame, builder)
         else:
