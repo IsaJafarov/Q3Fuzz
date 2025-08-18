@@ -1,0 +1,224 @@
+{
+  "initial": "START",
+  "transitions": [
+    {
+      "source": "START",
+      "dest": "HANDSHAKING",
+      "trigger": "INITIAL => ACK,CRY,CRY,CRY,CRY,CRY,CRY"
+    },
+    {
+      "source": "HANDSHAKING",
+      "dest": "CONNECTED",
+      "trigger": "HANDSHAKE => CRY,CRY,HD,ST(3)[\u2298],ST(3)[SE],ST(7)[Dec]"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "1",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "7",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "3",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "6",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "7",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "11",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "6",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "11",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[\u2298]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "3",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "7",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "3",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,SS(6),CC\n",
+      "conditions": [
+        "packet_number:8"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,SS(6),CC\n",
+      "conditions": [
+        "packet_number:8"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,SS(2),CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "6",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => \u2298\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "11",
+      "trigger": "ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:8"
+      ]
+    },
+    {
+      "source": "3",
+      "dest": "11",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(7)[Dec],ST(4)[HE,DA],ST(4)[\u2298]\n",
+      "conditions": [
+        "packet_number:8"
+      ]
+    }
+  ],
+  "states": [
+    {
+      "name": "START"
+    },
+    {
+      "name": "FINISH"
+    },
+    {
+      "name": "HANDSHAKING"
+    },
+    {
+      "name": "CONNECTED"
+    },
+    {
+      "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "3"
+    },
+    {
+      "name": "6"
+    },
+    {
+      "name": "7"
+    },
+    {
+      "name": "11"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "START",
+      "name": "HTTP/3 State Machine",
+      "class-name": "statemachine.ProtoModel"
+    }
+  ]
+}
