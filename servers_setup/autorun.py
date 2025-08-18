@@ -18,12 +18,14 @@ def run_caddy(version):
 def run_nginx(version):
     print("[+] Running nginx %s..." % version)
     if version=='1.23.4':
-        os.chdir("./nginx-1.23.4/nginx-quic")
+        os.chdir("./nginx-quic")
     elif version=='1.25.5':
-        os.chdir("./nginx-1.25.5/nginx-1.25.5")
+        os.chdir("./nginx-1.25.5")
     elif version=='1.27.0':
-        os.chdir("./nginx-1.27.0/nginx-1.27.0")
-    os.system("sudo ../installation-root/sbin/nginx")
+        os.chdir("./nginx-1.27.0")
+    elif version=='1.28.0':
+        os.chdir("./nginx-1.28.0")
+    os.system("sudo ./installation-root/sbin/nginx")
 
 def run_openlitespeed(version):
     print("[+] Running openlitespeed %s..." % version)

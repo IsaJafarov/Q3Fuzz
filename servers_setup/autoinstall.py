@@ -36,61 +36,86 @@ def install_caddy(version):
 def install_nginx(version):
     if version=='1.23.4':
         os.system("sudo apt update && sudo apt install build-essential")
-        os.system("sudo rm -r ./nginx-1.23.4; mkdir nginx-1.23.4")
-        os.chdir("nginx-1.23.4")
+        os.system("sudo rm -r ./nginx-quic")
+        os.system("rm nginx-quic.tar.gz")
+        
         os.system("cp ../nginx-files/v1.23.4/nginx-quic.tar.gz ./")
         os.system("tar -zxf nginx-quic.tar.gz")
         os.chdir("nginx-quic")
         
-        os.system("mkdir ../installation-root")
+        # os.system("mkdir ./installation-root")
         
         os.system("./auto/configure --with-debug --with-http_v3_module         \
-					   --prefix=../installation-root \
-                       --with-cc-opt=\"-I../boringssl/include\"     \
-                       --with-ld-opt=\"-L../boringssl/build/ssl    \
-                                      -L../boringssl/build/crypto\"")        
+					   --prefix=./installation-root \
+                       --with-cc-opt=\"-I./boringssl/include\"     \
+                       --with-ld-opt=\"-L./boringssl/build/ssl    \
+                                      -L./boringssl/build/crypto\"")        
         os.system("sudo make -j")
         os.system("sudo make install")
-        os.system("sudo cp ../../nginx-files/v1.23.4/nginx.conf ../installation-root/conf/nginx.conf")
+        os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
 
-        os.system("sudo ../installation-root/sbin/nginx")
+        os.system("sudo ./installation-root/sbin/nginx")
         
 
     elif version=='1.25.5':
         os.system("sudo apt update && sudo apt install gcc libpcre3-dev libssl-dev zlib1g-dev")
-        os.system("sudo rm -r ./nginx-1.25.5; mkdir nginx-1.25.5")
-        os.chdir("nginx-1.25.5")
-        os.system("cp ../nginx-files/v1.25.5/nginx-1.25.5.tar.gz ./")
+        os.system("rm -rf ./nginx-1.25.5")
+        os.system("rm ./nginx-1.25.5.tar.gz")
+
+        os.system("wget https://github.com/nginx/nginx/releases/download/release-1.25.5/nginx-1.25.5.tar.gz")
         os.system("tar -zxf nginx-1.25.5.tar.gz")
         os.chdir("nginx-1.25.5")
         os.system('./configure \
-	--prefix=../installation-root \
+	--prefix=./installation-root \
 	--with-debug \
 	--with-http_v3_module \
-	--with-cc-opt="-I../boringssl/include" \
-	--with-ld-opt="-L../boringssl/build/ssl -L../boringssl/build/crypto"')
+	--with-cc-opt="-I./boringssl/include" \
+	--with-ld-opt="-L./boringssl/build/ssl -L../boringssl/build/crypto"')
         os.system("sudo make -j")
         os.system("sudo make install")
-        os.system("sudo cp ../../nginx-files/v1.25.5/nginx.conf ../installation-root/conf/nginx.conf")
-        os.system("sudo ../installation-root/sbin/nginx")
+        os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
+        os.system("sudo ./installation-root/sbin/nginx")
+
 
     elif version=='1.27.0':
         os.system("sudo apt update && sudo apt install gcc libpcre3-dev libssl-dev zlib1g-dev")
-        os.system("sudo rm -r ./nginx-1.27.0; mkdir nginx-1.27.0")
-        os.chdir("nginx-1.27.0")
-        os.system("cp ../nginx-files/v1.27.0/nginx-1.27.0.tar.gz ./")
+        os.system("rm -rf ./nginx-1.27.0")
+        os.system("rm ./nginx-1.27.0.tar.gz")
+        
+        os.system("wget https://github.com/nginx/nginx/releases/download/release-1.27.0/nginx-1.27.0.tar.gz")
         os.system("tar -zxf nginx-1.27.0.tar.gz")
         os.chdir("nginx-1.27.0")
         os.system('./configure \
-	--prefix=../installation-root \
+	--prefix=./installation-root \
 	--with-debug \
 	--with-http_v3_module \
-	--with-cc-opt="-I../boringssl/include" \
-	--with-ld-opt="-L../boringssl/build/ssl -L../boringssl/build/crypto"')
+	--with-cc-opt="-I./boringssl/include" \
+	--with-ld-opt="-L./boringssl/build/ssl -L../boringssl/build/crypto"')
         os.system("sudo make -j")
         os.system("sudo make install")
-        os.system("sudo cp ../../nginx-files/v1.27.0/nginx.conf ../installation-root/conf/nginx.conf")
-        os.system("sudo ../installation-root/sbin/nginx")
+        os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
+        os.system("sudo ./installation-root/sbin/nginx")
+
+
+    elif version=='1.28.0':
+        os.system("sudo apt update && sudo apt install gcc libpcre3-dev libssl-dev zlib1g-dev")
+        os.system("rm -rf ./nginx-1.28.0")
+        os.system("rm ./nginx-1.28.0.tar.gz")
+        
+        os.system("wget https://github.com/nginx/nginx/releases/download/release-1.28.0/nginx-1.28.0.tar.gz")
+        os.system("tar -zxf nginx-1.28.0.tar.gz")
+        os.chdir("nginx-1.28.0")
+        os.system('./configure \
+	--prefix=./installation-root \
+	--with-debug \
+	--with-http_v3_module \
+	--with-cc-opt="-I./boringssl/include" \
+	--with-ld-opt="-L./boringssl/build/ssl -L./boringssl/build/crypto"')
+
+        os.system("sudo make -j")
+        os.system("sudo make install")
+        os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
+        os.system("sudo ./installation-root/sbin/nginx")
 
 def install_openlitespeed(version):
     if version=='1.7.15':
@@ -382,7 +407,7 @@ def install_xquic(version):
     if version == "1.8.3":
         os.system("sudo rm -r ./xquic")
 
-        os.system("sudo apt install -y build-essential libevent-dev")
+        os.system("sudo apt install -y build-essential libevent-dev cmake")
 
         os.system("git clone https://github.com/alibaba/xquic.git")
         os.chdir("xquic")
@@ -398,12 +423,22 @@ def install_xquic(version):
         os.chdir("../../..")
 
 
-
         os.system("git submodule update --init --recursive")
         os.system("mkdir -p build")
         os.chdir("build")
 
-        os.system("cmake -DGCOV=on -DCMAKE_BUILD_TYPE=Debug -DXQC_ENABLE_TESTING=1 -DXQC_SUPPORT_SENDMMSG_BUILD=1 -DXQC_ENABLE_EVENT_LOG=1 -DXQC_ENABLE_BBR2=1 -DXQC_ENABLE_RENO=1 -DSSL_TYPE=\"boringssl\" -DSSL_PATH=\"../third_party/boringssl\" ..")
+        # os.system("cmake -DGCOV=on -DCMAKE_BUILD_TYPE=Debug -DXQC_ENABLE_TESTING=1 -DXQC_SUPPORT_SENDMMSG_BUILD=1 -DXQC_ENABLE_EVENT_LOG=1 -DXQC_ENABLE_BBR2=1 -DXQC_ENABLE_RENO=1 -DSSL_TYPE=\"boringssl\" -DSSL_PATH=\"../third_party/boringssl\" ..")
+        
+        os.system("cmake -DGCOV=on " \
+    "-DCMAKE_BUILD_TYPE=Release " \
+    "-DXQC_ENABLE_TESTING=0 " \
+    "-DXQC_SUPPORT_SENDMMSG_BUILD=1 " \
+    "-DXQC_ENABLE_EVENT_LOG=0 " \
+    "-DXQC_ENABLE_BBR2=1 " \
+    "-DXQC_ENABLE_RENO=1 " \
+    "-DSSL_TYPE=\"boringssl\" " \
+    "-DSSL_PATH=\"../third_party/boringssl\" ..")
+        
         os.system("make -j2")
         os.chdir("../scripts")
         
@@ -466,7 +501,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
-    "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n"
+    "- 1.23.4, 1.25.5, 1.27.0 or 1.28.0 \t(for nginx) \n"
     "- 2.4.6, 2.7.6, 2.8.4, 2.10.0\t(for caddy) \n"
     "- a429117, 222b36d or 16b13ee\t(for h2o) \n"
     "- 1.7.15, 1.8.1, 1.8.3.1\t(for ols)\n"
