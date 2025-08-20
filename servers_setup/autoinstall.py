@@ -35,7 +35,7 @@ def install_caddy(version):
 
 def install_nginx(version):
     if version=='1.23.4':
-        os.system("sudo apt update && sudo apt install build-essential")
+        os.system("sudo apt update && sudo apt install -y build-essential")
         os.system("sudo rm -r ./nginx-quic")
         os.system("rm nginx-quic.tar.gz")
         
@@ -58,7 +58,7 @@ def install_nginx(version):
         
 
     elif version=='1.25.5':
-        os.system("sudo apt update && sudo apt install gcc libpcre3-dev libssl-dev zlib1g-dev")
+        os.system("sudo apt update && sudo apt install -y gcc libpcre3-dev libssl-dev zlib1g-dev")
         os.system("rm -rf ./nginx-1.25.5")
         os.system("rm ./nginx-1.25.5.tar.gz")
 
@@ -78,7 +78,7 @@ def install_nginx(version):
 
 
     elif version=='1.27.0':
-        os.system("sudo apt update && sudo apt install gcc libpcre3-dev libssl-dev zlib1g-dev")
+        os.system("sudo apt update && sudo apt install -y gcc libpcre3-dev libssl-dev zlib1g-dev")
         os.system("rm -rf ./nginx-1.27.0")
         os.system("rm ./nginx-1.27.0.tar.gz")
         
@@ -98,7 +98,7 @@ def install_nginx(version):
 
 
     elif version=='1.28.0':
-        os.system("sudo apt update && sudo apt install gcc libpcre3-dev libssl-dev zlib1g-dev")
+        os.system("sudo apt update && sudo apt install -y gcc libpcre3-dev libssl-dev zlib1g-dev")
         os.system("rm -rf ./nginx-1.28.0")
         os.system("rm ./nginx-1.28.0.tar.gz")
         
@@ -112,7 +112,7 @@ def install_nginx(version):
 	--with-cc-opt="-I./boringssl/include" \
 	--with-ld-opt="-L./boringssl/build/ssl -L./boringssl/build/crypto"')
 
-        os.system("sudo make -j")
+        os.system("sudo make -j2")
         os.system("sudo make install")
         os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
         os.system("sudo ./installation-root/sbin/nginx")
@@ -306,11 +306,12 @@ def install_neqo(version):
         os.system("sudo apt install -y mercurial")
         os.system("hg clone https://hg.mozilla.org/projects/nss")
         os.system("hg clone https://hg.mozilla.org/projects/nspr")
-        os.chdir("nss")
-        os.system("hg update NSS_3_110_RTM")
-        os.chdir("../nspr")
-        os.system("hg update NSPR_4_36_RTM")
-        os.chdir("..")
+        # Optionally, you can choose NSS & NSP versions that were released around the release time of the chosen Neqo version
+        # os.chdir("nss")
+        # os.system("hg update NSS_3_115_RTM")
+        # os.chdir("../nspr")
+        # os.system("hg update NSPR_4_37_RTM")
+        # os.chdir("..")
         
         # install GYP and Ninja, which NSS depends on
         os.system("sudo apt install -y gyp ninja-build")
@@ -325,10 +326,10 @@ def install_neqo(version):
         
         # set necessary env variables (NSS_DIR and LD_LIBRARY_PATH) and install Neqo
         os.system("sudo apt install clang") # clang is required
-        os.system("export NSS_DIR=\"$(realpath ./nss)\"; export LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\"; $HOME/.cargo/bin/cargo build")
+        os.system("export NSS_DIR=\"$(realpath ./nss)\"; export LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\"; $HOME/.cargo/bin/cargo build --release")
 
         # run Neqo's test server
-        os.system("sudo ./target/debug/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
+        os.system("sudo env LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\" ./target/release/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
 
 def install_aioquic(version):
     if version == '1.2.0':
