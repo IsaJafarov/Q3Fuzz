@@ -28,6 +28,7 @@ from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, T
 from rich.console import Console
 from rich.table import Table
 import warnings
+import paramiko
 
 
 from hypothesis import example, given, note, reproduce_failure, settings, Verbosity, Phase, strategies as st
@@ -102,12 +103,18 @@ class QuicStream:
     length:int = None
     h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
 
+@dataclass
+class QuicMaxStreams(QuicH3Frame):
+    maximum_streams:int = None
+
 """
 
 
 
 class Fuzzer():
-    def __init__(self, quic_conf:QuicConfiguration, hostname:str, keylog_file:str, mutations:int, parallel_requests:int, interval:int, duration:int, verbose:bool, reproduce_failure:str):
+    def __init__(self, quic_conf:QuicConfiguration, hostname:str, keylog_file:str, mutations:int, 
+                 parallel_requests:int, interval:int, duration:int, verbose:bool, reproduce_failure:str, 
+                 restart_server:bool, ssh_user:str, ssh_key_path:str, server_name:str, server_version:str):
         self.quic_conf:QuicConfiguration = quic_conf
         self.hostname:str = hostname
         self.keylog_file:str = keylog_file
@@ -119,6 +126,13 @@ class Fuzzer():
         self.duration:int = duration
         self.verbose = verbose
         self.reproduce_failure = reproduce_failure
+        self.restart_server = restart_server
+        self.ssh_user = ssh_user
+        self.ssh_key_path = ssh_key_path
+        self.server_name = server_name
+        self.server_version = server_version
+
+
     
     def set_up_graph(self, sm_file_path:str, traffic_file_path:str):
         with open(sm_file_path, 'r') as f:
@@ -177,8 +191,8 @@ class Fuzzer():
 
             successors = list()
             for successor in self.graph.successors(node):
-                # skip transitions that close the connection
-                if node == successor or successor == LAST_STATE:
+                # skip transitions that close the connection or loop back
+                if successor == LAST_STATE: # or node == successor:
                     continue
                 successors.append( (node, successor) )
                 
@@ -254,17 +268,21 @@ class Fuzzer():
                 if self.verbose:
                     print("\tFuzzing ACK" )
                 strategy = self.build_ack_strategy(quic_frame)
-                
             elif isinstance(quic_frame, QuicNewConnectionId):
                 if self.verbose:
                     print("\tFuzzing NCI" )
                 strategy = self.build_nci_strategy(quic_frame)
-
             elif isinstance(quic_frame, QuicStream):
                 if self.verbose:
                     print("\tFuzzing STREAM" )
                 strategy = self.build_stream_strategy(quic_frame)
-
+            elif isinstance(quic_frame, QuicMaxStreams):
+                if self.verbose:
+                    print("\tFuzzing QuicMaxStreams" )
+                strategy = self.build_max_streams_strategy(quic_frame)
+            else:
+                raise Exception("[-] Unsupported QUIC Frame: {}".format(quic_frame))
+            
             try:
                 self.fuzz_msg_with_strategy(strategy, moving_msgs, preceding_quic_frames, succeeding_quic_frames, following_msgs)
             except KeyboardInterrupt:
@@ -323,7 +341,7 @@ class Fuzzer():
                   database=DirectoryBasedExampleDatabase("/home/ubuntu/hypothesis-db"))
         @reproduce_tag
         @verify_hypothesis_failures()
-        def fuzz_msg_with_strategy_innner(moving_msgs:List[List[QuicH3Frame]], 
+        def fuzz_msg_with_strategy_inner(moving_msgs:List[List[QuicH3Frame]], 
                                           preceding_quic_frames:List[QuicH3Frame], 
                                           succeeding_quic_frames:List[QuicH3Frame], 
                                           following_msgs:List[List[QuicH3Frame]],
@@ -381,6 +399,9 @@ class Fuzzer():
                 # if we can't, then the server is down
                 fuzzer.check_server_availability()
 
+                if self.restart_server:
+                    fuzzer.restart_remote_server()
+
                 # if self.verbose:
                     # print("\nAttack lasted for {} seconds".format(round(attack_end_time - attack_start_time, 2)))
 
@@ -401,7 +422,7 @@ class Fuzzer():
 
             mutations_bar = progress.add_task("Fuzz "+self.extract_fuzzed_object_str_from_strategy(strategy), total=self.mutations, visible=not self.verbose)
 
-            fuzz_msg_with_strategy_innner(moving_msgs, preceding_quic_frames, succeeding_quic_frames, following_msgs)
+            fuzz_msg_with_strategy_inner(moving_msgs, preceding_quic_frames, succeeding_quic_frames, following_msgs)
             
 
     def check_server_availability(self) -> None:
@@ -444,7 +465,6 @@ class Fuzzer():
                 response = h3client.read_from_buffer()
                 if self.verbose:
                     print("\t\tConnection: {}. Connection Response: {}".format(h3client.connection._host_cids[0].cid.hex(), response) )
-
             else:
                 self.reach_source_state(h3client, moving_msgs)
 
@@ -885,9 +905,6 @@ class Fuzzer():
                           final_strategy[4] )
             )
 
-        
-        #print(st.one_of(built_strategies))
-
         return st.one_of(built_strategies)
 
     def build_stream_strategy(self, stream_frame:QuicStream) -> st.SearchStrategy:
@@ -909,6 +926,9 @@ class Fuzzer():
             st.integers(min_value=0, max_value=2), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
+
+        # When you fuzz msquic, set fin_bit to False in order not to discover the same vulnerability over and over 
+        # fin_bit_field_strategy = st.just(False)
 
         # variable-length integer
         offset_field_strategy = st.one_of(
@@ -938,6 +958,8 @@ class Fuzzer():
             h3_frame_strategy = st.builds(QpackDecoder, payload= st.one_of(
                                             st.just(stream_frame.h3_frame.payload),
                                             st.binary(min_size=0, max_size=1000)))
+        elif stream_frame.h3_frame is None:
+            h3_frame_strategy = st.none() # stream doesn't have any application layer data
         else:
             raise Exception("[-] Unsupported Application Layer Data: {}".format(stream_frame.h3_frame))
         
@@ -972,6 +994,38 @@ class Fuzzer():
         
         return st.one_of(built_strategies)
     
+    def build_max_streams_strategy(self, max_streams_frame:QuicMaxStreams) -> st.SearchStrategy:
+        """
+        maximum_streams:int = None
+        """
+
+        # variable-length integer
+        max_streams_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        default_field_strategies = [
+            st.just(max_streams_frame.maximum_streams)
+        ]
+
+        modifying_field_strategies = [
+            max_streams_field_strategy
+        ]
+        
+        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
+
+
+        built_strategies = []
+        for final_strategy in inter_field_strategies:
+            built_strategies.append(
+                st.builds(QuicMaxStreams, 
+                          final_strategy[0])
+            )
+
+        return st.one_of(built_strategies)
+
+
     def build_h3_settings_strategy(self, settings_frame:H3Settings) -> st.SearchStrategy:
         """
         max_table_capacity:int = None
@@ -1152,6 +1206,30 @@ class Fuzzer():
 
         return fuzzed_object_str
 
+    def restart_remote_server(self):
+
+        def run_remote_tmux_command(ssh, command):
+            stdin, stdout, stderr = ssh.exec_command(command)
+            return stdout.read().decode(), stderr.read().decode()
+        
+        # Setup SSH connection
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        key = paramiko.Ed25519Key.from_private_key_file(self.ssh_key_path)
+        client.connect(self.hostname, 22, self.ssh_user, pkey=key)
+        
+        # Kill running process
+        cmd ="sudo pkill -9 -f autorun.py"
+        run_remote_tmux_command(client, cmd)
+
+        time.sleep(3)
+
+        # Run the new process
+        cmd = "tmux send-keys -t server 'sudo python3 autorun.py {} {}' Enter".format(self.server_name, self.server_version)
+        run_remote_tmux_command(client, cmd)
+
+        client.close()
 
 if __name__ == "__main__":
     #install()
@@ -1217,6 +1295,37 @@ if __name__ == "__main__":
         help="Comma seperated hypothesis version and test case string to reproduce a specific case (e.g. 6.113.0,AAMBAw==) to build @reproduce_failure('6.113.0', b'AAMBAw==')"
     )
     parser.add_argument(
+        "-rs", "--restart_server", action="store_true", help="After fuzzing for each mutation, connect to the target server and restart the QUIC server"
+    )
+    parser.add_argument(
+        "-su",
+        "--ssh_user",
+        type=str,
+        default="ubuntu",
+        help="The SSH user on the server side to connect to (default: ubuntu)"
+    )
+    parser.add_argument(
+        "-skp",
+        "--ssh_key_path",
+        type=str,
+        default="/home/ubuntu/.ssh/id_ed25519",
+        help="The SSH private key path to use to connect to the target server (default: /home/ubuntu/.ssh/id_ed25519)"
+    )
+    parser.add_argument(
+        "-sn",
+        "--server_name",
+        type=str,
+        default=None,
+        help="Server name to use as input parameter while running autorun.py to restart QUIC server"
+    )
+    parser.add_argument(
+        "-sv",
+        "--server_version",
+        type=str,
+        default=None,
+        help="Server name to use as input parameter while running autorun.py to restart QUIC server"
+    )
+    parser.add_argument(
         "-v", "--verbose", action="store_true", help="Verbose output"
     )
     
@@ -1250,7 +1359,12 @@ if __name__ == "__main__":
         interval=args.interval,
         duration=args.duration,
         verbose = args.verbose,
-        reproduce_failure=args.reproduce_failure)
+        reproduce_failure=args.reproduce_failure,
+        restart_server=args.restart_server,
+        ssh_user=args.ssh_user,
+        ssh_key_path=args.ssh_key_path,
+        server_name=args.server_name,
+        server_version=args.server_version)
     
     
     fuzzer.set_up_graph(args.state_machine, args.pcap)
@@ -1260,68 +1374,3 @@ if __name__ == "__main__":
     fuzzer.fuzz()
 
     sys.exit()
-
-    #for m in fuzzer.traffic_messages:
-    #    print( util.h3msg_to_str(m) )
-    #print()
-
-    '''
-    print(fuzzer.find_message_by_packet_number(1))
-
-    dissecter = MSGDissector()
-    quic_frames = dissecter.dissect_msg(fuzzer.find_message_by_packet_number(8))
-
-    st4 = None
-    st6 = None
-    for qf in quic_frames:
-        if type(qf) == QuicStream:
-            if qf.stream_id == 4:
-                st4 = qf
-            elif qf.stream_id == 6:
-                st6 = qf
-
-    st6.offset=1
-    print(st4)
-    print(st6)
-
-    fuzzer.execute_attack(
-        st4,
-        [1],
-        [],
-        [st6]
-    )
-    '''
-
-    #print(fuzzer.find_message_by_packet_number(8))
-
-    for msg in util.h3msg_from_pcap(args.pcap, args.decrypt_keylog, True):
-        dissector = MSGDissector()
-        print( dissector.dissect_msg(msg) )
-        print()
-
-    sys.exit()
-    dissecter = MSGDissector()
-    print(fuzzer.find_message_by_packet_number(10))
-    quic_frames = dissecter.dissect_msg(fuzzer.find_message_by_packet_number(10))
-
-    st0 = None
-    st2 = None
-    for qf in quic_frames:
-        if type(qf) == QuicStream:
-            if qf.stream_id == 2:
-                st2 = qf
-            elif qf.stream_id == 0:
-                st0 = qf
-           
-    #st2.h3_frame.max_table_capacity=None
-    #st2.h3_frame.max_field_section_size=None
-    #st2.h3_frame.blocked_streams=None
-    #st2.h3_frame.h3_datagram=0
-    print(st2)
-
-    fuzzer.execute_attack(
-        st2,
-        [],
-        [],
-        []
-    )
