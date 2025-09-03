@@ -68,7 +68,7 @@ def run_neqo(version):
     print("[+] Running neqo %s..." % version)
     if version == '0.13.1':
         os.chdir("neqo")
-        os.system("sudo env LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\" ./target/release/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
+        os.system("sudo env LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\" RUST_BACKTRACE=full ./target/release/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
 
 def run_aioquic(version):
     print("[+] Running aioquic %s..." % version)

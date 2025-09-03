@@ -329,7 +329,7 @@ def install_neqo(version):
         os.system("export NSS_DIR=\"$(realpath ./nss)\"; export LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\"; $HOME/.cargo/bin/cargo build --release")
 
         # run Neqo's test server
-        os.system("sudo env LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\" ./target/release/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
+        os.system("sudo env LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\" RUST_BACKTRACE=full ./target/release/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
 
 def install_aioquic(version):
     if version == '1.2.0':

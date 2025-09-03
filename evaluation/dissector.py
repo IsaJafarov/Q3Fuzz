@@ -74,6 +74,7 @@ class QuicStream(QuicH3Frame):
     offset:int = None
     h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
 
+QuicH3Packet = List[QuicH3Frame]
 
 class MSGDissector():
     def __init__(self):
