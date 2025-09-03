@@ -9,16 +9,10 @@ from aioquic.quic.connection import *
 from pyshark.packet.packet import Packet
 from urllib.parse import urlparse
 
-from aioquic.h3.connection import FrameType
-from crafter import MSGCrafter
 import util
-from rich.traceback import install
 from http_client import HttpClient
 from aioquic.h3.connection import H3_ALPN
-from aioquic.tls import Epoch
-from pyshark.packet.layers.xml_layer import XmlLayer
 from dissector import *
-from aioquic.h3.connection import encode_frame
 from aioquic.quic.packet import QuicPreferredAddress
 from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 from datetime import datetime
@@ -29,11 +23,12 @@ from rich.console import Console
 from rich.table import Table
 import warnings
 import paramiko
-
-
-from hypothesis import example, given, note, reproduce_failure, settings, Verbosity, Phase, strategies as st
+from enum import Enum
+from hypothesis import given, reproduce_failure, settings, Verbosity, Phase, strategies as st
 from hypothesis.database import DirectoryBasedExampleDatabase
-
+import random
+from rich.traceback import install
+import functools
 
 
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
@@ -48,6 +43,7 @@ SAMPLE_VALUES_FOR_VARINT_VALUES = [0, 2**10, 2**18, 2**25, 2**40, 2**50, 997, 10
 UNNCESESSARY_NODES = ['START', 'HANDSHAKING']
 FIRST_STATE = "CONNECTED"
 LAST_STATE = "FINISH"
+
 
 """
 @dataclass
@@ -110,7 +106,6 @@ class QuicMaxStreams(QuicH3Frame):
 """
 
 
-
 class Fuzzer():
     def __init__(self, quic_conf:QuicConfiguration, hostname:str, keylog_file:str, mutations:int, 
                  parallel_requests:int, interval:int, duration:int, verbose:bool, reproduce_failure:str, 
@@ -131,7 +126,6 @@ class Fuzzer():
         self.ssh_key_path = ssh_key_path
         self.server_name = server_name
         self.server_version = server_version
-
 
     
     def set_up_graph(self, sm_file_path:str, traffic_file_path:str):
@@ -172,9 +166,11 @@ class Fuzzer():
         Extract all the transitions from the graph to fuzz
         """
 
-        def get_triggering_msg_of_transition(source_node:str, target_node:str) -> List[QuicH3Frame]:
+        def get_triggering_msg_of_transition(source_node:str, target_node:str) -> QuicH3Packet:
             edge_to_fuzz = self.graph.get_edge_data(source_node, target_node)
-            #response = edge_to_fuzz['trigger'].split("=>")[1].strip()
+            
+            if edge_to_fuzz['packet_number'] is None: 
+                return None
             triggering_msg_packet_num = int(edge_to_fuzz['packet_number'])
             packet = self.find_message_by_packet_number(triggering_msg_packet_num)
             return MSGDissector().dissect_msg( packet )
@@ -186,23 +182,22 @@ class Fuzzer():
         # because after fuzzing the (source_node, target_node) transition, we will need to travel the following transition, too.
         for node in self.graph.nodes():
 
-            if node in [FIRST_STATE, LAST_STATE]:
+            if node == FIRST_STATE:
                 continue
 
             successors = list()
             for successor in self.graph.successors(node):
-                # skip transitions that close the connection or loop back
-                if successor == LAST_STATE: # or node == successor:
-                    continue
-                successors.append( (node, successor) )
-                
+                if get_triggering_msg_of_transition(node, successor): # the transition has a packet
+                    successors.append( (node, successor) )
+            
             # skip loop transitions
             for predecessor in self.graph.predecessors(node):
-                if predecessor == node: 
-                    continue
-                fuzzing_and_following_transitions[ (predecessor, node) ] = successors
+                if get_triggering_msg_of_transition(predecessor, node): # the transition has a packet
+                    fuzzing_and_following_transitions[ (predecessor, node) ] = successors
         
+
         self.print_info(fuzzing_and_following_transitions.keys())
+
 
         # 2. Fuzz Transport Prameters
         if self.verbose:
@@ -239,7 +234,7 @@ class Fuzzer():
             
             self.fuzz_state_transition(moving_msgs, triggering_msg, following_msgs)
 
-    def reach_source_state(self, h3client:HttpClient, moving_msgs:List[List[QuicH3Frame]]) -> None:
+    def reach_source_state(self, h3client:HttpClient, moving_msgs:List[QuicH3Packet]) -> None:
         
         h3client.connect()
         connect_response = h3client.read_from_buffer()  # Receive any response from the server
@@ -252,16 +247,13 @@ class Fuzzer():
         for moving_msg in moving_msgs:
             response = h3client.send_frames(moving_msg)
 
-    def fuzz_state_transition(self, moving_msgs:List[List[QuicH3Frame]], triggering_msg:List[QuicH3Frame], following_msgs:List[List[QuicH3Frame]]) -> None:
+    def fuzz_state_transition(self, moving_msgs:List[QuicH3Packet], triggering_msg:QuicH3Packet, following_msgs:List[QuicH3Packet]) -> None:
         """
         Dissect the triggering message into individual frames to fuzz them independently
         """
 
         for i in range(len(triggering_msg)):
             quic_frame = triggering_msg[i]
-
-            preceding_quic_frames = triggering_msg[:i]
-            succeeding_quic_frames = triggering_msg[i+1:]
 
             strategy = None
             if isinstance(quic_frame, QuicAck):
@@ -284,16 +276,21 @@ class Fuzzer():
                 raise Exception("[-] Unsupported QUIC Frame: {}".format(quic_frame))
             
             try:
-                self.fuzz_msg_with_strategy(strategy, moving_msgs, preceding_quic_frames, succeeding_quic_frames, following_msgs)
+                self.fuzz_msg_with_strategy(strategy, 
+                                            moving_msgs=moving_msgs, 
+                                            preceding_quic_frames=triggering_msg[:i], 
+                                            succeeding_quic_frames=triggering_msg[i+1:], 
+                                            following_msgs=following_msgs)
             except KeyboardInterrupt:
                 pass # when interrupted, move to the next frame
-
+            
+        
     def fuzz_msg_with_strategy(self, 
                             strategy:st.SearchStrategy,
-                            moving_msgs:List[List[QuicH3Frame]] = [], 
+                            moving_msgs:List[QuicH3Packet] = [], 
                             preceding_quic_frames:List[QuicH3Frame] = [], 
                             succeeding_quic_frames:List[QuicH3Frame] = [],
-                            following_msgs:List[List[QuicH3Frame]] = []) -> None:
+                            following_msgs:List[QuicH3Packet] = []) -> None:
         """
         Apply the mutation strategy to the selected frame
         """
@@ -306,7 +303,7 @@ class Fuzzer():
         else:
             reproduce_tag = lambda f: f  # No-op decorator
 
-        import functools
+        
         def verify_hypothesis_failures(retries=2):
             def decorator(test_func):
                 @functools.wraps(test_func)
@@ -341,12 +338,11 @@ class Fuzzer():
                   database=DirectoryBasedExampleDatabase("/home/ubuntu/hypothesis-db"))
         @reproduce_tag
         @verify_hypothesis_failures()
-        def fuzz_msg_with_strategy_inner(moving_msgs:List[List[QuicH3Frame]], 
-                                          preceding_quic_frames:List[QuicH3Frame], 
+        def fuzz_msg_with_strategy_inner(moving_msgs:List[QuicH3Packet], 
+                                          preceding_quic_frames:QuicH3Packet, 
                                           succeeding_quic_frames:List[QuicH3Frame], 
-                                          following_msgs:List[List[QuicH3Frame]],
-                                          fuzzed_entity:QuicH3Frame):
-            
+                                          following_msgs:List[QuicH3Packet],
+                                          fuzzed_entity):
                 
             if self.verbose:
                 nonlocal num
@@ -360,22 +356,11 @@ class Fuzzer():
             #             print("Hellllllllllllllllllllllll Yeah. Found that MF")
             #             print(fuzzed_entity)
 
-            if self.does_msg_close_connection(fuzzed_entity):
-                if self.verbose:
-                    print("\t\tMessage closes the connection. No need to fuzz with this message.\n\n\n")
-                progress.update(mutations_bar, advance=1)
-                return
-            else:
-                if self.verbose:
-                    print("\t\tMessage does not close the connection. Let's fuzz with this message.")
-
             # if there is no following state, then still we need to fuzz this transition once
             for i in range(max(1, len(following_msgs))): 
                 following_msg =  following_msgs[i] if i < len(following_msgs) else None
-                attack_start_time = time.time()
                 
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    futures = list()
 
                     if self.verbose:
                         print("\n\t\tSend {} requests in parallel for {} sec. with {} sec. interval with each of {} following messages"
@@ -386,24 +371,20 @@ class Fuzzer():
                         for __ in range(self.parallel_requests):
 
                             # Submit each iteration as a separate task
-                            futures.append(executor.submit(self.execute_attack, 
+                            executor.submit(self.execute_attack, 
                                                         fuzzed_entity,
                                                         moving_msgs=moving_msgs, 
                                                         preceding_quic_frames=preceding_quic_frames,
                                                         succeeding_quic_frames=succeeding_quic_frames,
-                                                        following_msg=following_msg))
+                                                        following_msg=following_msg)
                         time.sleep(self.interval)
-                attack_end_time = time.time()
 
                 # check if we can establish a connection with the server.
                 # if we can't, then the server is down
-                fuzzer.check_server_availability()
+                self.check_server_availability()
 
                 if self.restart_server:
-                    fuzzer.restart_remote_server()
-
-                # if self.verbose:
-                    # print("\nAttack lasted for {} seconds".format(round(attack_end_time - attack_start_time, 2)))
+                    self.restart_remote_server()
 
             
             progress.update(mutations_bar, advance=1)
@@ -445,49 +426,14 @@ class Fuzzer():
         
         if self.verbose:
             print("\t\tServer is UP")
-        
-
-    def does_msg_close_connection(self, 
-                       fuzzed_entity:QuicH3Frame, 
-                       moving_msgs:List[List[QuicH3Frame]]=[], 
-                       preceding_quic_frames:List[QuicH3Frame]=[], 
-                       succeeding_quic_frames:List[QuicH3Frame]=[]) -> bool:
-        
-        try: 
-            h3client = HttpClient(self.quic_conf, self.hostname)
-
-            response = None
-            if isinstance(fuzzed_entity, QuicTransportParameters):
-                
-                fuzzed_entity.initial_source_connection_id = h3client.connection._host_cids[0].cid
-
-                h3client.connect(fuzzed_entity)
-                response = h3client.read_from_buffer()
-                if self.verbose:
-                    print("\t\tConnection: {}. Connection Response: {}".format(h3client.connection._host_cids[0].cid.hex(), response) )
-            else:
-                self.reach_source_state(h3client, moving_msgs)
-
-                response = h3client.send_frames( preceding_quic_frames + [fuzzed_entity] + succeeding_quic_frames )
-                if self.verbose:
-                    print("\t\tConnection: {}. Fuzzed Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), response))
-
-                
-            return QUIC_FRAME_ABBREVIATIONS["CONNECTION_CLOSE"] in response
-
-        except Exception as e:
-            if self.verbose:
-                print(e)
-        finally:
-            h3client.close_local_socket()
 
 
     def execute_attack(self, 
-                       fuzzed_entity:QuicH3Frame, 
-                       moving_msgs:List[List[QuicH3Frame]]=[], 
+                       fuzzed_entity:Union[QuicH3Frame, QuicH3Packet], 
+                       moving_msgs:List[QuicH3Packet]=[], 
                        preceding_quic_frames:List[QuicH3Frame]=[], 
                        succeeding_quic_frames:List[QuicH3Frame]=[],
-                       following_msg:List[QuicH3Frame]=[]) -> None:
+                       following_msg:QuicH3Packet=[]) -> None:
         
         # Ignore errors during the attack.
         # Once the attack completes, we will check the server availability. At that point, we will care about the connection errors.
@@ -685,7 +631,6 @@ class Fuzzer():
             st.binary(min_size=0, max_size=2000),
             st.sampled_from( [None] ),
         )
-        
         
         default_field_strategies = [
             st.just(3),  # ack_delay_exponent
@@ -914,7 +859,7 @@ class Fuzzer():
         offset:int = None
         h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
         """
-
+        
         # variable-length integer
         stream_id_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**31+1),
@@ -922,10 +867,7 @@ class Fuzzer():
         )
 
         # variable-length integer
-        fin_bit_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=2), 
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
-        )
+        fin_bit_field_strategy = st.booleans()
 
         # When you fuzz msquic, set fin_bit to False in order not to discover the same vulnerability over and over 
         # fin_bit_field_strategy = st.just(False)
@@ -937,6 +879,7 @@ class Fuzzer():
         )
 
         h3_frame_strategy = st.none()
+
         if isinstance(stream_frame.h3_frame, H3Settings):
             h3_frame_strategy = self.build_h3_settings_strategy(stream_frame.h3_frame)
         elif isinstance(stream_frame.h3_frame, H3PriorityUpdate):
@@ -977,6 +920,8 @@ class Fuzzer():
             offset_field_strategy,
             h3_frame_strategy
         ]
+
+        
         
         inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
@@ -1012,7 +957,7 @@ class Fuzzer():
         modifying_field_strategies = [
             max_streams_field_strategy
         ]
-        
+
         inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
 
@@ -1117,8 +1062,6 @@ class Fuzzer():
             st.sampled_from(["", "000000", "a"*20, "a"*200, "\u2298" ])
         )
 
-       
-        
         default_field_strategies = [
             st.just(priority_update_frame.element_id), 
             st.just(priority_update_frame.field_value)
@@ -1232,7 +1175,7 @@ class Fuzzer():
         client.close()
 
 if __name__ == "__main__":
-    #install()
+    install()
 
     defaults = QuicConfiguration(is_client=True)
 
@@ -1284,8 +1227,8 @@ if __name__ == "__main__":
         "-d",
         "--duration",
         type=int,
-        default=30,
-        help="The length of attack (in sec.) (default 30)"
+        default=60,
+        help="The length of attack (in sec.) (default 60)"
     )
     parser.add_argument(
         "-rf",
@@ -1364,7 +1307,7 @@ if __name__ == "__main__":
         ssh_user=args.ssh_user,
         ssh_key_path=args.ssh_key_path,
         server_name=args.server_name,
-        server_version=args.server_version)
+        server_version=args.server_version )
     
     
     fuzzer.set_up_graph(args.state_machine, args.pcap)
