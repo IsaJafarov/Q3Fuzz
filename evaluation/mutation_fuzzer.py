@@ -23,10 +23,8 @@ from rich.console import Console
 from rich.table import Table
 import warnings
 import paramiko
-from enum import Enum
 from hypothesis import given, reproduce_failure, settings, Verbosity, Phase, strategies as st
 from hypothesis.database import DirectoryBasedExampleDatabase
-import random
 from rich.traceback import install
 import functools
 
@@ -43,7 +41,6 @@ SAMPLE_VALUES_FOR_VARINT_VALUES = [0, 2**10, 2**18, 2**25, 2**40, 2**50, 997, 10
 UNNCESESSARY_NODES = ['START', 'HANDSHAKING']
 FIRST_STATE = "CONNECTED"
 LAST_STATE = "FINISH"
-
 
 """
 @dataclass
@@ -106,6 +103,7 @@ class QuicMaxStreams(QuicH3Frame):
 """
 
 
+
 class Fuzzer():
     def __init__(self, quic_conf:QuicConfiguration, hostname:str, keylog_file:str, mutations:int, 
                  parallel_requests:int, interval:int, duration:int, verbose:bool, reproduce_failure:str, 
@@ -126,6 +124,7 @@ class Fuzzer():
         self.ssh_key_path = ssh_key_path
         self.server_name = server_name
         self.server_version = server_version
+
 
     
     def set_up_graph(self, sm_file_path:str, traffic_file_path:str):
@@ -187,17 +186,16 @@ class Fuzzer():
 
             successors = list()
             for successor in self.graph.successors(node):
-                if get_triggering_msg_of_transition(node, successor): # the transition has a packet
+                if get_triggering_msg_of_transition(node, successor): # the transition has a triggering message
                     successors.append( (node, successor) )
             
             # skip loop transitions
             for predecessor in self.graph.predecessors(node):
-                if get_triggering_msg_of_transition(predecessor, node): # the transition has a packet
+                if get_triggering_msg_of_transition(predecessor, node): # the transition has a triggering message
                     fuzzing_and_following_transitions[ (predecessor, node) ] = successors
         
 
         self.print_info(fuzzing_and_following_transitions.keys())
-
 
         # 2. Fuzz Transport Prameters
         if self.verbose:
@@ -255,6 +253,9 @@ class Fuzzer():
         for i in range(len(triggering_msg)):
             quic_frame = triggering_msg[i]
 
+            preceding_quic_frames = triggering_msg[:i]
+            succeeding_quic_frames = triggering_msg[i+1:]
+
             strategy = None
             if isinstance(quic_frame, QuicAck):
                 if self.verbose:
@@ -276,15 +277,10 @@ class Fuzzer():
                 raise Exception("[-] Unsupported QUIC Frame: {}".format(quic_frame))
             
             try:
-                self.fuzz_msg_with_strategy(strategy, 
-                                            moving_msgs=moving_msgs, 
-                                            preceding_quic_frames=triggering_msg[:i], 
-                                            succeeding_quic_frames=triggering_msg[i+1:], 
-                                            following_msgs=following_msgs)
+                self.fuzz_msg_with_strategy(strategy, moving_msgs, preceding_quic_frames, succeeding_quic_frames, following_msgs)
             except KeyboardInterrupt:
                 pass # when interrupted, move to the next frame
-            
-        
+
     def fuzz_msg_with_strategy(self, 
                             strategy:st.SearchStrategy,
                             moving_msgs:List[QuicH3Packet] = [], 
@@ -303,7 +299,6 @@ class Fuzzer():
         else:
             reproduce_tag = lambda f: f  # No-op decorator
 
-        
         def verify_hypothesis_failures(retries=2):
             def decorator(test_func):
                 @functools.wraps(test_func)
@@ -429,7 +424,7 @@ class Fuzzer():
 
 
     def execute_attack(self, 
-                       fuzzed_entity:Union[QuicH3Frame, QuicH3Packet], 
+                       fuzzed_entity:Union[QuicTransportParameters, QuicH3Frame], 
                        moving_msgs:List[QuicH3Packet]=[], 
                        preceding_quic_frames:List[QuicH3Frame]=[], 
                        succeeding_quic_frames:List[QuicH3Frame]=[],
@@ -631,6 +626,7 @@ class Fuzzer():
             st.binary(min_size=0, max_size=2000),
             st.sampled_from( [None] ),
         )
+        
         
         default_field_strategies = [
             st.just(3),  # ack_delay_exponent
@@ -859,7 +855,7 @@ class Fuzzer():
         offset:int = None
         h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
         """
-        
+
         # variable-length integer
         stream_id_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**31+1),
@@ -879,7 +875,6 @@ class Fuzzer():
         )
 
         h3_frame_strategy = st.none()
-
         if isinstance(stream_frame.h3_frame, H3Settings):
             h3_frame_strategy = self.build_h3_settings_strategy(stream_frame.h3_frame)
         elif isinstance(stream_frame.h3_frame, H3PriorityUpdate):
@@ -920,8 +915,6 @@ class Fuzzer():
             offset_field_strategy,
             h3_frame_strategy
         ]
-
-        
         
         inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
@@ -957,7 +950,7 @@ class Fuzzer():
         modifying_field_strategies = [
             max_streams_field_strategy
         ]
-
+        
         inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
 
@@ -1062,6 +1055,8 @@ class Fuzzer():
             st.sampled_from(["", "000000", "a"*20, "a"*200, "\u2298" ])
         )
 
+       
+        
         default_field_strategies = [
             st.just(priority_update_frame.element_id), 
             st.just(priority_update_frame.field_value)
@@ -1175,7 +1170,7 @@ class Fuzzer():
         client.close()
 
 if __name__ == "__main__":
-    install()
+    #install()
 
     defaults = QuicConfiguration(is_client=True)
 
@@ -1307,7 +1302,7 @@ if __name__ == "__main__":
         ssh_user=args.ssh_user,
         ssh_key_path=args.ssh_key_path,
         server_name=args.server_name,
-        server_version=args.server_version )
+        server_version=args.server_version)
     
     
     fuzzer.set_up_graph(args.state_machine, args.pcap)
