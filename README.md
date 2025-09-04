@@ -3,7 +3,7 @@
 ## Requirements
 - python 3.x
 - pyshark and aioquic packages
-```
+```bash
 $ sudo add-apt-repository ppa:wireshark-dev/stable
 $ sudo apt update
 $ sudo apt install -y tshark=4.4.9-1~ubuntu22.04.0~ppa1
@@ -13,6 +13,7 @@ $ pip3 install networkx==3.1
 $ pip3 install hypothesis==6.113.0
 $ pip3 install rich
 $ pip3 install transitions[diagrams]
+$ pip3 install paramiko # to restart web server periodically during fuzzing
 ```
 
 - To communicate with the web servers, import root-ca.crt in your browser.
