@@ -34,7 +34,6 @@ class MSGCrafter():
         for quic_frame in quic_frames:
             self.add_dissected_frames_to_builder(quic_frame, builder)
 
-
     def add_dissected_frames_to_builder(self, quic_frame, builder:QuicPacketBuilder):
         if isinstance(quic_frame, QuicAck):
             self.add_ack_frame(quic_frame, builder)
@@ -44,6 +43,42 @@ class MSGCrafter():
             self.add_max_streams_frame(quic_frame, builder)
         elif isinstance(quic_frame, QuicStream):
             self.add_stream_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicResetStream):
+            self.add_reset_streams_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicPadding):
+            self.add_padding_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicPing):
+            self.add_ping_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicStopSending):
+            self.add_stop_sending_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicCrypto):
+            self.add_crypto_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicNewTokenFrame):
+            self.add_new_token_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicMaxData):
+            self.add_max_data_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicMaxStreamData):
+            self.add_max_stream_data_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicDataBlocked):
+            self.add_data_blocked_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicStreamDataBlocked):
+            self.add_stream_data_blocked_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicStreamsBlocked):
+            self.add_streams_blocked_uni_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicRetireConnectionId):
+            self.add_retire_connection_id_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicPathChallenge):
+            self.add_path_challenge_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicPathResponse):
+            self.add_path_response_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicConnectionClose):
+            self.add_connection_close_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicHandshakeDone):
+            self.add_handshake_done_frame(quic_frame, builder)
+
+
+        
+            
         else:
             raise Exception("Unexpected QUIC frame {}. Add it here.".format(quic_frame))
         
@@ -77,11 +112,10 @@ class MSGCrafter():
     def add_nci_frame(self, quic_frame:QuicNewConnectionId, builder:QuicPacketBuilder) -> None:
         """
         class QuicNewConnectionId:
-        sequence_number:int = None
-        retire_prior_to:int = None
-        length:int = None
-        connection_id:bytes = None
-        stateless_reset_token:bytes = None
+            sequence_number:int = None
+            retire_prior_to:int = None
+            connection_id:bytes = None
+            stateless_reset_token:bytes = None
         """
 
         buf = builder.start_frame(
@@ -90,19 +124,18 @@ class MSGCrafter():
         )
         buf.push_uint_var( quic_frame.sequence_number ) # Sequence Number
         buf.push_uint_var( quic_frame.retire_prior_to ) # Retire Prior To
-        buf.push_uint8( quic_frame.length ) # Length
+        buf.push_uint8( len(quic_frame.connection_id) ) # Length
         buf.push_bytes( quic_frame.connection_id ) # Connection ID
         buf.push_bytes( quic_frame.stateless_reset_token  ) # Stateless Reset Token
 
     def add_stream_frame(self, quic_frame:QuicStream, builder:QuicPacketBuilder) -> None:
         """
-        @dataclass
         class QuicStream:
-        stream_id:int = None
-        fin_bit:bool = None
-        offset:int = None
-        length:int = None
-        h3_frame:int = None
+            stream_id:int = None
+            fin_bit:bool = None
+            offset:int = None
+            length:int = None
+            h3_frame:int = None
         """
 
         current_offset = self.stream_offsets.get(quic_frame.stream_id, 0)
@@ -128,6 +161,14 @@ class MSGCrafter():
             h3_frame_payload = self.generate_h3_data_frame(quic_frame.h3_frame)
         elif isinstance(quic_frame.h3_frame, H3PriorityUpdate):
             h3_frame_payload = self.generate_h3_priority_update_frame(quic_frame.h3_frame)
+        elif isinstance(quic_frame.h3_frame, H3CancelPush):
+            h3_frame_payload = self.generate_cancel_push_frame(quic_frame.h3_frame)
+        elif isinstance(quic_frame.h3_frame, H3PushPromise):
+            h3_frame_payload = self.generate_push_promise_frame(quic_frame.h3_frame)
+        elif isinstance(quic_frame.h3_frame, H3GoAway):
+            h3_frame_payload = self.generate_goaway_frame(quic_frame.h3_frame)
+        elif isinstance(quic_frame.h3_frame, H3MaxPushId):
+            h3_frame_payload = self.generate_max_push_id_frame(quic_frame.h3_frame)
         elif isinstance(quic_frame.h3_frame, QpackEncoder):
             h3_frame_payload = self.generate_qpack_encoder(quic_frame.h3_frame, quic_frame.offset==0)
         elif isinstance(quic_frame.h3_frame, QpackDecoder):
@@ -161,17 +202,15 @@ class MSGCrafter():
 
     def add_max_streams_frame(self, quic_frame:QuicMaxStreams, builder:QuicPacketBuilder) -> None:
         '''
-        @dataclass
         class QuicMaxStreams:
-        maximum_streams:int = None
+            maximum_streams:int = None
         '''
         buf = builder.start_frame(
             QuicFrameType.MAX_STREAMS_UNI,
             capacity=MAX_STREAM_DATA_FRAME_CAPACITY
         )
         buf.push_uint_var( quic_frame.maximum_streams ) # Maximum Streams
-        
-
+    
     def generate_h3_settings_frame(self, h3_frame:H3Settings) -> bytes:
         """
         max_table_capacity:int = None
@@ -243,6 +282,283 @@ class MSGCrafter():
         else:
             return h3_frame.payload
 
+    def generate_cancel_push_frame(self, h3_frame:H3CancelPush) -> bytes:
+        """
+        class H3CancelPush(QuicH3Frame):
+            push_id:int = None
+        """
 
+        data_payload = b""
+        # data_payload += encode_uint_var(h3_frame.length)
+        data_payload += encode_uint_var(h3_frame.push_id)
 
+        print("data_payload = {}".format(data_payload))
+        
+        # Encode the PRIORITY_UPDATE frame
+        frame_data = encode_frame(FrameType.CANCEL_PUSH, data_payload )
+        print("frame_data = {}".format(frame_data))
+        
+        return frame_data
     
+    def generate_push_promise_frame(self, h3_frame:H3PushPromise) -> bytes:
+        """
+        class H3PushPromise(QuicH3Frame):
+            push_id:int = None
+            field_section:bytes = None
+        """
+
+        data_payload = b""
+        # data_payload += encode_uint_var(h3_frame.length)
+        data_payload += encode_uint_var(h3_frame.push_id)
+        data_payload += h3_frame.field_section
+
+        print("data_payload = {}".format(data_payload))
+        
+        # Encode the PRIORITY_UPDATE frame
+        frame_data = encode_frame(FrameType.PUSH_PROMISE, data_payload )
+        print("frame_data = {}".format(frame_data))
+        
+        return frame_data
+    
+    def generate_goaway_frame(self, h3_frame:H3GoAway) -> bytes:
+        """
+        class H3GoAway(QuicH3Frame):
+            stream_id:int = None
+        """
+
+        data_payload = b""
+        data_payload += encode_uint_var(h3_frame.stream_id)
+
+        
+        # Encode the PRIORITY_UPDATE frame
+        frame_data = encode_frame(FrameType.GOAWAY, data_payload )
+        
+        return frame_data
+    
+    def generate_max_push_id_frame(self, h3_frame:H3MaxPushId) -> bytes:
+        """
+        class H3MaxPushId(QuicH3Frame):
+            push_id:int = None
+        """
+
+        data_payload = b""
+        data_payload += encode_uint_var(h3_frame.push_id)
+
+        
+        # Encode the PRIORITY_UPDATE frame
+        frame_data = encode_frame(FrameType.MAX_PUSH_ID, data_payload )
+        
+        return frame_data
+
+    def add_padding_frame(self, quic_frame:QuicPadding, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicPadding(QuicH3Frame):
+            pass
+        """
+        buf = builder.start_frame(
+            QuicFrameType.PADDING,
+            # capacity=PADDING
+        )
+
+    def add_ping_frame(self, quic_frame:QuicPing, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicPing(QuicH3Frame):
+            pass
+        """
+        buf = builder.start_frame(
+            QuicFrameType.PING,
+            capacity=PING_FRAME_CAPACITY
+        )
+    
+    def add_reset_streams_frame(self, quic_frame:QuicResetStream, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicResetStream(QuicH3Frame):
+            stream_id:int = None
+            app_protocol_error_code:int = None
+            final_size:int = None
+        """
+        buf = builder.start_frame(
+            QuicFrameType.RESET_STREAM,
+            capacity=RESET_STREAM_FRAME_CAPACITY
+        )
+        buf.push_uint_var( quic_frame.stream_id ) # Stream ID
+        buf.push_uint_var( quic_frame.app_protocol_error_code ) # Application Protocol Error Code
+        buf.push_uint_var( quic_frame.final_size ) # Final Size
+
+    def add_stop_sending_frame(self, quic_frame:QuicStopSending, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicStopSending(QuicH3Frame):
+            stream_id:int = None
+            app_protocol_error_code:int = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.STOP_SENDING,
+            capacity=STOP_SENDING_FRAME_CAPACITY
+        )
+        buf.push_uint_var( quic_frame.stream_id ) # Stream ID
+        buf.push_uint_var( quic_frame.app_protocol_error_code ) # Application Protocol Error Code
+    
+    def add_crypto_frame(self, quic_frame:QuicCrypto, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicCrypto(QuicH3Frame):
+            offset:int = None
+            data:bytes = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.CRYPTO,
+            # capacity=CRYPTO_BUFFER_SIZE
+        )
+        buf.push_uint_var( quic_frame.offset ) # Offset
+        buf.push_uint_var( len( quic_frame.data ) ) # Length
+        buf.push_bytes( quic_frame.data ) # Crypto Data
+
+    def add_new_token_frame(self, quic_frame:QuicNewTokenFrame, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicNewTokenFrame(QuicH3Frame):
+            token:bytes = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.NEW_TOKEN,
+            # capacity=NEW_TOKE
+        )
+        buf.push_uint_var( len(quic_frame.token) ) # Token Length
+        buf.push_bytes( quic_frame.token ) # Token
+    
+    def add_max_data_frame(self, quic_frame:QuicMaxData, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicMaxData(QuicH3Frame):
+            max_data:int = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.MAX_DATA,
+            # capacity=MAX_DATA
+        )
+        buf.push_uint_var( quic_frame.max_data ) # Maximum Data
+        
+
+    def add_max_stream_data_frame(self, quic_frame:QuicMaxStreamData, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicMaxStreamData(QuicH3Frame):
+            stream_id:int = None
+            max_stream_data:int = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.MAX_STREAM_DATA,
+            capacity=MAX_STREAM_DATA_FRAME_CAPACITY
+        )
+        buf.push_uint_var( quic_frame.stream_id ) # Stream ID
+        buf.push_uint_var( quic_frame.max_stream_data ) # Maximum Stream Data
+
+
+    def add_data_blocked_frame(self, quic_frame:QuicDataBlocked, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicDataBlocked(QuicH3Frame):
+            max_data:int = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.DATA_BLOCKED,
+            # capacity=DATA_BLOCKED
+        )
+        buf.push_uint_var( quic_frame.max_data ) # Maximum Data
+
+    def add_stream_data_blocked_frame(self, quic_frame:QuicStreamDataBlocked, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicStreamDataBlocked(QuicH3Frame):
+            stream_id:int = None
+            max_stream_data:int = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.STREAM_DATA_BLOCKED,
+            # capacity=STREAm_da
+        )
+        buf.push_uint_var( quic_frame.stream_id ) # Stream ID
+        buf.push_uint_var( quic_frame.max_stream_data ) # Maximum Stream Data
+
+
+    def add_streams_blocked_uni_frame(self, quic_frame:QuicStreamsBlocked, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicStreamsBlocked(QuicH3Frame):
+            bidirectional:bool = None
+            max_streams:int = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.STREAMS_BLOCKED_BIDI if quic_frame.bidirectional else QuicFrameType.STREAMS_BLOCKED_UNI,
+            capacity=STREAMS_BLOCKED_CAPACITY
+        )
+        buf.push_uint_var( quic_frame.max_streams ) # Maximum Streams
+
+    def add_retire_connection_id_frame(self, quic_frame:QuicRetireConnectionId, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicRetireConnectionId(QuicH3Frame):
+            sequence_number:int = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.RETIRE_CONNECTION_ID,
+            capacity=RETIRE_CONNECTION_ID_CAPACITY
+        )
+        buf.push_uint_var( quic_frame.sequence_number ) # Sequence Number
+
+    def add_path_challenge_frame(self, quic_frame:QuicPathChallenge, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicPathChallenge(QuicH3Frame):
+            data:bytes = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.PATH_CHALLENGE,
+            capacity=PATH_CHALLENGE_FRAME_CAPACITY
+        )
+        buf.push_bytes( quic_frame.data ) # Data
+
+    def add_path_response_frame(self, quic_frame:QuicPathResponse, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicPathResponse(QuicH3Frame):
+            data:bytes = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.PATH_RESPONSE,
+            capacity=PATH_RESPONSE_FRAME_CAPACITY
+        )
+        buf.push_bytes( quic_frame.data ) # Data
+
+    def add_connection_close_frame(self, quic_frame:QuicConnectionClose, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicConnectionClose(QuicH3Frame):
+            error_code:int = None
+            frame_type:int = None
+            reason_phrase_length:int = None
+            reason_phrase:bytes = None
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.TRANSPORT_CLOSE if quic_frame.transport_layer else QuicFrameType.APPLICATION_CLOSE,
+            capacity = TRANSPORT_CLOSE_FRAME_CAPACITY if quic_frame.transport_layer else APPLICATION_CLOSE_FRAME_CAPACITY
+        )
+
+        buf.push_uint_var( quic_frame.error_code ) # Error Code
+        buf.push_uint_var( quic_frame.frame_type ) # Frame Type
+        buf.push_uint_var( len( quic_frame.reason_phrase ) ) # Reason Phrase Length
+        buf.push_bytes( quic_frame.reason_phrase ) # Reason Phrase
+
+    def add_handshake_done_frame(self, quic_frame:QuicHandshakeDone, builder:QuicPacketBuilder) -> None:
+        """
+        class QuicHandshakeDone(QuicH3Frame):
+            pass
+        """
+
+        buf = builder.start_frame(
+            QuicFrameType.HANDSHAKE_DONE,
+            capacity = HANDSHAKE_DONE_FRAME_CAPACITY
+        )
+
+

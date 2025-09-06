@@ -27,9 +27,9 @@ class QuicAck(QuicH3Frame):
 class QuicNewConnectionId(QuicH3Frame):
     sequence_number:int = None
     retire_prior_to:int = None
-    length:int = None
+    # length:int = None
     connection_id:bytes = None
-    stateless_reset_token:bytes = None
+    stateless_reset_token:bytes = None # it should be 16 byte. Otherwise, it is malformed
 
 @dataclass
 class H3Settings(QuicH3Frame):
@@ -73,6 +73,109 @@ class QuicStream(QuicH3Frame):
     # length:int = None
     offset:int = None
     h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
+
+# following frames 
+
+@dataclass
+class QuicPadding(QuicH3Frame):
+    pass
+
+@dataclass
+class QuicPing(QuicH3Frame):
+    pass
+
+@dataclass
+class QuicResetStream(QuicH3Frame):
+    stream_id:int = None
+    app_protocol_error_code:int = None
+    final_size:int = None
+
+@dataclass
+class QuicStopSending(QuicH3Frame):
+    stream_id:int = None
+    app_protocol_error_code:int = None
+
+@dataclass
+class QuicCrypto(QuicH3Frame):
+    offset:int = None
+    # length:int = None
+    data:bytes = None # offset, length and the length of data should match. Otherwise, it is malformed
+
+@dataclass
+class QuicNewTokenFrame(QuicH3Frame):
+    # length:int = None
+    token:bytes = None
+
+@dataclass
+class QuicMaxData(QuicH3Frame):
+    max_data:int = None
+
+
+@dataclass
+class QuicMaxStreamData(QuicH3Frame):
+    stream_id:int = None
+    max_stream_data:int = None
+
+@dataclass
+class QuicDataBlocked(QuicH3Frame):
+    max_data:int = None
+
+@dataclass
+class QuicStreamDataBlocked(QuicH3Frame):
+    stream_id:int = None
+    max_stream_data:int = None
+
+@dataclass
+class QuicStreamsBlocked(QuicH3Frame):
+    bidirectional:bool = None
+    max_streams:int = None
+
+@dataclass
+class QuicRetireConnectionId(QuicH3Frame):
+    sequence_number:int = None
+
+@dataclass
+class QuicPathChallenge(QuicH3Frame): 
+    data:bytes = None  # should be 8 bytes or it is malformed
+
+
+@dataclass
+class QuicPathResponse(QuicH3Frame):
+    data:bytes = None # should be 8 bytes or it is malformed
+
+@dataclass
+class QuicConnectionClose(QuicH3Frame):
+    transport_layer:bool = None
+    error_code:int = None
+    frame_type:int = None
+    # reason_phrase_length:int = None # reason_phrase_length should match the length of reason_phrase. Otherwise it is malformed
+    reason_phrase:bytes = None
+
+@dataclass
+class H3CancelPush(QuicH3Frame):
+    push_id:int = None
+
+@dataclass
+class H3PushPromise(QuicH3Frame):
+    push_id:int = None
+    field_section:bytes = None
+
+@dataclass
+class H3GoAway(QuicH3Frame):
+    stream_id:int = None
+    
+@dataclass
+class H3MaxPushId(QuicH3Frame):
+    push_id:int = None
+
+    
+
+
+
+@dataclass
+class QuicHandshakeDone(QuicH3Frame):
+    pass
+
 
 QuicH3Packet = List[QuicH3Frame]
 
