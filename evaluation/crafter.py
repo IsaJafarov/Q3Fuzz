@@ -1,14 +1,9 @@
-import sys
 
-import aioquic
 from aioquic.quic.connection import *
 from aioquic.h3.connection import FrameType, StreamType, encode_settings, encode_frame
 from aioquic.buffer import encode_uint_var
-from aioquic.tls import Epoch
 from pyshark.packet.packet import Packet
-from pyshark.packet.layers.xml_layer import XmlLayer
-from dataclasses import dataclass, field
-from typing import List, Union
+from typing import List
 from dissector import *
 
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
@@ -98,12 +93,9 @@ class MSGCrafter():
         data_payload = b""
         # data_payload += encode_uint_var(h3_frame.length)
         data_payload += encode_uint_var(h3_frame.push_id)
-
-        print("data_payload = {}".format(data_payload))
         
-        # Encode the PRIORITY_UPDATE frame
+        # Add the Frame Type
         frame_data = encode_frame(FrameType.CANCEL_PUSH, data_payload )
-        print("frame_data = {}".format(frame_data))
         
         return frame_data
     
@@ -153,12 +145,9 @@ class MSGCrafter():
         # data_payload += encode_uint_var(h3_frame.length)
         data_payload += encode_uint_var(h3_frame.push_id)
         data_payload += h3_frame.field_section
-
-        print("data_payload = {}".format(data_payload))
         
-        # Encode the PRIORITY_UPDATE frame
+        # Add the Frame Type
         frame_data = encode_frame(FrameType.PUSH_PROMISE, data_payload )
-        print("frame_data = {}".format(frame_data))
         
         return frame_data
     
@@ -172,7 +161,7 @@ class MSGCrafter():
         data_payload += encode_uint_var(h3_frame.stream_id)
 
         
-        # Encode the PRIORITY_UPDATE frame
+        # Add the Frame Type
         frame_data = encode_frame(FrameType.GOAWAY, data_payload )
         
         return frame_data
@@ -187,7 +176,7 @@ class MSGCrafter():
         data_payload += encode_uint_var(h3_frame.push_id)
 
         
-        # Encode the PRIORITY_UPDATE frame
+        # Add the Frame Type
         frame_data = encode_frame(FrameType.MAX_PUSH_ID, data_payload )
         
         return frame_data
@@ -203,7 +192,7 @@ class MSGCrafter():
         data_payload += encode_uint_var(h3_frame.element_id)  
         data_payload += h3_frame.field_value.encode()
         
-        # Encode the PRIORITY_UPDATE frame
+        # Add the Frame Type
         frame_data = encode_frame(PRIORITY_UPDATE_FRAME_IDS[0], data_payload )
         
         return frame_data

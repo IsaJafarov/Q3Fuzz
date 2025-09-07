@@ -1,13 +1,10 @@
-import sys
 
 from aioquic.quic.connection import *
-from aioquic.h3.connection import FrameType, StreamType, encode_settings, encode_frame
-from aioquic.buffer import encode_uint_var
-from aioquic.tls import Epoch
+from aioquic.h3.connection import FrameType
 from pyshark.packet.packet import Packet
 from pyshark.packet.layers.xml_layer import XmlLayer
 from dataclasses import dataclass, field
-from typing import List, Union
+from typing import List
 
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
