@@ -16,21 +16,24 @@ class H3Frame:
     pass
 
 @dataclass
+class H3Data(H3Frame):
+    payload:bytes = None
+
+@dataclass
 class H3Headers(H3Frame):
     payload:bytes = None
 
 @dataclass
-class H3Data(H3Frame):
-    payload:bytes = None
-    
-@dataclass
-class H3PriorityUpdate(H3Frame):
-    element_id:int = None
-    field_value:str = None
-
-@dataclass
 class H3CancelPush(H3Frame):
     push_id:int = None
+
+@dataclass
+class H3Settings(H3Frame):
+    max_table_capacity:int = None
+    max_field_section_size:int = None
+    blocked_streams:int = None
+    h3_datagram:int = None
+    webtransport:int = None
 
 @dataclass
 class H3PushPromise(H3Frame):
@@ -40,14 +43,35 @@ class H3PushPromise(H3Frame):
 @dataclass
 class H3GoAway(H3Frame):
     stream_id:int = None
-    
+
 @dataclass
 class H3MaxPushId(H3Frame):
     push_id:int = None
 
+@dataclass
+class H3PriorityUpdate(H3Frame):
+    element_id:int = None
+    field_value:str = None
+
+@dataclass
+class QpackEncoder(H3Frame):
+    payload:bytes = None
+
+@dataclass
+class QpackDecoder(H3Frame):
+    payload:bytes = None
+
 
 @dataclass
 class QuicFrame:
+    pass
+
+@dataclass
+class QuicPadding(QuicFrame):
+    pass
+
+@dataclass
+class QuicPing(QuicFrame):
     pass
 
 @dataclass
@@ -57,51 +81,6 @@ class QuicAck(QuicFrame):
     ack_range_count:int=None
     ack_first_ack_range:int=None
     ack_ranges:List[Tuple[int,int]] = field(default_factory=list) # [gap, ack_range]
-
-@dataclass
-class QuicNewConnectionId(QuicFrame):
-    sequence_number:int = None
-    retire_prior_to:int = None
-    # length:int = None
-    connection_id:bytes = None
-    stateless_reset_token:bytes = None # it should be 16 byte. Otherwise, the frame is malformed
-
-@dataclass
-class H3Settings(QuicFrame):
-    max_table_capacity:int = None
-    max_field_section_size:int = None
-    blocked_streams:int = None
-    h3_datagram:int = None
-    webtransport:int = None
-
-@dataclass
-class QuicMaxStreams(QuicFrame):
-    maximum_streams:int = None
-
-@dataclass
-class QpackEncoder(QuicFrame):
-    payload:bytes = None
-
-@dataclass
-class QpackDecoder(QuicFrame):
-    payload:bytes = None
-
-@dataclass
-class QuicStream(QuicFrame):
-    stream_id:int = None
-    fin_bit:bool = None
-    # No need to play with the length field. We calculate length dynamically. Otherwise, the stream frame will be malformed most of the time.
-    # length:int = None
-    offset:int = None
-    h3_frame:H3Frame = None
-
-@dataclass
-class QuicPadding(QuicFrame):
-    pass
-
-@dataclass
-class QuicPing(QuicFrame):
-    pass
 
 @dataclass
 class QuicResetStream(QuicFrame):
@@ -126,14 +105,26 @@ class QuicNewTokenFrame(QuicFrame):
     token:bytes = None
 
 @dataclass
+class QuicStream(QuicFrame):
+    stream_id:int = None
+    fin_bit:bool = None
+    # No need to play with the length field. We calculate length dynamically. Otherwise, the stream frame will be malformed most of the time.
+    # length:int = None
+    offset:int = None
+    h3_frame:H3Frame = None
+
+@dataclass
 class QuicMaxData(QuicFrame):
     max_data:int = None
-
 
 @dataclass
 class QuicMaxStreamData(QuicFrame):
     stream_id:int = None
     max_stream_data:int = None
+
+@dataclass
+class QuicMaxStreams(QuicFrame):
+    maximum_streams:int = None
 
 @dataclass
 class QuicDataBlocked(QuicFrame):
@@ -150,13 +141,20 @@ class QuicStreamsBlocked(QuicFrame):
     max_streams:int = None
 
 @dataclass
+class QuicNewConnectionId(QuicFrame):
+    sequence_number:int = None
+    retire_prior_to:int = None
+    # length:int = None
+    connection_id:bytes = None
+    stateless_reset_token:bytes = None # it should be 16 byte. Otherwise, the frame is malformed
+
+@dataclass
 class QuicRetireConnectionId(QuicFrame):
     sequence_number:int = None
 
 @dataclass
 class QuicPathChallenge(QuicFrame): 
     data:bytes = None  # should be 8 bytes or it is malformed
-
 
 @dataclass
 class QuicPathResponse(QuicFrame):
@@ -173,6 +171,8 @@ class QuicConnectionClose(QuicFrame):
 @dataclass
 class QuicHandshakeDone(QuicFrame):
     pass
+
+
 
 
 QuicPacket = List[QuicFrame] # A QUIC packet is basically a few Quic Frames sent together
