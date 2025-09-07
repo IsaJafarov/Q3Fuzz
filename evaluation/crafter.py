@@ -84,12 +84,12 @@ class MSGCrafter():
         
     def add_ack_frame(self, quic_frame:QuicAck, builder:QuicPacketBuilder) -> None:
         """
-        class QuicAck:
-        largest_acknowledged:int=None
-        ack_delay:int=None
-        ack_range_count:int=None
-        ack_first_ack_range:int=None
-        ack_ranges:List[Tuple[int,int]] = field(default_factory=list)
+        QuicAck:
+            largest_acknowledged:int
+            ack_delay:int
+            ack_range_count:int
+            ack_first_ack_range:int
+            ack_ranges:List[Tuple[int,int]]
         """
 
         # Start the ACK frame in the builder
@@ -111,11 +111,11 @@ class MSGCrafter():
 
     def add_nci_frame(self, quic_frame:QuicNewConnectionId, builder:QuicPacketBuilder) -> None:
         """
-        class QuicNewConnectionId:
-            sequence_number:int = None
-            retire_prior_to:int = None
-            connection_id:bytes = None
-            stateless_reset_token:bytes = None
+        QuicNewConnectionId:
+            sequence_number:int
+            retire_prior_to:int
+            connection_id:bytes
+            stateless_reset_token:bytes
         """
 
         buf = builder.start_frame(
@@ -130,12 +130,11 @@ class MSGCrafter():
 
     def add_stream_frame(self, quic_frame:QuicStream, builder:QuicPacketBuilder) -> None:
         """
-        class QuicStream:
-            stream_id:int = None
-            fin_bit:bool = None
-            offset:int = None
-            length:int = None
-            h3_frame:int = None
+        QuicStream:
+            stream_id:int
+            fin_bit:bool
+            offset:int
+            h3_frame:int
         """
 
         current_offset = self.stream_offsets.get(quic_frame.stream_id, 0)
@@ -202,8 +201,8 @@ class MSGCrafter():
 
     def add_max_streams_frame(self, quic_frame:QuicMaxStreams, builder:QuicPacketBuilder) -> None:
         '''
-        class QuicMaxStreams:
-            maximum_streams:int = None
+         QuicMaxStreams:
+            maximum_streams:int
         '''
         buf = builder.start_frame(
             QuicFrameType.MAX_STREAMS_UNI,
@@ -213,11 +212,12 @@ class MSGCrafter():
     
     def generate_h3_settings_frame(self, h3_frame:H3Settings) -> bytes:
         """
-        max_table_capacity:int = None
-        max_field_section_size:int = None
-        blocked_streams:int = None
-        h3_datagram:int = None
-        webtransport:int = None
+        H3Settings
+            max_table_capacity:int
+            max_field_section_size:int
+            blocked_streams:int
+            h3_datagram:int
+            webtransport:int
         """
         settings = {}
 
@@ -255,8 +255,9 @@ class MSGCrafter():
 
     def generate_h3_priority_update_frame(self, h3_frame:H3PriorityUpdate) -> bytes:
         """
-        element_id:int = None
-        field_value:str = None
+        H3PriorityUpdate
+            element_id:int
+            field_value:str
         """
 
         data_payload = b""
@@ -284,8 +285,8 @@ class MSGCrafter():
 
     def generate_cancel_push_frame(self, h3_frame:H3CancelPush) -> bytes:
         """
-        class H3CancelPush(QuicH3Frame):
-            push_id:int = None
+        H3CancelPush:
+            push_id:int
         """
 
         data_payload = b""
@@ -302,9 +303,9 @@ class MSGCrafter():
     
     def generate_push_promise_frame(self, h3_frame:H3PushPromise) -> bytes:
         """
-        class H3PushPromise(QuicH3Frame):
-            push_id:int = None
-            field_section:bytes = None
+        H3PushPromise:
+            push_id:int
+            field_section:bytes
         """
 
         data_payload = b""
@@ -322,8 +323,8 @@ class MSGCrafter():
     
     def generate_goaway_frame(self, h3_frame:H3GoAway) -> bytes:
         """
-        class H3GoAway(QuicH3Frame):
-            stream_id:int = None
+        H3GoAway:
+            stream_id:int
         """
 
         data_payload = b""
@@ -337,8 +338,8 @@ class MSGCrafter():
     
     def generate_max_push_id_frame(self, h3_frame:H3MaxPushId) -> bytes:
         """
-        class H3MaxPushId(QuicH3Frame):
-            push_id:int = None
+        H3MaxPushId:
+            push_id:int
         """
 
         data_payload = b""
@@ -352,7 +353,7 @@ class MSGCrafter():
 
     def add_padding_frame(self, quic_frame:QuicPadding, builder:QuicPacketBuilder) -> None:
         """
-        class QuicPadding(QuicH3Frame):
+        QuicPadding:
             pass
         """
         buf = builder.start_frame(
@@ -362,7 +363,7 @@ class MSGCrafter():
 
     def add_ping_frame(self, quic_frame:QuicPing, builder:QuicPacketBuilder) -> None:
         """
-        class QuicPing(QuicH3Frame):
+        QuicPing:
             pass
         """
         buf = builder.start_frame(
@@ -372,10 +373,10 @@ class MSGCrafter():
     
     def add_reset_streams_frame(self, quic_frame:QuicResetStream, builder:QuicPacketBuilder) -> None:
         """
-        class QuicResetStream(QuicH3Frame):
-            stream_id:int = None
-            app_protocol_error_code:int = None
-            final_size:int = None
+        QuicResetStream:
+            stream_id:int
+            app_protocol_error_code:int
+            final_size:int
         """
         buf = builder.start_frame(
             QuicFrameType.RESET_STREAM,
@@ -387,9 +388,9 @@ class MSGCrafter():
 
     def add_stop_sending_frame(self, quic_frame:QuicStopSending, builder:QuicPacketBuilder) -> None:
         """
-        class QuicStopSending(QuicH3Frame):
-            stream_id:int = None
-            app_protocol_error_code:int = None
+        QuicStopSending:
+            stream_id:int
+            app_protocol_error_code:int
         """
 
         buf = builder.start_frame(
@@ -401,9 +402,9 @@ class MSGCrafter():
     
     def add_crypto_frame(self, quic_frame:QuicCrypto, builder:QuicPacketBuilder) -> None:
         """
-        class QuicCrypto(QuicH3Frame):
-            offset:int = None
-            data:bytes = None
+        QuicCrypto:
+            offset:int
+            data:bytes
         """
 
         buf = builder.start_frame(
@@ -416,8 +417,8 @@ class MSGCrafter():
 
     def add_new_token_frame(self, quic_frame:QuicNewTokenFrame, builder:QuicPacketBuilder) -> None:
         """
-        class QuicNewTokenFrame(QuicH3Frame):
-            token:bytes = None
+        QuicNewTokenFrame:
+            token:bytes
         """
 
         buf = builder.start_frame(
@@ -429,8 +430,8 @@ class MSGCrafter():
     
     def add_max_data_frame(self, quic_frame:QuicMaxData, builder:QuicPacketBuilder) -> None:
         """
-        class QuicMaxData(QuicH3Frame):
-            max_data:int = None
+        QuicMaxData:
+            max_data:int
         """
 
         buf = builder.start_frame(
@@ -442,9 +443,9 @@ class MSGCrafter():
 
     def add_max_stream_data_frame(self, quic_frame:QuicMaxStreamData, builder:QuicPacketBuilder) -> None:
         """
-        class QuicMaxStreamData(QuicH3Frame):
-            stream_id:int = None
-            max_stream_data:int = None
+        QuicMaxStreamData:
+            stream_id:int
+            max_stream_data:int
         """
 
         buf = builder.start_frame(
@@ -457,8 +458,8 @@ class MSGCrafter():
 
     def add_data_blocked_frame(self, quic_frame:QuicDataBlocked, builder:QuicPacketBuilder) -> None:
         """
-        class QuicDataBlocked(QuicH3Frame):
-            max_data:int = None
+        QuicDataBlocked:
+            max_data:int
         """
 
         buf = builder.start_frame(
@@ -469,9 +470,9 @@ class MSGCrafter():
 
     def add_stream_data_blocked_frame(self, quic_frame:QuicStreamDataBlocked, builder:QuicPacketBuilder) -> None:
         """
-        class QuicStreamDataBlocked(QuicH3Frame):
-            stream_id:int = None
-            max_stream_data:int = None
+        QuicStreamDataBlocked:
+            stream_id:int
+            max_stream_data:int
         """
 
         buf = builder.start_frame(
@@ -484,9 +485,9 @@ class MSGCrafter():
 
     def add_streams_blocked_uni_frame(self, quic_frame:QuicStreamsBlocked, builder:QuicPacketBuilder) -> None:
         """
-        class QuicStreamsBlocked(QuicH3Frame):
-            bidirectional:bool = None
-            max_streams:int = None
+        QuicStreamsBlocked:
+            bidirectional:bool
+            max_streams:int
         """
 
         buf = builder.start_frame(
@@ -497,8 +498,8 @@ class MSGCrafter():
 
     def add_retire_connection_id_frame(self, quic_frame:QuicRetireConnectionId, builder:QuicPacketBuilder) -> None:
         """
-        class QuicRetireConnectionId(QuicH3Frame):
-            sequence_number:int = None
+        QuicRetireConnectionId:
+            sequence_number:int
         """
 
         buf = builder.start_frame(
@@ -509,8 +510,8 @@ class MSGCrafter():
 
     def add_path_challenge_frame(self, quic_frame:QuicPathChallenge, builder:QuicPacketBuilder) -> None:
         """
-        class QuicPathChallenge(QuicH3Frame):
-            data:bytes = None
+        QuicPathChallenge:
+            data:bytes
         """
 
         buf = builder.start_frame(
@@ -521,8 +522,8 @@ class MSGCrafter():
 
     def add_path_response_frame(self, quic_frame:QuicPathResponse, builder:QuicPacketBuilder) -> None:
         """
-        class QuicPathResponse(QuicH3Frame):
-            data:bytes = None
+        QuicPathResponse:
+            data:bytes
         """
 
         buf = builder.start_frame(
@@ -533,11 +534,10 @@ class MSGCrafter():
 
     def add_connection_close_frame(self, quic_frame:QuicConnectionClose, builder:QuicPacketBuilder) -> None:
         """
-        class QuicConnectionClose(QuicH3Frame):
-            error_code:int = None
-            frame_type:int = None
-            reason_phrase_length:int = None
-            reason_phrase:bytes = None
+        QuicConnectionClose:
+            error_code:int
+            frame_type:int
+            reason_phrase:bytes
         """
 
         buf = builder.start_frame(
@@ -552,7 +552,7 @@ class MSGCrafter():
 
     def add_handshake_done_frame(self, quic_frame:QuicHandshakeDone, builder:QuicPacketBuilder) -> None:
         """
-        class QuicHandshakeDone(QuicH3Frame):
+        QuicHandshakeDone:
             pass
         """
 
@@ -561,4 +561,4 @@ class MSGCrafter():
             capacity = HANDSHAKE_DONE_FRAME_CAPACITY
         )
 
-
+    

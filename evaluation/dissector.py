@@ -12,11 +12,46 @@ from typing import List, Union
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 
 @dataclass
-class QuicH3Frame:
+class H3Frame:
     pass
 
 @dataclass
-class QuicAck(QuicH3Frame):
+class H3Headers(H3Frame):
+    payload:bytes = None
+
+@dataclass
+class H3Data(H3Frame):
+    payload:bytes = None
+    
+@dataclass
+class H3PriorityUpdate(H3Frame):
+    element_id:int = None
+    field_value:str = None
+
+@dataclass
+class H3CancelPush(H3Frame):
+    push_id:int = None
+
+@dataclass
+class H3PushPromise(H3Frame):
+    push_id:int = None
+    field_section:bytes = None
+
+@dataclass
+class H3GoAway(H3Frame):
+    stream_id:int = None
+    
+@dataclass
+class H3MaxPushId(H3Frame):
+    push_id:int = None
+
+
+@dataclass
+class QuicFrame:
+    pass
+
+@dataclass
+class QuicAck(QuicFrame):
     largest_acknowledged:int=None
     ack_delay:int=None
     ack_range_count:int=None
@@ -24,15 +59,15 @@ class QuicAck(QuicH3Frame):
     ack_ranges:List[Tuple[int,int]] = field(default_factory=list) # [gap, ack_range]
 
 @dataclass
-class QuicNewConnectionId(QuicH3Frame):
+class QuicNewConnectionId(QuicFrame):
     sequence_number:int = None
     retire_prior_to:int = None
     # length:int = None
     connection_id:bytes = None
-    stateless_reset_token:bytes = None # it should be 16 byte. Otherwise, it is malformed
+    stateless_reset_token:bytes = None # it should be 16 byte. Otherwise, the frame is malformed
 
 @dataclass
-class H3Settings(QuicH3Frame):
+class H3Settings(QuicFrame):
     max_table_capacity:int = None
     max_field_section_size:int = None
     blocked_streams:int = None
@@ -40,111 +75,95 @@ class H3Settings(QuicH3Frame):
     webtransport:int = None
 
 @dataclass
-class QuicMaxStreams(QuicH3Frame):
+class QuicMaxStreams(QuicFrame):
     maximum_streams:int = None
 
-    
 @dataclass
-class H3Headers(QuicH3Frame):
+class QpackEncoder(QuicFrame):
     payload:bytes = None
 
 @dataclass
-class H3Data(QuicH3Frame):
-    payload:bytes = None
-    
-@dataclass
-class H3PriorityUpdate(QuicH3Frame):
-    element_id:int = None
-    field_value:str = None
-
-@dataclass
-class QpackEncoder(QuicH3Frame):
+class QpackDecoder(QuicFrame):
     payload:bytes = None
 
 @dataclass
-class QpackDecoder(QuicH3Frame):
-    payload:bytes = None
-
-@dataclass
-class QuicStream(QuicH3Frame):
+class QuicStream(QuicFrame):
     stream_id:int = None
     fin_bit:bool = None
     # No need to play with the length field. We calculate length dynamically. Otherwise, the stream frame will be malformed most of the time.
     # length:int = None
     offset:int = None
-    h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
-
-# following frames 
+    h3_frame:H3Frame = None
 
 @dataclass
-class QuicPadding(QuicH3Frame):
+class QuicPadding(QuicFrame):
     pass
 
 @dataclass
-class QuicPing(QuicH3Frame):
+class QuicPing(QuicFrame):
     pass
 
 @dataclass
-class QuicResetStream(QuicH3Frame):
+class QuicResetStream(QuicFrame):
     stream_id:int = None
     app_protocol_error_code:int = None
     final_size:int = None
 
 @dataclass
-class QuicStopSending(QuicH3Frame):
+class QuicStopSending(QuicFrame):
     stream_id:int = None
     app_protocol_error_code:int = None
 
 @dataclass
-class QuicCrypto(QuicH3Frame):
+class QuicCrypto(QuicFrame):
     offset:int = None
     # length:int = None
     data:bytes = None # offset, length and the length of data should match. Otherwise, it is malformed
 
 @dataclass
-class QuicNewTokenFrame(QuicH3Frame):
+class QuicNewTokenFrame(QuicFrame):
     # length:int = None
     token:bytes = None
 
 @dataclass
-class QuicMaxData(QuicH3Frame):
+class QuicMaxData(QuicFrame):
     max_data:int = None
 
 
 @dataclass
-class QuicMaxStreamData(QuicH3Frame):
+class QuicMaxStreamData(QuicFrame):
     stream_id:int = None
     max_stream_data:int = None
 
 @dataclass
-class QuicDataBlocked(QuicH3Frame):
+class QuicDataBlocked(QuicFrame):
     max_data:int = None
 
 @dataclass
-class QuicStreamDataBlocked(QuicH3Frame):
+class QuicStreamDataBlocked(QuicFrame):
     stream_id:int = None
     max_stream_data:int = None
 
 @dataclass
-class QuicStreamsBlocked(QuicH3Frame):
+class QuicStreamsBlocked(QuicFrame):
     bidirectional:bool = None
     max_streams:int = None
 
 @dataclass
-class QuicRetireConnectionId(QuicH3Frame):
+class QuicRetireConnectionId(QuicFrame):
     sequence_number:int = None
 
 @dataclass
-class QuicPathChallenge(QuicH3Frame): 
+class QuicPathChallenge(QuicFrame): 
     data:bytes = None  # should be 8 bytes or it is malformed
 
 
 @dataclass
-class QuicPathResponse(QuicH3Frame):
+class QuicPathResponse(QuicFrame):
     data:bytes = None # should be 8 bytes or it is malformed
 
 @dataclass
-class QuicConnectionClose(QuicH3Frame):
+class QuicConnectionClose(QuicFrame):
     transport_layer:bool = None
     error_code:int = None
     frame_type:int = None
@@ -152,38 +171,17 @@ class QuicConnectionClose(QuicH3Frame):
     reason_phrase:bytes = None
 
 @dataclass
-class H3CancelPush(QuicH3Frame):
-    push_id:int = None
-
-@dataclass
-class H3PushPromise(QuicH3Frame):
-    push_id:int = None
-    field_section:bytes = None
-
-@dataclass
-class H3GoAway(QuicH3Frame):
-    stream_id:int = None
-    
-@dataclass
-class H3MaxPushId(QuicH3Frame):
-    push_id:int = None
-
-    
-
-
-
-@dataclass
-class QuicHandshakeDone(QuicH3Frame):
+class QuicHandshakeDone(QuicFrame):
     pass
 
 
-QuicH3Packet = List[QuicH3Frame]
+QuicPacket = List[QuicFrame] # A QUIC packet is basically a few Quic Frames sent together
 
 class MSGDissector():
     def __init__(self):
         self.quic_frames:list = []
 
-    def dissect_msg(self, message:Packet) -> List[QuicH3Frame]:
+    def dissect_msg(self, message:Packet) -> List[QuicFrame]:
         h3_frames = []
         # Parse layers in the h3msg
         for layer in message.layers:
