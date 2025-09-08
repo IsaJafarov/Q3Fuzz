@@ -94,7 +94,7 @@ class QuicStopSending(QuicFrame):
 class QuicCrypto(QuicFrame):
     offset:int = None
     # length:int = None
-    data:bytes = None # offset, length and the length of data should match. Otherwise, it is malformed
+    data:bytes = None
 
 @dataclass
 class QuicNewTokenFrame(QuicFrame):
@@ -419,6 +419,6 @@ class MSGDissector():
         
         max_streams = QuicMaxStreams()
         
-        max_streams.maximum_streams = layer.ms_max_streams
+        max_streams.maximum_streams = int(layer.ms_max_streams)
         
         return max_streams
