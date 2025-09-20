@@ -230,7 +230,7 @@ def install_h2o(version):
         os.system("cmake ..")
         os.system("make")
         os.system("sudo make install")
-        os.system("cp ~/prett3/PRETT3/servers_setup/h2o-files/f1918a5/h2o.conf ../examples/h2o/h2o.conf")
+        os.system("cp ../../h2o-files/f1918a5/h2o.conf ../examples/h2o/h2o.conf")
         os.system("cp /usr/local/nginx/html/index.html ../examples/doc_root/index.html") # replace the html file
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
     
