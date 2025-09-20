@@ -58,7 +58,7 @@ def install_nginx(version):
         
 
     elif version=='1.25.5':
-        os.system("sudo apt update && sudo apt install -y gcc libpcre3-dev libssl-dev zlib1g-dev")
+        os.system("sudo apt update && sudo apt install -y build-essential gcc libpcre3-dev libssl-dev zlib1g-dev")
         os.system("rm -rf ./nginx-1.25.5")
         os.system("rm ./nginx-1.25.5.tar.gz")
 
@@ -78,7 +78,7 @@ def install_nginx(version):
 
 
     elif version=='1.27.0':
-        os.system("sudo apt update && sudo apt install -y gcc libpcre3-dev libssl-dev zlib1g-dev")
+        os.system("sudo apt update && sudo apt install -y build-essential gcc libpcre3-dev libssl-dev zlib1g-dev")
         os.system("rm -rf ./nginx-1.27.0")
         os.system("rm ./nginx-1.27.0.tar.gz")
         
@@ -98,7 +98,7 @@ def install_nginx(version):
 
 
     elif version=='1.28.0':
-        os.system("sudo apt update && sudo apt install -y gcc libpcre3-dev libssl-dev zlib1g-dev")
+        os.system("sudo apt update && sudo apt install -y build-essential gcc libpcre3-dev libssl-dev zlib1g-dev")
         os.system("rm -rf ./nginx-1.28.0")
         os.system("rm ./nginx-1.28.0.tar.gz")
         
@@ -181,7 +181,7 @@ def install_openlitespeed(version):
 
 def install_h2o(version):
     os.system("sudo apt install -y unzip cmake build-essential libssl-dev zlib1g-dev")
-    if version=='a429117':
+    if version=='a429117': # 2022/02/15
         os.system("sudo rm -r ./h2o-a429117; mkdir ./h2o-a429117")
         os.chdir("h2o-a429117")
         os.system("cp ../h2o-files/a429117/a429117babff09542d3517c4fa36c1ef769889c1.zip ./")
@@ -194,7 +194,7 @@ def install_h2o(version):
         os.system("sudo make install")
         os.system("cp ../../../h2o-files/a429117/h2o.conf ../examples/h2o/h2o.conf")
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
-    if version=='222b36d':
+    if version=='222b36d': # 2024/04/11
         os.system("sudo rm -r ./h2o-222b36d; mkdir ./h2o-222b36d")
         os.chdir("h2o-222b36d")
         os.system("cp ../h2o-files/222b36d/222b36d7bd3a98616eae82993552098747268d5e.zip ./")
@@ -207,7 +207,7 @@ def install_h2o(version):
         os.system("sudo make install")
         os.system("cp ../../../h2o-files/222b36d/h2o.conf ../examples/h2o/h2o.conf")
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
-    if version=='16b13ee':
+    if version=='16b13ee': # 2024/06/18
         os.system("sudo rm -r ./h2o-16b13ee; mkdir ./h2o-16b13ee")
         os.chdir("h2o-16b13ee")
         os.system("cp ../h2o-files/16b13ee/16b13eee8ad7895b4fe3fcbcabee53bd52782562.zip ./")
@@ -220,6 +220,20 @@ def install_h2o(version):
         os.system("sudo make install")
         os.system("cp ../../../h2o-files/16b13ee/h2o.conf ../examples/h2o/h2o.conf")
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
+    if version=="f1918a5": # 2025/04/29
+        os.system("mkdir h2o-f1918a5")
+        os.system("git clone https://github.com/h2o/h2o.git ./h2o-f1918a5")
+        os.chdir("h2o-f1918a5")
+        os.system("git checkout f1918a5b9f75f4da9db801b442886cb13b3c7bcd")
+        os.system("mkdir -p build")
+        os.chdir("build")
+        os.system("cmake ..")
+        os.system("make")
+        os.system("sudo make install")
+        os.system("cp ~/prett3/PRETT3/servers_setup/h2o-files/f1918a5/h2o.conf ../examples/h2o/h2o.conf")
+        os.system("cp /usr/local/nginx/html/index.html ../examples/doc_root/index.html") # replace the html file
+        os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
+    
     
 def install_quiche(version):
     if version == '0.23.5':
@@ -227,7 +241,7 @@ def install_quiche(version):
 
         # install dependencies: rust and cmake
         os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo sh -s -- -y") 
-        os.system("sudo apt install -y cmake")
+        os.system("sudo apt install -y build-essential cmake")
         
         # clone Quiche
         os.system("git clone https://github.com/cloudflare/quiche.git")
@@ -236,7 +250,7 @@ def install_quiche(version):
         os.system("git submodule update --init --recursive") # retrieve submodules, such as boringssl
 
         # build and run
-        os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" /root/.cargo/bin/cargo run --bin quiche-server -- --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
+        os.system("sudo env RUSTFLAGS=\"-C link-args=-lstdc++\" /root/.cargo/bin/cargo run --release --bin quiche-server -- --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
         
 
 def install_quic_go(version):
@@ -282,7 +296,7 @@ def install_msquic_kestrel(version):
         os.chdir("msquic_kestrel")
         os.system("cp ../msquic-kestrel-files/Program.cs ./")
         os.system("sudo dotnet run")
-        
+
 def install_neqo(version):
     if version == '0.13.1':
         
@@ -504,7 +518,7 @@ if __name__ == '__main__':
     parser.add_argument("version", help="corresponding version(s) \n\t"
     "- 1.23.4, 1.25.5, 1.27.0 or 1.28.0 \t(for nginx) \n"
     "- 2.4.6, 2.7.6, 2.8.4, 2.10.0\t(for caddy) \n"
-    "- a429117, 222b36d or 16b13ee\t(for h2o) \n"
+    "- a429117, 222b36d, 16b13ee or f1918a5\t(for h2o) \n"
     "- 1.7.15, 1.8.1, 1.8.3.1\t(for ols)\n"
     "- 0.23.5 \t(for quiche)\n"
     "- 0.50.1 \t (for quic-go)\n"

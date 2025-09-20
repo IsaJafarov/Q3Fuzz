@@ -42,6 +42,9 @@ def run_h2o(version):
     elif version=='16b13ee':
         os.chdir("h2o-16b13ee")
         os.chdir("h2o-16b13eee8ad7895b4fe3fcbcabee53bd52782562")
+    elif version=='f1918a5':
+        os.chdir("h2o-f1918a5")
+
     os.chdir("build")
     os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
 
@@ -121,7 +124,7 @@ if __name__ == '__main__':
     parser.add_argument("version", help="corresponding version(s) \n\t"
     "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n"
     "- 2.4.6, 2.7.6, 2.8.4, 2.10.0\t(for caddy) \n"
-    "- a429117, 222b36d or 16b13ee\t(for h2o) \n"
+    "- a429117, 222b36d, 16b13ee or f1918a5\t(for h2o) \n"
     "- 1.7.15 or 1.8.1\t(for ols)\n"
     "- 0.23.5 \t(for quiche)\n"
     "- 0.50.1 \t (for quic-go)\n"
