@@ -102,6 +102,11 @@ def run_mvfst_proxygen(version):
         "--mode=server --port=443 -host 0.0.0.0 -static_root=/usr/local/nginx/html " \
         "-cert=../../certs/prett3.com.pem -key=../../certs/prett3.com.key")
 
+def run_picoquic(version):
+    if version=="b19dcf1":
+        os.chdir("picoquic")
+        os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key")
+ 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HTTP/3 web servers runner', formatter_class=argparse.RawTextHelpFormatter)
@@ -119,6 +124,7 @@ if __name__ == '__main__':
     "- ngtcp2-nghttp3\n"
     "- xquic\n"
     "- mvfst-proxygen\n"
+    "- picoquic\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -135,6 +141,7 @@ if __name__ == '__main__':
     "- 1.12.0 \t (for ngtcp2-nghttp3)\n"
     "- 1.8.3 \t (for xquic)\n"
     "- 2025.04.14.00 \t (for mvfst-proxygen)\n"
+    "- b19dcf1 \t (for picoquic)\n"
     )
 
     args = parser.parse_args()
@@ -173,5 +180,7 @@ if __name__ == '__main__':
         run_xquic(version)
     elif server == "mvfst-proxygen":
         run_mvfst_proxygen(version)
+    elif server == "picoquic":
+        run_picoquic(version)
 
     print("[+] Done.")

@@ -496,6 +496,17 @@ def install_mvfst_proxygen(version):
         "-cert=../../certs/prett3.com.pem -key=../../certs/prett3.com.key")
         
 
+def install_picoquic(version):
+    if version=="b19dcf1": # 2025/04/26
+        os.system("git clone https://github.com/private-octopus/picoquic.git")
+        os.chdir("picoquic")
+        os.system("git checkout b19dcf13216c14a1ad7a590fc0c93efade421d25")
+        os.system("cmake -DPICOQUIC_FETCH_PTLS=Y .")
+        os.system("make")
+        os.system("./picoquic_ct")
+        os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key")
+
+        
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation', formatter_class=argparse.RawTextHelpFormatter)
@@ -513,6 +524,7 @@ if __name__ == '__main__':
     "- ngtcp2-nghttp3\n"
     "- xquic\n"
     "- mvfst-proxygen\n"
+    "- picoquic\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -529,7 +541,9 @@ if __name__ == '__main__':
     "- 1.12.0 \t (for ngtcp2-nghttp3)\n"
     "- 1.8.3 \t (for xquic)\n"
     "- 2025.04.14.00 \t (for mvfst-proxygen)\n"
+    "- b19dcf1 \t (for picoquic)\n"
     )
+
     args = parser.parse_args()
     server = args.server
     version = args.version
@@ -566,5 +580,7 @@ if __name__ == '__main__':
         install_xquic(version)
     elif server == "mvfst-proxygen":
         install_mvfst_proxygen(version)
+    elif server == "picoquic":
+        install_picoquic(version)
         
 
