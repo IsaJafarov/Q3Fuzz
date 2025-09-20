@@ -221,7 +221,7 @@ def install_h2o(version):
         os.system("cp ../../../h2o-files/16b13ee/h2o.conf ../examples/h2o/h2o.conf")
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
     if version=="f1918a5": # 2025/04/29
-        os.system("mkdir h2o-f1918a5")
+        os.system("sudo rm -rf ./h2o-f1918a5; mkdir ./h2o-f1918a5")
         os.system("git clone https://github.com/h2o/h2o.git ./h2o-f1918a5")
         os.chdir("h2o-f1918a5")
         os.system("git checkout f1918a5b9f75f4da9db801b442886cb13b3c7bcd")
