@@ -506,7 +506,7 @@ def install_picoquic(version):
         os.system("cmake -DPICOQUIC_FETCH_PTLS=Y .")
         os.system("make")
         os.system("./picoquic_ct") # run tests
-        os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key")
+        os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key -x 10000000")
 
         
 if __name__ == '__main__':

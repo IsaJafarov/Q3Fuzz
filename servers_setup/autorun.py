@@ -105,7 +105,7 @@ def run_mvfst_proxygen(version):
 def run_picoquic(version):
     if version=="b19dcf1":
         os.chdir("picoquic")
-        os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key")
+        os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key -x 10000000")
  
 
 if __name__ == '__main__':
