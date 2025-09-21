@@ -498,12 +498,14 @@ def install_mvfst_proxygen(version):
 
 def install_picoquic(version):
     if version=="b19dcf1": # 2025/04/26
+        os.system("sudo apt update && sudo apt install -y build-essential cmake libssl-dev libbrotli-dev pkg-config")
+        os.system("sudo rm -rf ./picoquic")
         os.system("git clone https://github.com/private-octopus/picoquic.git")
         os.chdir("picoquic")
         os.system("git checkout b19dcf13216c14a1ad7a590fc0c93efade421d25")
         os.system("cmake -DPICOQUIC_FETCH_PTLS=Y .")
         os.system("make")
-        os.system("./picoquic_ct")
+        os.system("./picoquic_ct") # run tests
         os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key")
 
         
