@@ -363,8 +363,8 @@ def install_aioquic(version):
         os.system("cp /usr/local/nginx/html/index.html ./examples/templates/index.html")
 
         # run
-        os.system("sudo python3 ./examples/http3_server.py -c ../certs/prett3.com.pem -k ../certs/prett3.com.key --port 443 -v")
-        
+        os.system("sudo python3 ./examples/http3_server.py -c ../certs/prett3.com.pem -k ../certs/prett3.com.key --port 443")
+
 
 def install_quinn_h3(version):
     if version == '0.0.9':
@@ -552,7 +552,7 @@ if __name__ == '__main__':
     
     # kill the running webserver processes
     print("[+] Stopping the process running on UDP port 443 ...")
-    os.system("sudo kill -9 $(sudo lsof -i UDP:443 -t)")
+    os.system("sudo sh -c 'kill -9 $(lsof -i UDP:443 -t)' 2>/dev/null")
     os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
     print("[+] All server killed.")
 

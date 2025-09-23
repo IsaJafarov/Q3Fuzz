@@ -77,7 +77,7 @@ def run_aioquic(version):
     print("[+] Running aioquic %s..." % version)
     if version == '1.2.0':
         os.chdir("aioquic")
-        os.system("sudo python3 ./examples/http3_server.py -c ../certs/prett3.com.pem -k ../certs/prett3.com.key --port 443 -v")
+        os.system("sudo python3 ./examples/http3_server.py -c ../certs/prett3.com.pem -k ../certs/prett3.com.key --port 443")
         
 def run_quinn_h3(version):
     print("[+] Running quinn + h3 %s..." % version)
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     
     # kill the running webserver processes
     print("[+] Stopping the process running on UDP port 443 ...")
-    os.system("sudo kill -9 $(sudo lsof -i UDP:443 -t)")
+    os.system("sudo kill -9 $(sudo lsof -i UDP:443 -t) 2>/dev/null")
     os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
     print("[+] All server killed.")
     
