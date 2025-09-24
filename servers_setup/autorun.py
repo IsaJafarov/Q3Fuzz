@@ -150,7 +150,7 @@ if __name__ == '__main__':
     
     # kill the running webserver processes
     print("[+] Stopping the process running on UDP port 443 ...")
-    os.system("sudo kill -9 $(sudo lsof -i UDP:443 -t) 2>/dev/null")
+    os.system("sudo sh -c 'kill -9 $(lsof -i UDP:443 -t)' 2>/dev/null")
     os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
     print("[+] All server killed.")
     
