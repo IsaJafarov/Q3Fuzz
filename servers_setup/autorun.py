@@ -175,7 +175,7 @@ if __name__ == '__main__':
         run_neqo(version)
     elif server == "aioquic":
         run_aioquic(version)
-    elif server == "quinn":
+    elif server == "quinn-h3":
         run_quinn_h3(version)
     elif server == "ngtcp2-nghttp3":
         run_ngtcp2(version)
