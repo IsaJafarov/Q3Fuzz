@@ -53,7 +53,7 @@ def run_quiche(version):
     print("[+] Running quiche %s..." % version)
     if version == '0.23.5':
         os.chdir("quiche")
-        os.system("sudo ./target/debug/quiche-server --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
+        os.system("sudo ./target/release/quiche-server --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
 
 def run_quic_go(version):
     print("[+] Running quic_go %s..." % version)
