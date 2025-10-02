@@ -70,8 +70,11 @@ def run_msquic_kestrel(version):
 def run_neqo(version):
     print("[+] Running neqo %s..." % version)
     if version == '0.13.1':
-        os.chdir("neqo")
-        os.system("sudo env LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\" RUST_BACKTRACE=full ./target/release/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
+        os.chdir("neqo-0.13.1")
+    if version == '0.14.1':
+        os.chdir("neqo-0.14.1")
+    
+    os.system("sudo env LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\" RUST_BACKTRACE=full ./target/release/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
 
 def run_aioquic(version):
     print("[+] Running aioquic %s..." % version)
@@ -135,7 +138,7 @@ if __name__ == '__main__':
     "- 0.23.5 \t(for quiche)\n"
     "- 0.50.1 \t (for quic-go)\n"
     "- 2.4.8 \t (for msquic-kestrel)\n"
-    "- 0.13.1 \t (for neqo)\n"
+    "- 0.13.1, 0.14.1 \t (for neqo)\n"
     "- 1.2.0 \t (for aioquic)\n"
     "- 0.0.9 \t (for quinn-h3)\n"
     "- 1.12.0 \t (for ngtcp2-nghttp3)\n"

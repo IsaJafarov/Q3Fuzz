@@ -298,26 +298,60 @@ def install_msquic_kestrel(version):
         os.system("sudo dotnet run")
 
 def install_neqo(version):
+
+    # install dependencies
+    os.system("sudo apt install -y build-essential zlib1g-dev libnss3-tools mercurial clang gyp ninja-build")
+
+    # Install Rust
+    os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y")
+
     if version == '0.13.1':
         
-        os.system("sudo rm -rf ./neqo")
-
-        # install dependencies
-        os.system("sudo apt install build-essential zlib1g-dev -y")
+        os.system("sudo rm -rf ./neqo-0.13.1")
         
         # clone Neqo v0.13.1
-        os.system("git clone https://github.com/mozilla/neqo.git")
-        os.chdir("neqo")
+        os.system("git clone https://github.com/mozilla/neqo.git ./neqo-0.13.1")
+        os.chdir("./neqo-0.13.1")
         os.system("git checkout tags/v0.13.1")
 
         # create NSS database with our ssl certs
         os.system("mkdir certdb")
-        os.system("sudo apt install libnss3-tools -y")
         os.system("pk12util -i ../certs/prett3.com.pfx -d ./certdb/ -W \"\" -K \"\"")
 
+        # clone Neqo's dependencies: NSS v3.110 and NSPR v4.36
+        os.system("hg clone https://hg.mozilla.org/projects/nss")
+        os.system("hg clone https://hg.mozilla.org/projects/nspr")
+        # Optionally, you can choose NSS & NSP versions that were released around the release time of the chosen Neqo version
+        # os.chdir("nss")
+        # os.system("hg update NSS_3_115_RTM")
+        # os.chdir("../nspr")
+        # os.system("hg update NSPR_4_37_RTM")
+        # os.chdir("..")
+
+        # build NSS
+        os.system("sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1")
+        os.system("bash ./nss/build.sh")
+        
+        # set necessary env variables (NSS_DIR and LD_LIBRARY_PATH) and install Neqo
+        os.system("export NSS_DIR=\"$(realpath ./nss)\"; export LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\"; $HOME/.cargo/bin/cargo build --release")
+
+        # run Neqo's test server
+        os.system("sudo env LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\" RUST_BACKTRACE=full ./target/release/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
+
+
+    if version == '0.14.1':
+        os.system("sudo rm -rf ./neqo-0.14.1")
+
+        # clone Neqo v0.14.1
+        os.system("git clone https://github.com/mozilla/neqo.git ./neqo-0.14.1")
+        os.chdir("./neqo-0.14.1")
+        os.system("git checkout tags/v0.14.1")
+
+        # create NSS database with our ssl certs
+        os.system("mkdir certdb")
+        os.system("pk12util -i ../certs/prett3.com.pfx -d ./certdb/ -W \"\" -K \"\"")
 
         # clone Neqo's dependencies: NSS v3.110 and NSPR v4.36
-        os.system("sudo apt install -y mercurial")
         os.system("hg clone https://hg.mozilla.org/projects/nss")
         os.system("hg clone https://hg.mozilla.org/projects/nspr")
         # Optionally, you can choose NSS & NSP versions that were released around the release time of the chosen Neqo version
@@ -327,23 +361,16 @@ def install_neqo(version):
         # os.system("hg update NSPR_4_37_RTM")
         # os.chdir("..")
         
-        # install GYP and Ninja, which NSS depends on
-        os.system("sudo apt install -y gyp ninja-build")
-
         # build NSS
         os.system("sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1")
         os.system("bash ./nss/build.sh")
-
-        # install Rust
-        os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y")
-        
         
         # set necessary env variables (NSS_DIR and LD_LIBRARY_PATH) and install Neqo
-        os.system("sudo apt install clang") # clang is required
         os.system("export NSS_DIR=\"$(realpath ./nss)\"; export LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\"; $HOME/.cargo/bin/cargo build --release")
 
         # run Neqo's test server
         os.system("sudo env LD_LIBRARY_PATH=\"$(realpath ./dist/Debug/lib)\" RUST_BACKTRACE=full ./target/release/neqo-server 0.0.0.0:443 -d ./certdb/ -k \"prett3.com - CUNY\"")
+
 
 def install_aioquic(version):
     if version == '1.2.0':
@@ -357,7 +384,7 @@ def install_aioquic(version):
         os.system("git clone https://github.com/aiortc/aioquic.git")
         os.chdir("aioquic")
         os.system("git checkout tags/1.2.0")
-
+        
         # backup the default index.html and replace with the one we always use
         os.system("cp ./examples/templates/index.html ./examples/templates/index.html.bak")
         os.system("cp /usr/local/nginx/html/index.html ./examples/templates/index.html")
@@ -537,7 +564,7 @@ if __name__ == '__main__':
     "- 0.23.5 \t(for quiche)\n"
     "- 0.50.1 \t (for quic-go)\n"
     "- 2.4.8 \t (for msquic-kestrel)\n"
-    "- 0.13.1 \t (for neqo)\n"
+    "- 0.13.1, 0.14.1 \t (for neqo)\n"
     "- 1.2.0 \t (for aioquic)\n"
     "- 0.0.9 \t (for quinn-h3)\n"
     "- 1.12.0 \t (for ngtcp2-nghttp3)\n"
