@@ -131,7 +131,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
-    "- 1.23.4, 1.25.5 or 1.27.0 \t(for nginx) \n"
+    "- 1.23.4, 1.25.5, 1.27.0 or 1.28.0 \t(for nginx) \n"
     "- 2.4.6, 2.7.6, 2.8.4, 2.10.0\t(for caddy) \n"
     "- a429117, 222b36d, 16b13ee or f1918a5\t(for h2o) \n"
     "- 1.7.15 or 1.8.1\t(for ols)\n"
