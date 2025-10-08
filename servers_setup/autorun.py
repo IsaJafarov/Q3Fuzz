@@ -91,7 +91,7 @@ def run_quinn_h3(version):
 def run_ngtcp2(version):
     print("[+] Running ngtcp2 + nghttp3 %s..." % version)
     if version == "1.12.0":
-        os.system("sudo ./ngtcp2/examples/bsslserver 0.0.0.0 443 ./certs/prett3.com.key ./certs/prett3.com.crt -d /usr/local/nginx/html/")
+        os.system("sudo ./ngtcp2/examples/bsslserver 0.0.0.0 443 ./certs/prett3.com.key ./certs/prett3.com.crt -d /usr/local/nginx/html/ -q")
 
 def run_xquic(version):
     if version == "1.8.3":
