@@ -384,7 +384,7 @@ def install_aioquic(version):
         os.system("git clone https://github.com/aiortc/aioquic.git")
         os.chdir("aioquic")
         os.system("git checkout tags/1.2.0")
-        
+
         # backup the default index.html and replace with the one we always use
         os.system("cp ./examples/templates/index.html ./examples/templates/index.html.bak")
         os.system("cp /usr/local/nginx/html/index.html ./examples/templates/index.html")
@@ -580,7 +580,8 @@ if __name__ == '__main__':
     # kill the running webserver processes
     print("[+] Stopping the process running on UDP port 443 ...")
     os.system("sudo sh -c 'kill -9 $(lsof -i UDP:443 -t)' 2>/dev/null")
-    os.system("sudo /usr/local/lsws/bin/lswsctrl stop; sudo service lsws stop")
+    # OpenLiteSpeed runs as a service. If it exists, stop its service.
+    os.system("[ -x /usr/local/lsws/bin/lswsctrl ] && sudo /usr/local/lsws/bin/lswsctrl stop && sudo service lsws stop")
     print("[+] All server killed.")
 
     if server == 'caddy':
