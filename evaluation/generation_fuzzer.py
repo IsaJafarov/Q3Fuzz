@@ -24,7 +24,7 @@ from rich.table import Table
 import warnings
 import paramiko
 from enum import Enum
-from hypothesis import given, reproduce_failure, settings, Verbosity, Phase, strategies as st
+from hypothesis import given, reproduce_failure, settings, Verbosity, Phase, strategies as st, HealthCheck
 from hypothesis.database import DirectoryBasedExampleDatabase
 import random
 from rich.traceback import install
@@ -45,71 +45,10 @@ FIRST_STATE = "CONNECTED"
 LAST_STATE = "FINISH"
 
 
-"""
-@dataclass
-class QuicAck:
-    largest_acknowledged:int=None
-    ack_delay:int=None
-    ack_range_count:int=None
-    ack_first_ack_range:int=None
-    ack_ranges:List[Tuple[int,int]] = field(default_factory=list) # [gap, ack_range]
-
-@dataclass
-class QuicNewConnectionId:
-    sequence_number:int = None
-    retire_prior_to:int = None
-    length:int = None
-    connection_id:bytes = None
-    stateless_reset_token:bytes = None
-
-@dataclass
-class H3Settings:
-    max_table_capacity:int = None
-    max_field_section_size:int = None
-    blocked_streams:int = None
-    h3_datagram:int = None
-    webtransport:int = None
-    
-@dataclass
-class H3Headers:
-    payload:bytes = None
-
-@dataclass
-class H3Data:
-    payload:bytes = None
-    
-@dataclass
-class H3PriorityUpdate:
-    element_id:int = None
-    field_value:str = None
-
-@dataclass
-class QpackEncoder:
-    payload:bytes = None
-
-@dataclass
-class QpackDecoder:
-    payload:bytes = None
-
-@dataclass
-class QuicStream:
-    stream_id:int = None
-    fin_bit:bool = None
-    offset:int = None
-    length:int = None
-    h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
-
-@dataclass
-class QuicMaxStreams(QuicH3Frame):
-    maximum_streams:int = None
-
-"""
-
-
 class Fuzzer():
     def __init__(self, quic_conf:QuicConfiguration, hostname:str, keylog_file:str, mutations:int, 
-                 parallel_requests:int, interval:int, duration:int, generation:int, verbose:bool, reproduce_failure:str, 
-                 restart_server:bool, ssh_user:str, ssh_key_path:str, server_name:str, server_version:str):
+                 parallel_requests:int, interval:int, duration:int, generation:int, verbose:bool, 
+                 restart_server:bool, ssh_user:str, ssh_key_path:str, server_name:str, server_version:str, num_of_replays:int):
         self.quic_conf:QuicConfiguration = quic_conf
         self.hostname:str = hostname
         self.keylog_file:str = keylog_file
@@ -121,12 +60,12 @@ class Fuzzer():
         self.duration:int = duration
         self.generation:int = generation
         self.verbose = verbose
-        self.reproduce_failure = reproduce_failure
         self.restart_server = restart_server
         self.ssh_user = ssh_user
         self.ssh_key_path = ssh_key_path
         self.server_name = server_name
         self.server_version = server_version
+        self.num_of_replays = num_of_replays
     
     def set_up_graph(self, sm_file_path:str, traffic_file_path:str):
         with open(sm_file_path, 'r') as f:
@@ -167,41 +106,33 @@ class Fuzzer():
         Extract all the transitions from the graph to fuzz
         """
 
-        def get_triggering_msg_of_transition(source_node:str, target_node:str) -> QuicH3Packet:
+        def get_triggering_msg_of_transition(source_node:str, target_node:str) -> QuicPacket:
             edge_to_fuzz = self.graph.get_edge_data(source_node, target_node)
             
             if edge_to_fuzz['packet_number'] is None: 
                 return None
             triggering_msg_packet_num = int(edge_to_fuzz['packet_number'])
-            packet = self.find_message_by_packet_number(triggering_msg_packet_num)
+            packet = self._find_message_by_packet_number(triggering_msg_packet_num)
             return MSGDissector().dissect_msg( packet )
 
         # 1. Extract the transitions from the State Machine
-        fuzzing_and_following_transitions = OrderedDict()
-        # Keys: the list of transitions to fuzz in the form of (source_node, target_node) tuple. 
-        # Values: the list of transitions that follow the target_node. We need this information, 
-        # because after fuzzing the (source_node, target_node) transition, we will need to travel the following transition, too.
+        fuzzing_transitions = list(tuple())
+        
         for node in self.graph.nodes():
 
             if node == FIRST_STATE:
                 continue
-
-            successors = list()
-            for successor in self.graph.successors(node):
-                if get_triggering_msg_of_transition(node, successor): # the transition has a packet
-                    successors.append( (node, successor) )
             
-            # skip loop transitions
             for predecessor in self.graph.predecessors(node):
                 if get_triggering_msg_of_transition(predecessor, node): # the transition has a packet
-                    fuzzing_and_following_transitions[ (predecessor, node) ] = successors
+                    fuzzing_transitions.append( (predecessor, node) )
         
 
-        self.print_info(fuzzing_and_following_transitions.keys())
+        self.print_info(fuzzing_transitions)
 
 
-        # 3. Fuzz individual messages
-        for source_node, target_node in fuzzing_and_following_transitions.keys():
+        # 2. Fuzz individual messages
+        for source_node, target_node in fuzzing_transitions:
 
             print("\n\nTransition: {} -> {}\n".format(source_node, target_node))
 
@@ -210,30 +141,13 @@ class Fuzzer():
             for i in range(len(moving_msgs_path)-1):
                 moving_msgs.append( get_triggering_msg_of_transition(moving_msgs_path[i], moving_msgs_path[i+1]) )
 
-
-            following_msgs = list()
-            for target_node, following_node in fuzzing_and_following_transitions[ (source_node, target_node) ]:
-                following_msgs.append( get_triggering_msg_of_transition(target_node, following_node))
-            
-            self.fuzz_msg_with_strategy(moving_msgs, following_msgs)
-
-    def reach_source_state(self, h3client:HttpClient, moving_msgs:List[QuicH3Packet]) -> None:
-        
-        h3client.connect()
-        connect_response = h3client.read_from_buffer()  # Receive any response from the server
-
-        # Complete the connection by sending handshake completion messages
-        h3client.complete_connection()
-        handshake_response = h3client.read_from_buffer()        
-
-        #print("\nMoving Messages:")
-        for moving_msg in moving_msgs:
-            response = h3client.send_frames(moving_msg)
+            try:
+                self.fuzz_msg_with_strategy(moving_msgs)
+            except KeyboardInterrupt:
+                pass # when interrupted, move to the next frame            
 
 
-    def fuzz_msg_with_strategy(self, 
-                            moving_msgs:List[QuicH3Packet] = [],
-                            following_msgs:List[QuicH3Packet] = []) -> None:
+    def fuzz_msg_with_strategy(self, moving_msgs:List[QuicPacket] = []) -> None:
         """
         Apply the mutation strategy to the selected frame
         """
@@ -248,117 +162,196 @@ class Fuzzer():
 
             bar1 = progress.add_task("Generation ", total=self.generation, visible=not self.verbose)
 
-            for _ in range( self.generation ):
+            for gen in range( self.generation ):
 
-                available_quic_frame_types = [QuicAck, QuicNewConnectionId, QuicStream, QuicMaxStreams]
-            
-                num_of_quic_frames = random.randint(1, 5)
-                random_quic_frame_types = random.choices(available_quic_frame_types, k=num_of_quic_frames)
+                available_quic_frame_types = [
+                    QuicPadding, QuicPing, QuicAck, QuicResetStream, QuicStopSending, 
+                    QuicCrypto, QuicNewTokenFrame, QuicStream, QuicMaxData, QuicMaxStreamData, 
+                    QuicMaxStreams, QuicDataBlocked, QuicStreamDataBlocked, QuicStreamsBlocked, QuicNewConnectionId, 
+                    QuicRetireConnectionId, QuicPathChallenge, QuicPathResponse, QuicConnectionClose, QuicHandshakeDone
+                    ]
+                
+                # Give a higher priority to QuicStream, because it is more complex.
+                weights = [
+                    1,1,1,1,1,
+                    1,1,10,1,1, 
+                    1,1,1,1,1,
+                    1,1,1,1,1
+                ]
+
+
+                if self.server_name == "neqo":
+                    # Sending many PATH_CHALLENGE frames puts a lot of stress on the server and
+                    # interestingly when the attack stops, it crashes the server.
+                    # In order not to discover the same vulnerability, replace each QuicPathChallenge frame with something else.
+                    weights[16] = 0 # QuicPathChallenge
+                    # Do not rediscover existing vulnerability: https://github.com/mozilla/neqo/security/advisories/GHSA-56c6-rfrf-rh4r
+                    weights[6] = 0 # QuicNewTokenFrame
+
+
+                random_quic_frame_types = random.choices(available_quic_frame_types, weights=weights, k=5)
+
+                if self.server_name == "h2o":
+                    # Sending a STREAM or STOP_SENDING frame after CONNECTION_CLOSE crashes Quicly
+                    # Prevent rediscovering the same vulnerability.
+                    # If there is STREAM or STOP_SENDING frame in the list, replace the preceeding CONNECTION_CLOSE frames with something else
+                    for i in range(4, -1, -1):
+                        if random_quic_frame_types[i] in [QuicStream, QuicStopSending]:
+                            for j in range(0, i):
+                                if random_quic_frame_types[j] is QuicConnectionClose:
+                                    random_quic_frame_types[j] = random.choice([x for x in available_quic_frame_types if x is not QuicConnectionClose])
+
+                if self.server_name == "neqo":
+                    # Sending a PATH_RESPONSE + STREAM frames crashes the Neqo server with 'Unreachable Code' error.
+                    for i in range(4, 1, -1):
+                        if random_quic_frame_types[i] is QuicStream:
+                            for j in range(0, i):
+                                if random_quic_frame_types[j] is QuicPathResponse:
+                                    random_quic_frame_types[j] = random.choice([x for x in available_quic_frame_types if x is not QuicPathResponse])
+
+                if self.server_name == "neqo":
+                    # https://github.com/mozilla/neqo/security/advisories/GHSA-jfv6-x22w-grhf
+                    for i in range(4, 1, -1):
+                        if random_quic_frame_types[i] is QuicDataBlocked:
+                            for j in range(0, i):
+                                if random_quic_frame_types[j] is QuicResetStream:
+                                    random_quic_frame_types[j] = random.choice([x for x in available_quic_frame_types if x is not QuicResetStream])
+
+                
+                if self.server_name == "neqo":
+                    if moving_msgs and QuicStream in moving_msgs[-1]:
+                        for i in range(5):
+                            if random_quic_frame_types[i] is QuicDataBlocked:
+                                # https://github.com/mozilla/neqo/security/advisories/GHSA-jfv6-x22w-grhf
+                                random_quic_frame_types[i] = random.choice([x for x in available_quic_frame_types if x is not QuicDataBlocked])
+                            if random_quic_frame_types[i] is QuicConnectionClose:
+                                # https://github.com/IsaJafarov/Neqo-TransportInvalidStreamId-Crash-Exploit
+                                random_quic_frame_types[i] = random.choice([x for x in available_quic_frame_types if x is not QuicConnectionClose])
+
 
                 # build strategy for each frame
                 strategies = []
                 for quic_frame_type in random_quic_frame_types:
-                    if quic_frame_type is QuicAck:
-                        strategies.append(self.build_ack_strategy())
-                    elif quic_frame_type is QuicNewConnectionId:
-                        strategies.append(self.build_nci_strategy())
+                    if quic_frame_type is QuicPadding:
+                        strategies.append(self._build_padding_strategy())
+                    elif quic_frame_type is QuicPing:
+                        strategies.append(self._build_ping_strategy())
+                    elif quic_frame_type is QuicAck:
+                        strategies.append(self._build_ack_strategy())
+                    elif quic_frame_type is QuicResetStream:
+                        strategies.append(self._build_reset_stream_strategy())
+                    elif quic_frame_type is QuicStopSending:
+                        strategies.append(self._build_stop_sending_strategy())
+                    elif quic_frame_type is QuicCrypto:
+                        strategies.append(self._build_crypto_strategy())
+                    elif quic_frame_type is QuicNewTokenFrame:
+                        strategies.append(self._build_new_token_frame_strategy())
                     elif quic_frame_type is QuicStream:
-                        strategies.append(self.build_stream_strategy())
+                        strategies.append(self._build_stream_strategy())
+                    elif quic_frame_type is QuicMaxData:
+                        strategies.append(self._build_max_data_frame_strategy())
+                    elif quic_frame_type is QuicMaxStreamData:
+                        strategies.append(self._build_max_stream_data_frame_strategy())
                     elif quic_frame_type is QuicMaxStreams:
-                        strategies.append(self.build_max_streams_strategy())
+                        strategies.append(self._build_max_streams_frame_strategy())
+                    elif quic_frame_type is QuicDataBlocked:
+                        strategies.append(self._build_data_blocked_frame_strategy())
+                    elif quic_frame_type is QuicStreamDataBlocked:
+                        strategies.append(self._build_stream_data_blocked_frame_strategy())
+                    elif quic_frame_type is QuicStreamsBlocked:
+                        strategies.append(self._build_streams_blocked_frame_strategy())
+                    elif quic_frame_type is QuicNewConnectionId:
+                        strategies.append(self._build_new_connection_id_strategy())
+                    elif quic_frame_type is QuicRetireConnectionId:
+                        strategies.append(self._build_retire_connection_id_frame_strategy())
+                    elif quic_frame_type is QuicPathChallenge:
+                        strategies.append(self._build_path_challenge_frame_strategy())
+                    elif quic_frame_type is QuicPathResponse:
+                        strategies.append(self._build_path_response_frame_strategy())
+                    elif quic_frame_type is QuicConnectionClose:
+                        strategies.append(self._build_connection_close_frame_strategy())
+                    elif quic_frame_type is QuicHandshakeDone:
+                        strategies.append(self._build_handshake_done_frame_strategy())
                 
                 strategy = st.tuples(*strategies).map(list)
                 
-                try:
-                    if self.verbose:                    
-                        print("\n\tGeneration: {}".format( list(map(lambda x: x.__name__, random_quic_frame_types)) ))
-                    self.outside( strategy, moving_msgs, following_msgs, progress)
-                    progress.update(bar1, advance=1)
-                except KeyboardInterrupt:
-                    pass # when interrupted, move to the next frame
+                
+                if self.verbose:                    
+                    print("\n\tGeneration #{}: {}".format( gen+1, list(map(lambda x: x.__name__, random_quic_frame_types)) ))
+                self.outside( strategy, moving_msgs, progress)
+                progress.update(bar1, advance=1)
+                
 
                 
-    def outside(self, strategy, moving_msgs, following_msgs, progress:Progress):
+    def outside(self, strategy:st.SearchStrategy, moving_msgs:List[QuicPacket], progress:Progress):
 
         
-        def verify_hypothesis_failures(retries=2):
+        def verify_hypothesis_failures():
             def decorator(test_func):
                 @functools.wraps(test_func)
                 def wrapper(*args, **kwargs):
                     try:
                         test_func(*args, **kwargs)
                     except Exception as original_error:
-                        print(">>> Failed. Let's rerun twice." )
+                        print(">>> Failed. Let's replay {} times.".format(self.num_of_replays) )
                         # Test failed - verify it's consistent
                         failures = 0
-                        for _ in range(retries):
+                        for _ in range(self.num_of_replays):
                             try:
-                                time.sleep(10)
+                                time.sleep(5)    
+                                self._restart_remote_server()
+                                time.sleep(5)
                                 test_func(*args, **kwargs)
                                 print(">>> Passed this time :(")
                                 return
                             except Exception:
-                                print(">>> Failed again!" )
+                                print(">>> Failed again:)" )
                                 failures += 1
                         # Only raise if it fails consistently
-                        if failures == retries:
-                            print(">>> Voila. Failed twice!".format() )
+                        if failures == self.num_of_replays:
+                            print(">>> Failed in all attempts!".format() )
                             raise original_error
                 return wrapper
             return decorator
 
-        num=1
-
-        reproduce_tag = None
-        if self.reproduce_failure:
-            hypothesis_version, test_string = self.reproduce_failure.split(",")
-            reproduce_tag = reproduce_failure(hypothesis_version, test_string.encode())
-        else:
-            reproduce_tag = lambda f: f  # No-op decorator
+        num_of_mutation=1
 
         @given( strategy )
         @settings(deadline=None, verbosity=Verbosity.normal, print_blob=True, 
                   # Exclude the Shrinking phase. We want to see the first example that caused the error.
                   phases=[Phase.explicit , Phase.reuse, Phase.generate, Phase.target], 
                   max_examples=self.mutations,
-                  database=DirectoryBasedExampleDatabase("/home/ubuntu/hypothesis-db"))
-        @reproduce_tag
+                  database=DirectoryBasedExampleDatabase("/home/ubuntu/hypothesis-db"),
+                  suppress_health_check=list(HealthCheck))
         @verify_hypothesis_failures()
-        def fuzz_msg_with_strategy_inner(moving_msgs:List[QuicH3Packet], following_msgs:List[QuicH3Packet], fuzzed_entity):
+        def fuzz_msg_with_strategy_inner(moving_msgs:List[QuicPacket], fuzzed_entity:QuicPacket):
             
             if self.verbose:
-                nonlocal num
-                print("\n\t\tMutation #{}: {}".format(num, fuzzed_entity))
-                num += 1
-
-            # if there is no following state, then still we need to fuzz this transition once
-            for i in range(max(1, len(following_msgs))): 
-                following_msg =  following_msgs[i] if i < len(following_msgs) else None
-                
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-
-                    if self.verbose:
-                        print("\n\t\tSend {} requests in parallel for {} sec. with {} sec. interval with each of {} following messages"
-                              .format( self.parallel_requests, self.duration, self.interval, len(following_msgs) ))
-                    
-                    for _ in range(int(self.duration/self.interval)):
-
-                        for __ in range(self.parallel_requests):
-
-                            # Submit each iteration as a separate task
-                            executor.submit(self.execute_attack, 
-                                                        fuzzed_entity,
-                                                        moving_msgs=moving_msgs, 
-                                                        following_msg=following_msg)
-                        time.sleep(self.interval)
-
-                # check if we can establish a connection with the server.
-                # if we can't, then the server is down
-                self.check_server_availability()
-
-                if self.restart_server:
-                    self.restart_remote_server()
+                nonlocal num_of_mutation
+                print("\n\t\tMutation #{}: {}".format(num_of_mutation, fuzzed_entity))
+                num_of_mutation += 1
             
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+
+                if self.verbose:
+                    print("\n\t\tSend {} requests in parallel for {} sec. with {} sec. interval"
+                            .format( self.parallel_requests, self.duration, self.interval ))
+                
+                for _ in range(int(self.duration/self.interval)):
+
+                    for __ in range(self.parallel_requests):
+
+                        # Submit each iteration as a separate task
+                        executor.submit(self.execute_attack, 
+                                                    fuzzed_entity,
+                                                    moving_msgs=moving_msgs)
+                    time.sleep(self.interval)
+
+            # check if we can establish a connection with the server.
+            # if we can't, then the server is down
+            self.check_server_liveness()
+
+            self._restart_remote_server()
             
             progress.update(bar2, advance=1)
             
@@ -368,11 +361,11 @@ class Fuzzer():
 
 
         bar2 = progress.add_task("Mutation ", total=self.mutations, visible=not self.verbose, transient=True)
-        fuzz_msg_with_strategy_inner(moving_msgs, following_msgs)
+        fuzz_msg_with_strategy_inner(moving_msgs)
         progress.remove_task(bar2)
             
 
-    def check_server_availability(self) -> None:
+    def check_server_liveness(self) -> None:
         """
         Check if the web server is available by initiating a connection with a new client.
         The server is up, if it responds with the HANDSHAKE_DONE frame
@@ -387,6 +380,8 @@ class Fuzzer():
         h3client.complete_connection()
         res2 = h3client.read_from_buffer()
 
+        # print("res2 = {}".format(res2))
+
         if QUIC_FRAME_ABBREVIATIONS['HANDSHAKE_DONE'] not in res2:
             raise Exception("Server did not complete handshake")
         
@@ -394,29 +389,40 @@ class Fuzzer():
             print("\t\tServer is UP")
 
 
-    def execute_attack(self, 
-                       fuzzed_entity:Union[QuicH3Frame, QuicH3Packet], 
-                       moving_msgs:List[QuicH3Packet]=[], 
-                       preceding_quic_frames:List[QuicH3Frame]=[], 
-                       succeeding_quic_frames:List[QuicH3Frame]=[],
-                       following_msg:QuicH3Packet=[]) -> None:
+    def execute_attack(self, fuzzed_entity:QuicPacket, 
+                       moving_msgs:List[QuicPacket]=[]) -> None:
         
         # Ignore errors during the attack.
-        # Once the attack completes, we will check the server availability. At that point, we will care about the connection errors.
+        # Once the attack completes, we will check the server liveness. At that point, we will care about the connection errors.
         try: 
             h3client = HttpClient(self.quic_conf, self.hostname)
 
-            self.reach_source_state(h3client, moving_msgs)
-
-            response = h3client.send_frames( fuzzed_entity if isinstance( fuzzed_entity, list ) else preceding_quic_frames + [fuzzed_entity] + succeeding_quic_frames )
+            # Connection Initialization
+            h3client.connect()
+            connect_response = h3client.read_from_buffer()  # Receive any response from the server
             if self.verbose:
-                print("\t\tConnection: {}. Fuzzed Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), response))
+                print("\t\tConnection: {}. Connection Response: {}".format(h3client.connection._host_cids[0].cid.hex(), connect_response) )
+            if connect_response == "\u2298":
+                return
 
-            
-            #h3client.replay_msg(following_msg) # TODO replay_msg() doesn't work. Don't make MSGDissector H3Client's object parameter
-            response = h3client.send_frames( following_msg ) 
+            # Complete the connection by sending handshake completion messages
+            h3client.complete_connection()
+            completion_response = h3client.read_from_buffer()
             if self.verbose:
-                print("\t\tConnection: {}. Following Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), response) )
+                print("\t\tConnection: {}. Handshake Response: {}".format(h3client.connection._host_cids[0].cid.hex(), completion_response) )
+            if completion_response == "\u2298":
+                return
+
+            # Send Moving Messages
+            for moving_msg in moving_msgs:
+                moving_msg_response = h3client.send_frames(moving_msg)
+                if moving_msg_response == "\u2298":
+                    return
+
+            # Send Test Input
+            test_input_response = h3client.send_frames( fuzzed_entity, wait_for_respose=False )
+            if self.verbose:
+                print("\t\tConnection: {}. Fuzzed Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), test_input_response))
 
         except Exception as e:
             if self.verbose:
@@ -425,7 +431,7 @@ class Fuzzer():
             h3client.close_local_socket()
 
 
-    def find_message_by_packet_number(self, packet_number:int) -> Packet:
+    def _find_message_by_packet_number(self, packet_number:int) -> Packet:
         for msg in self.traffic_messages:
             
             # The same packet number can used in a short and long header quic frames. We only care about short header QUIC frames.
@@ -434,34 +440,52 @@ class Fuzzer():
         raise Exception("Packet with packet_number {} does not exist!".format(packet_number)) 
         
 
-    def build_ack_strategy(self) -> st.SearchStrategy:
+
+
+
+
+    # Build QUIC frame strategies
+    def _build_padding_strategy(self) -> st.SearchStrategy:
         """
-        largest_acknowledged:int=None
-        ack_delay:int=None
-        ack_range_count:int=None
-        ack_first_ack_range:int=None
-        ack_ranges:List[Tuple[int,int]] = field(default_factory=list) # [gap, ack_range]
+        QuicPadding:
+            pass
         """
 
-        # variable-length integer
+        return st.builds(QuicPadding)
+
+    def _build_ping_strategy(self) -> st.SearchStrategy:
+        """
+        QuicPing:
+            pass
+        """
+
+        return st.builds(QuicPing)
+
+    def _build_ack_strategy(self) -> st.SearchStrategy:
+        """
+        QuicAck:
+            largest_acknowledged:int
+            ack_delay:int
+            ack_range_count:int
+            ack_first_ack_range:int
+            ack_ranges:List[Tuple[int,int]]
+        """
+
         ack_largest_acknowledged_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         ack_delay_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**14+1), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         ack_range_count_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**8+1), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         ack_first_ack_range_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
@@ -473,8 +497,9 @@ class Fuzzer():
                 st.tuples( 
                     st.integers(min_value=0,max_value=255), 
                     st.integers(min_value=0,max_value=LARGEST_VARINT_LEN8) ) ),
-            st.sampled_from( [ (0, 5), (16, 5), (997, 5), (LARGEST_VARINT_LEN8, 5), (None, 5), (LARGEST_VARINT_LEN2, 5),
-                               (5, 0), (5, 16), (5, 997), (5, LARGEST_VARINT_LEN8), (5, None), (5, LARGEST_VARINT_LEN2)] ),
+
+            st.sampled_from( [ [(0, 5)], [(16, 5)], [(997, 5)], [(LARGEST_VARINT_LEN8, 5)], [(None, 5)], [(LARGEST_VARINT_LEN2, 5)],
+                               [(5, 0)], [(5, 16)], [(5, 997)], [(5, LARGEST_VARINT_LEN8)], [(5, None)], [(5, LARGEST_VARINT_LEN2)] ] ),
         )
 
         
@@ -485,92 +510,146 @@ class Fuzzer():
                           ack_first_ack_range_field_strategy,
                           ack_ranges_field_strategy )
         
-        
-    def build_nci_strategy(self) -> st.SearchStrategy:
+    def _build_reset_stream_strategy(self) -> st.SearchStrategy:
         """
-        sequence_number:int = None
-        retire_prior_to:int = None
-        length:int = None
-        connection_id:bytes = None
-        stateless_reset_token:bytes = None
+        QuicResetStream:
+            stream_id:int
+            app_protocol_error_code:int
+            final_size:int
         """
 
-        # variable-length integer
-        sequence_number_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+        stream_id_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
-        retire_prior_to_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8), 
+        app_protocol_error_code_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
         # 8-bit unsigned integer
-        length_field_strategy = st.one_of(
+        final_size = st.one_of(
             st.integers(min_value=0, max_value=2**8+1), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # connection ID of the specified length
-        connection_id_field_strategy = st.binary(min_size=0, max_size=2**8+1)
+        if self.server_name == "h2o":
+            final_size = st.one_of(
+                st.integers(min_value=0, max_value=0x3FFFFFFFFF000000-1), 
+                st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+            )
 
-        # 128-bit (16 byte) value
-        stateless_reset_token_strategy = st.binary(min_size=0, max_size=20)
-        
-        return st.builds(QuicNewConnectionId, 
-                          sequence_number_field_strategy,
-                          retire_prior_to_field_strategy,
-                          length_field_strategy,
-                          connection_id_field_strategy,
-                          stateless_reset_token_strategy )
 
-    def build_stream_strategy(self) -> st.SearchStrategy:
+        return st.builds(QuicResetStream, 
+                          stream_id_field_strategy,
+                          app_protocol_error_code_field_strategy,
+                          final_size )
+
+    def _build_stop_sending_strategy(self) -> st.SearchStrategy:
         """
-        stream_id:int = None
-        fin_bit:bool = None
-        offset:int = None
-        h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
+        QuicStopSending:
+            stream_id:int
+            app_protocol_error_code:int
         """
-        
-        # variable-length integer
+
         stream_id_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=2**31+1),
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        app_protocol_error_code_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10), 
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+
+        return st.builds(QuicStopSending, 
+                          stream_id_field_strategy,
+                          app_protocol_error_code_field_strategy )
+
+    def _build_crypto_strategy(self) -> st.SearchStrategy:
+        """
+        QuicCrypto:
+            offset:int
+            data:bytes
+        """
+
+        offset_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        data_field_strategy = st.binary()
+
+
+        return st.builds(QuicCrypto, 
+                          offset_field_strategy,
+                          data_field_strategy )
+
+    def _build_new_token_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicNewTokenFrame:
+            token:bytes
+        """
+
+        token_field_strategy = st.binary()
+
+
+        return st.builds(QuicNewTokenFrame, 
+                        token_field_strategy )
+
+    def _build_stream_strategy(self) -> st.SearchStrategy:
+        """
+        QuicStream:
+            stream_id:int
+            fin_bit:bool
+            offset:int
+            h3_frame:H3Frame
+        """
+        
+        stream_id_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         fin_bit_field_strategy = st.booleans()
 
-        # When you fuzz msquic, set fin_bit to False in order not to discover the same vulnerability over and over 
-        # fin_bit_field_strategy = st.just(False)
+        # TODO: temp
+        if self.server_name == "msquic-kestrel":
+            # When you fuzz msquic, set fin_bit to False in order not to discover the same vulnerability over and over 
+            fin_bit_field_strategy = st.just(False)
 
-        # variable-length integer
         offset_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        h3_frame_strategy = st.none()
-
-        # choose H3 frame type randomly
-        available_h3_frames_types = [H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder]
+        # choose HTTP/3 frame type randomly
+        available_h3_frames_types = [H3Data, H3Headers, H3CancelPush, H3Settings, H3PushPromise, H3GoAway, H3MaxPushId, H3PriorityUpdate, QpackEncoder, QpackDecoder]
         random_h3_type = random.choice(available_h3_frames_types)
         
-        if random_h3_type is H3Settings:
-            h3_frame_strategy = self.build_h3_settings_strategy()
-        elif random_h3_type is H3PriorityUpdate:
-            h3_frame_strategy = self.build_h3_priority_update_strategy()
-        # The strategies for the following HTTP/3 frames are quite simple
+        h3_frame_strategy = st.none()
+        if random_h3_type is H3Data:
+            h3_frame_strategy = self._build_h3_data_strategy()
         elif random_h3_type is H3Headers:
-            h3_frame_strategy = st.builds(H3Headers, payload=st.binary(min_size=0, max_size=1000))
-        elif random_h3_type is H3Data:
-            h3_frame_strategy = st.builds(H3Data, payload=st.binary(min_size=0, max_size=1000))
+            h3_frame_strategy = self._build_h3_headers_strategy()
+        elif random_h3_type is H3CancelPush:
+            h3_frame_strategy = self._build_h3_cancel_push_strategy()
+        elif random_h3_type is H3Settings:
+            h3_frame_strategy = self._build_h3_settings_strategy()
+        elif random_h3_type is H3PushPromise:
+            h3_frame_strategy = self._build_h3_push_promise_strategy()
+        elif random_h3_type is H3GoAway:
+            h3_frame_strategy = self._build_h3_goaway_strategy()
+        elif random_h3_type is H3MaxPushId:
+            h3_frame_strategy = self._build_h3_max_push_id_strategy()
+        elif random_h3_type is H3PriorityUpdate:
+            h3_frame_strategy = self._build_h3_priority_update_strategy()
         elif random_h3_type is QpackEncoder:
-            h3_frame_strategy = st.builds(QpackEncoder, payload=st.binary(min_size=0, max_size=1000))
+            h3_frame_strategy = self._build_h3_qpack_encoder_strategy()
         elif random_h3_type is QpackDecoder:
-            h3_frame_strategy = st.builds(QpackDecoder, payload=st.binary(min_size=0, max_size=1000))
+            h3_frame_strategy = self._build_h3_qpack_decoder_strategy()
         
         return st.builds(QuicStream, 
                           stream_id_field_strategy,
@@ -578,56 +657,307 @@ class Fuzzer():
                           offset_field_strategy,
                           h3_frame_strategy)
         
-
-    
-    def build_max_streams_strategy(self) -> st.SearchStrategy:
+    def _build_max_data_frame_strategy(self) -> st.SearchStrategy:
         """
-        maximum_streams:int = None
+        QuicMaxData:
+            max_data:int
         """
 
-        # variable-length integer
-        max_streams_field_strategy = st.one_of(
+        max_data_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        return st.builds(QuicMaxStreams, max_streams_field_strategy)
+        return st.builds(QuicMaxData, 
+                        max_data_field_strategy )
 
-
-    def build_h3_settings_strategy(self) -> st.SearchStrategy:
+    def _build_max_stream_data_frame_strategy(self) -> st.SearchStrategy:
         """
-        max_table_capacity:int = None
-        max_field_section_size:int = None
-        blocked_streams:int = None
-        h3_datagram:int = None
-        webtransport:int = None
+        QuicMaxStreamData:
+            stream_id:int
+            max_stream_data:int
         """
 
-        # variable-length integer
+        stream_id_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        max_stream_data_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        return st.builds(QuicMaxStreamData, 
+                        stream_id_field_strategy,
+                        max_stream_data_field_strategy )
+
+    def _build_max_streams_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicMaxStreams:
+            maximum_streams:int
+        """
+
+        maximum_streams_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        return st.builds(QuicMaxStreams, 
+                        maximum_streams_field_strategy )
+    
+    def _build_data_blocked_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicDataBlocked:
+            max_data:int
+        """
+
+        max_data_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        return st.builds(QuicDataBlocked, 
+                        max_data_field_strategy )
+    
+    def _build_stream_data_blocked_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicStreamDataBlocked:
+            stream_id:int
+            max_stream_data:int
+        """
+
+        stream_id_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        max_stream_data_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        return st.builds(QuicStreamDataBlocked, 
+                        stream_id_field_strategy,
+                        max_stream_data_field_strategy )
+
+    def _build_streams_blocked_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicStreamsBlocked:
+            bidirectional:bool
+            max_streams:int
+        """
+
+        bidirectional_field_strategy = st.booleans()
+
+        max_streams_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        
+        return st.builds(QuicStreamsBlocked, 
+                        bidirectional_field_strategy,
+                        max_streams_field_strategy )
+
+    def _build_new_connection_id_strategy(self) -> st.SearchStrategy:
+        """
+        QuicNewConnectionId:
+            sequence_number:int
+            retire_prior_to:int
+            connection_id:bytes
+            stateless_reset_token:bytes
+        """
+
+        sequence_number_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        retire_prior_to_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8), 
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # connection ID of the specified length
+        connection_id_field_strategy = st.binary(min_size=0, max_size=2**8+1)
+
+        # It is supposed to be 16 bytes. Try both normal size to avoid crafting a malformed frame and also random length to test edge cases
+        stateless_reset_token_strategy = st.one_of(
+            st.binary(min_size=16, max_size=16),
+            st.binary()
+        )
+        
+        
+        return st.builds(QuicNewConnectionId, 
+                          sequence_number_field_strategy,
+                          retire_prior_to_field_strategy,
+                          connection_id_field_strategy,
+                          stateless_reset_token_strategy )
+
+    def _build_retire_connection_id_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicRetireConnectionId:
+            sequence_number:int
+        """
+
+        sequence_number_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        # TODO: temp
+        if self.server_name == "quiche":
+            sequence_number_field_strategy = st.one_of(
+            st.integers(min_value=1, max_value=LARGEST_VARINT_LEN8), # sequence_number=0 causes vulnerability in Quiche
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES[1:])
+        )
+        
+        return st.builds(QuicRetireConnectionId, 
+                        sequence_number_field_strategy )
+
+    def _build_path_challenge_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicPathChallenge: 
+            data:bytes
+        """
+
+        # It is supposed to be 8 bytes. Try both normal size to avoid crafting a malformed frame and also random length to test edge cases
+        data_field_strategy = st.one_of(
+            st.binary(min_size=8, max_size=8),
+            st.binary()
+        )
+        
+        
+        return st.builds(QuicPathChallenge, 
+                        data_field_strategy )
+    
+    def _build_path_response_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicPathResponse:
+            data:bytes
+        """
+
+        # It is supposed to be 8 bytes. Try both normal size to avoid crafting a malformed frame and also random length to test edge cases
+        data_field_strategy = st.one_of(
+            st.binary(min_size=8, max_size=8),
+            st.binary()
+        )
+
+        
+        return st.builds(QuicPathResponse, 
+                        data_field_strategy )
+    
+    def _build_connection_close_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicConnectionClose:
+            transport_layer:bool
+            error_code:int
+            frame_type:int
+            reason_phrase:bytes
+        """
+
+        transport_layer_field_strategy = st.booleans()
+
+
+        error_code_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        frame_type_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+        reason_phrase_field_strategy = st.binary()
+
+        
+        return st.builds(QuicConnectionClose, 
+                        transport_layer_field_strategy,
+                        error_code_field_strategy,
+                        frame_type_field_strategy,
+                        reason_phrase_field_strategy )
+
+    def _build_handshake_done_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicHandshakeDone:
+            pass
+        """
+
+        return st.builds(QuicHandshakeDone)
+    
+
+    # Build HTTP/3 frame strategies
+    def _build_h3_data_strategy(self) -> st.SearchStrategy:
+        """
+        H3Data:
+            payload:bytes
+        """
+
+        payload_field_strategy = st.binary()
+
+
+        return st.builds(H3Data, 
+                        payload_field_strategy )
+
+    def _build_h3_headers_strategy(self) -> st.SearchStrategy:
+        """
+        H3Headers:
+            payload:bytes
+        """
+
+        payload_field_strategy = st.binary()
+
+
+        return st.builds(H3Headers, 
+                        payload_field_strategy )
+    
+    def _build_h3_cancel_push_strategy(self) -> st.SearchStrategy:
+        """
+        H3CancelPush:
+            push_id:int
+        """
+
+        push_id_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        )
+
+
+        return st.builds(H3CancelPush, 
+                        push_id_field_strategy )
+
+    def _build_h3_settings_strategy(self) -> st.SearchStrategy:
+        """
+        H3Settings:
+            max_table_capacity:int
+            max_field_section_size:int
+            blocked_streams:int
+            h3_datagram:int
+            webtransport:int
+        """
+
         max_table_capacity_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**32+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         max_field_section_size_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**32+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         blocked_streams_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**32+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         h3_datagram_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**15+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         webtransport_strategy = st.one_of(
             st.integers(0, 100),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
@@ -640,16 +970,61 @@ class Fuzzer():
                           h3_datagram_field_strategy,
                           webtransport_strategy )
 
-                                                      
-    def build_h3_priority_update_strategy(self) -> st.SearchStrategy:
+    def _build_h3_push_promise_strategy(self) -> st.SearchStrategy:
         """
-        element_id:int = None
-        field_value:str = None
+        H3PushPromise:
+            push_id:int
+            field_section:bytes
         """
 
-        # variable-length integer
+        push_id_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
+        )
+
+        field_section_field_strategy = st.binary()
+
+        return st.builds(H3PushPromise, 
+                        push_id_field_strategy,
+                        field_section_field_strategy )
+
+    def _build_h3_goaway_strategy(self) -> st.SearchStrategy:
+        """
+        H3GoAway:
+            stream_id:int
+        """
+
         element_id_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=2**31+1),
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
+        )
+
+        return st.builds(H3GoAway, 
+                        element_id_field_strategy)
+    
+    def _build_h3_max_push_id_strategy(self) -> st.SearchStrategy:
+        """
+        H3MaxPushId:
+            push_id:int
+        """
+
+        push_id_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
+        )
+
+        return st.builds(H3MaxPushId, 
+                        push_id_field_strategy)
+
+    def _build_h3_priority_update_strategy(self) -> st.SearchStrategy:
+        """
+        H3PriorityUpdate:
+            element_id:int
+            field_value:str
+        """
+
+        element_id_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=10),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
@@ -663,42 +1038,45 @@ class Fuzzer():
                           element_id_field_strategy,
                           field_value_field_strategy )
     
+    def _build_h3_qpack_encoder_strategy(self) -> st.SearchStrategy:
+        """
+        QpackEncoder:
+            payload:bytes
+        """
+
+        payload_field_strategy = st.binary()
+
+        return st.builds(QpackEncoder, 
+                        payload_field_strategy )
     
-    def extract_fuzzed_object_str_from_strategy(self, strategy:st.SearchStrategy) -> str:
+    def _build_h3_qpack_decoder_strategy(self) -> st.SearchStrategy:
+        """
+        QpackDecoder:
+            payload:bytes
+        """
+
+        payload_field_strategy = st.binary()
+
+        return st.builds(QpackDecoder, 
+                        payload_field_strategy )
+    
+
+    def _restart_remote_server(self):
+
+        if not self.restart_server:
+            return
         
-        fuzzed_object_str = ""
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            example = strategy.example()
-            if isinstance(example, QuicTransportParameters):
-                fuzzed_object_str = "Transport Params"
-            elif isinstance(example, QuicAck):
-                fuzzed_object_str = "ACK"
-            elif isinstance(example, QuicNewConnectionId):
-                fuzzed_object_str = "NCI"
-            elif isinstance(example, QuicStream):
-                h3FrameName = ""
-                if isinstance(example, H3Settings):
-                    h3FrameName = H3_FRAME_ABBREVIATIONS["SETTINGS"]
-                elif isinstance(example, H3Headers):
-                    h3FrameName = H3_FRAME_ABBREVIATIONS["HEADERS"]
-                elif isinstance(example, H3Data):
-                    h3FrameName = H3_FRAME_ABBREVIATIONS["DATA"]
-                elif isinstance(example, H3PriorityUpdate):
-                    h3FrameName = H3_FRAME_ABBREVIATIONS["PRIORITY_UPDATE"]
-                elif isinstance(example, QpackEncoder):
-                    h3FrameName = "Enc"
-                elif isinstance(example, QpackDecoder):
-                    h3FrameName = "Dec"
-                fuzzed_object_str = "Stream[{}]".format(h3FrameName)
-
-        return fuzzed_object_str
-
-    def restart_remote_server(self):
+        if self.verbose:
+            print("\n\t\tRestarting the server...")
 
         def run_remote_tmux_command(ssh, command):
             stdin, stdout, stderr = ssh.exec_command(command)
+            channel = stdout.channel
+
+            while not channel.exit_status_ready():
+                # the command has not finished, yet
+                time.sleep(0.1)
+
             return stdout.read().decode(), stderr.read().decode()
         
         # Setup SSH connection
@@ -712,16 +1090,21 @@ class Fuzzer():
         cmd ="sudo pkill -9 -f autorun.py"
         run_remote_tmux_command(client, cmd)
 
-        time.sleep(3)
+        if self.server_name == "xquic":
+            # Delete Xquic's log files
+            cmd ="sudo rm /home/ubuntu/PRETT3/servers_setup/xquic/slog.log /home/ubuntu/PRETT3/servers_setup/xquic/skeys.log"
+            run_remote_tmux_command(client, cmd)
 
         # Run the new process
         cmd = "tmux send-keys -t server 'sudo python3 autorun.py {} {}' Enter".format(self.server_name, self.server_version)
         run_remote_tmux_command(client, cmd)
+        time.sleep(3)
 
         client.close()
 
+
 if __name__ == "__main__":
-    install()
+    # install()
 
     defaults = QuicConfiguration(is_client=True)
 
@@ -784,13 +1167,6 @@ if __name__ == "__main__":
         help="The length of attack (in sec.) (default 60)"
     )
     parser.add_argument(
-        "-rf",
-        "--reproduce_failure",
-        type=str,
-        default=None,
-        help="Comma seperated hypothesis version and test case string to reproduce a specific case (e.g. 6.113.0,AAMBAw==) to build @reproduce_failure('6.113.0', b'AAMBAw==')"
-    )
-    parser.add_argument(
         "-rs", "--restart_server", action="store_true", help="After fuzzing for each mutation, connect to the target server and restart the QUIC server"
     )
     parser.add_argument(
@@ -822,6 +1198,13 @@ if __name__ == "__main__":
         help="Server name to use as input parameter while running autorun.py to restart QUIC server"
     )
     parser.add_argument(
+        "-r",
+        "--replay",
+        type=int,
+        default=2,
+        help="Number of additional replays to confirm a finding (default 2)"
+    )
+    parser.add_argument(
         "-v", "--verbose", action="store_true", help="Verbose output"
     )
     
@@ -845,7 +1228,6 @@ if __name__ == "__main__":
     if not os.path.exists(decrypt_keylog_file):
         raise Exception("{} does not exist".format(decrypt_keylog_file))
 
-
     fuzzer = Fuzzer(
         configuration, 
         urlparse(args.url).netloc, 
@@ -856,18 +1238,14 @@ if __name__ == "__main__":
         duration=args.duration,
         generation=args.generation,
         verbose = args.verbose,
-        reproduce_failure=args.reproduce_failure,
         restart_server=args.restart_server,
         ssh_user=args.ssh_user,
         ssh_key_path=args.ssh_key_path,
         server_name=args.server_name,
-        server_version=args.server_version)
-    
+        server_version=args.server_version,
+        num_of_replays=args.replay)
     
     fuzzer.set_up_graph(args.state_machine, args.pcap)
 
-
     print("Starting the fuzzer at {}".format( datetime.now().strftime("%Y-%m-%d %H:%M:%S") ) )
     fuzzer.fuzz()
-
-    sys.exit()

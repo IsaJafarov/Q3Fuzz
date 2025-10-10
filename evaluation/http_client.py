@@ -232,7 +232,7 @@ class HttpClient():
         
 
 
-    def complete_connection(self):
+    def complete_connection(self) -> None:
         """
         How aioquic's QuicConnection does it:
         receive_datagram() calls _payload_received()
@@ -781,7 +781,7 @@ class HttpClient():
 
         return response_packets
     
-    def send_frames(self, quic_frames:List) -> str:
+    def send_frames(self, quic_frames:List, wait_for_respose=True) -> str:
         """
         Send the QUIC and HTTP/3 frames in a packet and capture responses.
         """
@@ -791,8 +791,9 @@ class HttpClient():
         self.msg_crafter.craft_msg_from_frames(quic_frames, builder)
         self.send_quic_frames_from_builder(builder)
 
-        response_packets = self.read_from_buffer()
-        #print("Received response: {}".format(response_packets))
+        response_packets = "\x1B[3m not waited \x1B[0m"
+        if wait_for_respose:
+            response_packets = self.read_from_buffer()
 
         return response_packets
 

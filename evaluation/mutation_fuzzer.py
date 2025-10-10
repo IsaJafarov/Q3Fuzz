@@ -8,6 +8,7 @@ from typing import List
 from aioquic.quic.connection import *
 from pyshark.packet.packet import Packet
 from urllib.parse import urlparse
+from typing import Union
 
 import util
 from http_client import HttpClient
@@ -23,7 +24,7 @@ from rich.console import Console
 from rich.table import Table
 import warnings
 import paramiko
-from hypothesis import given, reproduce_failure, settings, Verbosity, Phase, strategies as st
+from hypothesis import given, reproduce_failure, settings, Verbosity, Phase, strategies as st, HealthCheck
 from hypothesis.database import DirectoryBasedExampleDatabase
 from rich.traceback import install
 import functools
@@ -45,8 +46,8 @@ LAST_STATE = "FINISH"
 
 class Fuzzer():
     def __init__(self, quic_conf:QuicConfiguration, hostname:str, keylog_file:str, mutations:int, 
-                 parallel_requests:int, interval:int, duration:int, verbose:bool, reproduce_failure:str, 
-                 restart_server:bool, ssh_user:str, ssh_key_path:str, server_name:str, server_version:str):
+                 parallel_requests:int, interval:int, duration:int, verbose:bool, 
+                 restart_server:bool, ssh_user:str, ssh_key_path:str, server_name:str, server_version:str, num_of_replays:int):
         self.quic_conf:QuicConfiguration = quic_conf
         self.hostname:str = hostname
         self.keylog_file:str = keylog_file
@@ -57,15 +58,14 @@ class Fuzzer():
         self.interval:int = interval
         self.duration:int = duration
         self.verbose = verbose
-        self.reproduce_failure = reproduce_failure
         self.restart_server = restart_server
         self.ssh_user = ssh_user
         self.ssh_key_path = ssh_key_path
         self.server_name = server_name
         self.server_version = server_version
+        self.num_of_replays = num_of_replays
 
 
-    
     def set_up_graph(self, sm_file_path:str, traffic_file_path:str):
         with open(sm_file_path, 'r') as f:
             data = json.load(f)
@@ -110,7 +110,7 @@ class Fuzzer():
             if edge_to_fuzz['packet_number'] is None: 
                 return None
             triggering_msg_packet_num = int(edge_to_fuzz['packet_number'])
-            packet = self.find_message_by_packet_number(triggering_msg_packet_num)
+            packet = self._find_message_by_packet_number(triggering_msg_packet_num)
             return MSGDissector().dissect_msg( packet )
 
         # 1. Extract the transitions from the State Machine
@@ -139,7 +139,7 @@ class Fuzzer():
         if self.verbose:
             print("\n\nTransition: START -> {}\n".format(FIRST_STATE))
             print("\tFuzzing Transport Parameters" )
-        transport_params_strategy = self.build_transport_params_strategy()
+        transport_params_strategy = self._build_transport_params_strategy()
 
         following_msgs=list()
         for source_node, target_node in fuzzing_and_following_transitions.keys():
@@ -170,18 +170,6 @@ class Fuzzer():
             
             self.fuzz_state_transition(moving_msgs, triggering_msg, following_msgs)
 
-    def reach_source_state(self, h3client:HttpClient, moving_msgs:List[QuicPacket]) -> None:
-        
-        h3client.connect()
-        connect_response = h3client.read_from_buffer()  # Receive any response from the server
-
-        # Complete the connection by sending handshake completion messages
-        h3client.complete_connection()
-        handshake_response = h3client.read_from_buffer()        
-
-        #print("\nMoving Messages:")
-        for moving_msg in moving_msgs:
-            response = h3client.send_frames(moving_msg)
 
     def fuzz_state_transition(self, moving_msgs:List[QuicPacket], triggering_msg:QuicPacket, following_msgs:List[QuicPacket]) -> None:
         """
@@ -198,19 +186,19 @@ class Fuzzer():
             if isinstance(quic_frame, QuicAck):
                 if self.verbose:
                     print("\tFuzzing ACK" )
-                strategy = self.build_ack_strategy(quic_frame)
+                strategy = self._build_ack_strategy(quic_frame)
             elif isinstance(quic_frame, QuicNewConnectionId):
                 if self.verbose:
                     print("\tFuzzing NCI" )
-                strategy = self.build_nci_strategy(quic_frame)
+                strategy = self._build_new_connection_id_strategy(quic_frame)
             elif isinstance(quic_frame, QuicStream):
                 if self.verbose:
                     print("\tFuzzing STREAM" )
-                strategy = self.build_stream_strategy(quic_frame)
+                strategy = self._build_stream_strategy(quic_frame)
             elif isinstance(quic_frame, QuicMaxStreams):
                 if self.verbose:
                     print("\tFuzzing QuicMaxStreams" )
-                strategy = self.build_max_streams_strategy(quic_frame)
+                strategy = self._build_max_streams_strategy(quic_frame)
             else:
                 raise Exception("[-] Unsupported QUIC Frame: {}".format(quic_frame))
             
@@ -230,35 +218,31 @@ class Fuzzer():
         """
         
         num=1
-        reproduce_tag = None
-        if self.reproduce_failure:
-            hypothesis_version, test_string = self.reproduce_failure.split(",")
-            reproduce_tag = reproduce_failure(hypothesis_version, test_string.encode())
-        else:
-            reproduce_tag = lambda f: f  # No-op decorator
 
-        def verify_hypothesis_failures(retries=2):
+        def verify_hypothesis_failures():
             def decorator(test_func):
                 @functools.wraps(test_func)
                 def wrapper(*args, **kwargs):
                     try:
                         test_func(*args, **kwargs)
                     except Exception as original_error:
-                        print(">>> Failed. Let's rerun twice." )
+                        print(">>> Failed. Let's replay {} times.".format(self.num_of_replays) )
                         # Test failed - verify it's consistent
                         failures = 0
-                        for _ in range(retries):
+                        for _ in range(self.num_of_replays):
                             try:
-                                time.sleep(10)
+                                time.sleep(5)    
+                                self._restart_remote_server()
+                                time.sleep(5)
                                 test_func(*args, **kwargs)
                                 print(">>> Passed this time :(")
                                 return
                             except Exception:
-                                print(">>> Failed again!" )
+                                print(">>> Failed again:)" )
                                 failures += 1
                         # Only raise if it fails consistently
-                        if failures == retries:
-                            print(">>> Voila. Failed twice!".format() )
+                        if failures == self.num_of_replays:
+                            print(">>> Failed in all attempts!".format() )
                             raise original_error
                 return wrapper
             return decorator
@@ -268,8 +252,8 @@ class Fuzzer():
                   # Exclude the Shrinking phase. We want to see the first example that caused the error.
                   phases=[Phase.explicit , Phase.reuse, Phase.generate, Phase.target], 
                   max_examples=self.mutations,
-                  database=DirectoryBasedExampleDatabase("/home/ubuntu/hypothesis-db"))
-        @reproduce_tag
+                  database=DirectoryBasedExampleDatabase("/home/ubuntu/hypothesis-db"),
+                  suppress_health_check=list(HealthCheck))
         @verify_hypothesis_failures()
         def fuzz_msg_with_strategy_inner(moving_msgs:List[QuicPacket], 
                                           preceding_quic_frames:QuicPacket, 
@@ -314,10 +298,9 @@ class Fuzzer():
 
                 # check if we can establish a connection with the server.
                 # if we can't, then the server is down
-                self.check_server_availability()
-
-                if self.restart_server:
-                    self.restart_remote_server()
+                self.check_server_liveness()
+    
+                self._restart_remote_server()
 
             
             progress.update(mutations_bar, advance=1)
@@ -326,20 +309,20 @@ class Fuzzer():
                 print("\n\n")
             
 
-        # build a progress bar
-        with Progress(
+        
+        with Progress( # build a progress bar
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
             TimeElapsedColumn(),
             SpinnerColumn()) as progress:
 
-            mutations_bar = progress.add_task("Fuzz "+self.extract_fuzzed_object_str_from_strategy(strategy), total=self.mutations, visible=not self.verbose)
+            mutations_bar = progress.add_task("Fuzz "+self._extract_fuzzed_object_str_from_strategy(strategy), total=self.mutations, visible=not self.verbose)
 
             fuzz_msg_with_strategy_inner(moving_msgs, preceding_quic_frames, succeeding_quic_frames, following_msgs)
             
 
-    def check_server_availability(self) -> None:
+    def check_server_liveness(self) -> None:
         """
         Check if the web server is available by initiating a connection with a new client.
         The server is up, if it responds with the HANDSHAKE_DONE frame
@@ -369,7 +352,7 @@ class Fuzzer():
                        following_msg:QuicPacket=[]) -> None:
         
         # Ignore errors during the attack.
-        # Once the attack completes, we will check the server availability. At that point, we will care about the connection errors.
+        # Once the attack completes, we will check the server liveness. At that point, we will care about the connection errors.
         try: 
             h3client = HttpClient(self.quic_conf, self.hostname)
 
@@ -382,28 +365,54 @@ class Fuzzer():
                 connect_response = h3client.read_from_buffer()
                 if self.verbose:
                     print("\t\tConnection: {}. Connection Response: {}".format(h3client.connection._host_cids[0].cid.hex(), connect_response) )
+                if connect_response == "\u2298":
+                    return
 
                 h3client.complete_connection()
                 completion_response = h3client.read_from_buffer()
                 if self.verbose:
                     print("\t\tConnection: {}. Handshake Response: {}".format(h3client.connection._host_cids[0].cid.hex(), completion_response) )
+                if completion_response == "\u2298":
+                    return
                 
-                response = h3client.send_frames( following_msg )
+                following_trans_response = h3client.send_frames( following_msg, wait_for_respose=False )
                 if self.verbose:
-                    print("\t\tConnection: {}. Following Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), response) )
+                    print("\t\tConnection: {}. Following Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), following_trans_response) )
 
             else:
-                self.reach_source_state(h3client, moving_msgs)
 
-                response = h3client.send_frames( preceding_quic_frames + [fuzzed_entity] + succeeding_quic_frames )
+                # Connection Initialization
+                h3client.connect()
+                connect_response = h3client.read_from_buffer()  # Receive any response from the server
                 if self.verbose:
-                    print("\t\tConnection: {}. Fuzzed Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), response))
+                    print("\t\tConnection: {}. Connection Response: {}".format(h3client.connection._host_cids[0].cid.hex(), connect_response) )
+                if connect_response == "\u2298":
+                    return
 
-                
+                # Complete the connection by sending handshake completion messages
+                h3client.complete_connection()
+                completion_response = h3client.read_from_buffer()
+                if self.verbose:
+                    print("\t\tConnection: {}. Handshake Response: {}".format(h3client.connection._host_cids[0].cid.hex(), completion_response) )
+                if completion_response == "\u2298":
+                    return
+
+                # Send Moving Messages
+                for moving_msg in moving_msgs:
+                    moving_msg_response = h3client.send_frames(moving_msg)
+                    if moving_msg_response == "\u2298":
+                        return
+
+                test_input_response = h3client.send_frames( preceding_quic_frames + [fuzzed_entity] + succeeding_quic_frames )
+                if self.verbose:
+                    print("\t\tConnection: {}. Fuzzed Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), test_input_response))
+                if test_input_response == "\u2298":
+                    return
+
                 #h3client.replay_msg(following_msg) # TODO replay_msg() doesn't work. Don't make MSGDissector H3Client's object parameter
-                response = h3client.send_frames( following_msg ) 
+                following_trans_response = h3client.send_frames( following_msg, wait_for_respose=False ) 
                 if self.verbose:
-                    print("\t\tConnection: {}. Following Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), response) )
+                    print("\t\tConnection: {}. Following Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), following_trans_response) )
 
         except Exception as e:
             if self.verbose:
@@ -412,7 +421,7 @@ class Fuzzer():
             h3client.close_local_socket()
 
 
-    def find_message_by_packet_number(self, packet_number:int) -> Packet:
+    def _find_message_by_packet_number(self, packet_number:int) -> Packet:
         for msg in self.traffic_messages:
             
             # The same packet number can used in a short and long header quic frames. We only care about short header QUIC frames.
@@ -420,32 +429,104 @@ class Fuzzer():
                 return msg
         raise Exception("Packet with packet_number {} does not exist!".format(packet_number)) 
         
+    def _extract_fuzzed_object_str_from_strategy(self, strategy:st.SearchStrategy) -> str:
+        
+        fuzzed_object_str = ""
 
-    
-    # Build strategies
-    def build_transport_params_strategy(self) -> st.SearchStrategy:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            example = strategy.example()
+            if isinstance(example, QuicTransportParameters):
+                fuzzed_object_str = "Transport Params"
+            elif isinstance(example, QuicAck):
+                fuzzed_object_str = "ACK"
+            elif isinstance(example, QuicNewConnectionId):
+                fuzzed_object_str = "NCI"
+            elif isinstance(example, QuicStream):
+                h3FrameName = ""
+                if isinstance(example, H3Settings):
+                    h3FrameName = H3_FRAME_ABBREVIATIONS["SETTINGS"]
+                elif isinstance(example, H3Headers):
+                    h3FrameName = H3_FRAME_ABBREVIATIONS["HEADERS"]
+                elif isinstance(example, H3Data):
+                    h3FrameName = H3_FRAME_ABBREVIATIONS["DATA"]
+                elif isinstance(example, H3PriorityUpdate):
+                    h3FrameName = H3_FRAME_ABBREVIATIONS["PRIORITY_UPDATE"]
+                elif isinstance(example, QpackEncoder):
+                    h3FrameName = "Enc"
+                elif isinstance(example, QpackDecoder):
+                    h3FrameName = "Dec"
+                fuzzed_object_str = "Stream[{}]".format(h3FrameName)
+
+        return fuzzed_object_str
+
+    def _restart_remote_server(self):
+
+        if not self.restart_server:
+            return
+        
+        if self.verbose:
+            print("\n\t\tRestarting the server...")
+
+        def run_remote_tmux_command(ssh, command):
+            stdin, stdout, stderr = ssh.exec_command(command)
+            channel = stdout.channel
+
+            while not channel.exit_status_ready():
+                # the command has not finished, yet
+                time.sleep(0.1)
+
+            return stdout.read().decode(), stderr.read().decode()
+        
+        # Setup SSH connection
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        key = paramiko.Ed25519Key.from_private_key_file(self.ssh_key_path)
+        client.connect(self.hostname, 22, self.ssh_user, pkey=key)
+        
+        # Kill running process
+        cmd ="sudo pkill -9 -f autorun.py"
+        run_remote_tmux_command(client, cmd)
+
+        if self.server_name == "xquic":
+            # Delete Xquic's log files
+            cmd ="sudo rm /home/ubuntu/PRETT3/servers_setup/xquic/slog.log /home/ubuntu/PRETT3/servers_setup/xquic/skeys.log"
+            run_remote_tmux_command(client, cmd)
+
+        # Run the new process
+        cmd = "tmux send-keys -t server 'sudo python3 autorun.py {} {}' Enter".format(self.server_name, self.server_version)
+        run_remote_tmux_command(client, cmd)
+        time.sleep(3)
+
+        client.close()
+
+
+    # Build Transport Parameters strategy
+
+    def _build_transport_params_strategy(self) -> st.SearchStrategy:
         """
-        class QuicTransportParameters:
-            original_destination_connection_id: Optional[bytes] = None
-            max_idle_timeout: Optional[int] = None
-            stateless_reset_token: Optional[bytes] = None
-            max_udp_payload_size: Optional[int] = None
-            initial_max_data: Optional[int] = None
-            initial_max_stream_data_bidi_local: Optional[int] = None
-            initial_max_stream_data_bidi_remote: Optional[int] = None
-            initial_max_stream_data_uni: Optional[int] = None
-            initial_max_streams_bidi: Optional[int] = None
-            initial_max_streams_uni: Optional[int] = None
-            ack_delay_exponent: Optional[int] = None
-            max_ack_delay: Optional[int] = None
+        QuicTransportParameters:
+            original_destination_connection_id: Optional[bytes]
+            max_idle_timeout: Optional[int]
+            stateless_reset_token: Optional[bytes]
+            max_udp_payload_size: Optional[int]
+            initial_max_data: Optional[int]
+            initial_max_stream_data_bidi_local: Optional[int]
+            initial_max_stream_data_bidi_remote: Optional[int]
+            initial_max_stream_data_uni: Optional[int]
+            initial_max_streams_bidi: Optional[int]
+            initial_max_streams_uni: Optional[int]
+            ack_delay_exponent: Optional[int]
+            max_ack_delay: Optional[int]
             disable_active_migration: Optional[bool] = False
-            preferred_address: Optional[QuicPreferredAddress] = None
-            active_connection_id_limit: Optional[int] = None
-            initial_source_connection_id: Optional[bytes] = None
-            retry_source_connection_id: Optional[bytes] = None
-            version_information: Optional[QuicVersionInformation] = None
-            max_datagram_frame_size: Optional[int] = None
-            quantum_readiness: Optional[bytes] = None                         
+            preferred_address: Optional[QuicPreferredAddress]
+            active_connection_id_limit: Optional[int]
+            initial_source_connection_id: Optional[bytes]
+            retry_source_connection_id: Optional[bytes]
+            version_information: Optional[QuicVersionInformation]
+            max_datagram_frame_size: Optional[int]
+            quantum_readiness: Optional[bytes]                         
         """
 
 
@@ -467,55 +548,47 @@ class Fuzzer():
             st.sampled_from( [None] ),
         )
         
-        # variable-length integer. <1200 is invalid
+        # should be <1200 is invalid
         max_udp_payload_size_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
         
-        # variable-length integer
         initial_max_data_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         initial_max_stream_data_bidi_local_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         initial_max_stream_data_bidi_remote_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         initial_max_stream_data_uni_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         initial_max_streams_bidi_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         initial_max_streams_uni_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         ack_delay_exponent_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         max_ack_delay_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
@@ -530,7 +603,7 @@ class Fuzzer():
                                                      connection_id=st.binary(),
                                                      stateless_reset_token=st.binary())
 
-        # variable-length integer. <2 should result in connection close
+        # <2 should result in connection close
         active_connection_id_limit_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
@@ -553,7 +626,7 @@ class Fuzzer():
             available_versions = st.lists( st.integers(min_value=1, max_value=1), min_size=1, max_size=1 )
         )
 
-        # variable-length integer. RFC 9221
+        # RFC 9221
         max_datagram_frame_size_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
@@ -610,7 +683,7 @@ class Fuzzer():
             version_information_chosen_version_field_strategy
         ]
         
-        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
+        inter_field_strategies = self._build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
 
         built_strategies = []
@@ -635,43 +708,39 @@ class Fuzzer():
                         max_datagram_frame_size = final_strategy[14],
                         quantum_readiness = final_strategy[15],
                         stateless_reset_token = final_strategy[16],
-                        version_information = final_strategy[17]
-                        )
+                        version_information = final_strategy[17])
             )
-
-        
-        #print(st.one_of(built_strategies))
 
         return st.one_of(built_strategies)
 
-    def build_ack_strategy(self, ack_frame:QuicAck) -> st.SearchStrategy:
+
+    # Build QUIC frame strategies
+    
+    def _build_ack_strategy(self, ack_frame:QuicAck) -> st.SearchStrategy:
         """
-        largest_acknowledged:int=None
-        ack_delay:int=None
-        ack_range_count:int=None
-        ack_first_ack_range:int=None
-        ack_ranges:List[Tuple[int,int]] = field(default_factory=list) # [gap, ack_range]
+        QuicAck:
+            largest_acknowledged:int
+            ack_delay:int
+            ack_range_count:int
+            ack_first_ack_range:int
+            ack_ranges:List[Tuple[int,int]]
         """
 
-        # variable-length integer
         ack_largest_acknowledged_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         ack_delay_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**14+1), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         ack_range_count_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**8+1), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         ack_first_ack_range_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
@@ -683,8 +752,8 @@ class Fuzzer():
                 st.tuples( 
                     st.integers(min_value=0,max_value=255), 
                     st.integers(min_value=0,max_value=LARGEST_VARINT_LEN8) ) ),
-            st.sampled_from( [ (0, 5), (16, 5), (997, 5), (LARGEST_VARINT_LEN8, 5), (None, 5), (LARGEST_VARINT_LEN2, 5),
-                               (5, 0), (5, 16), (5, 997), (5, LARGEST_VARINT_LEN8), (5, None), (5, LARGEST_VARINT_LEN2)] ),
+            st.sampled_from( [ [(0, 5)], [(16, 5)], [(997, 5)], [(LARGEST_VARINT_LEN8, 5)], [(None, 5)], [(LARGEST_VARINT_LEN2, 5)],
+                               [(5, 0)], [(5, 16)], [(5, 997)], [(5, LARGEST_VARINT_LEN8)], [(5, None)], [(5, LARGEST_VARINT_LEN2)] ] ),
         )
         
         
@@ -704,7 +773,7 @@ class Fuzzer():
             ack_ranges_field_strategy
         ]
         
-        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
+        inter_field_strategies = self._build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
 
         built_strategies = []
@@ -720,22 +789,21 @@ class Fuzzer():
 
         return st.one_of(built_strategies)
     
-    def build_nci_strategy(self, nci_frame:QuicNewConnectionId) -> st.SearchStrategy:
+    def _build_new_connection_id_strategy(self, nci_frame:QuicNewConnectionId) -> st.SearchStrategy:
         """
-        sequence_number:int = None
-        retire_prior_to:int = None
-        length:int = None
-        connection_id:bytes = None
-        stateless_reset_token:bytes = None
+        QuicNewConnectionId:
+            sequence_number:int
+            retire_prior_to:int
+            length:int
+            connection_id:bytes
+            stateless_reset_token:bytes
         """
 
-        # variable-length integer
         sequence_number_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
         )
 
-        # variable-length integer
         retire_prior_to_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
@@ -770,7 +838,7 @@ class Fuzzer():
             stateless_reset_token_strategy
         ]
         
-        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
+        inter_field_strategies = self._build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
 
         built_strategies = []
@@ -786,54 +854,43 @@ class Fuzzer():
 
         return st.one_of(built_strategies)
 
-    def build_stream_strategy(self, stream_frame:QuicStream) -> st.SearchStrategy:
+    def _build_stream_strategy(self, stream_frame:QuicStream) -> st.SearchStrategy:
         """
-        stream_id:int = None
-        fin_bit:bool = None
-        offset:int = None
-        h3_frame:Union[H3Settings, H3Headers, H3Data, H3PriorityUpdate, QpackEncoder, QpackDecoder] = None
+        QuicStream:
+            stream_id:int
+            fin_bit:bool
+            offset:int
+            h3_frame:H3Frame
         """
 
-        # variable-length integer
         stream_id_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**31+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         fin_bit_field_strategy = st.booleans()
 
         # When you fuzz msquic, set fin_bit to False in order not to discover the same vulnerability over and over 
         # fin_bit_field_strategy = st.just(False)
 
-        # variable-length integer
         offset_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8), 
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
         h3_frame_strategy = st.none()
-        if isinstance(stream_frame.h3_frame, H3Settings):
-            h3_frame_strategy = self.build_h3_settings_strategy(stream_frame.h3_frame)
-        elif isinstance(stream_frame.h3_frame, H3PriorityUpdate):
-            h3_frame_strategy = self.build_h3_priority_update_strategy(stream_frame.h3_frame)
-        # The strategies for the following HTTP/3 frames are quite simple
+        if isinstance(stream_frame.h3_frame, H3Data):
+            h3_frame_strategy = self._build_h3_data_strategy(stream_frame.h3_frame)
         elif isinstance(stream_frame.h3_frame, H3Headers):
-            h3_frame_strategy = st.builds(H3Headers, payload=st.one_of(
-                                            st.just(stream_frame.h3_frame.payload),
-                                            st.binary(min_size=0, max_size=1000)))
-        elif isinstance(stream_frame.h3_frame, H3Data):
-            h3_frame_strategy = st.builds(H3Data, payload= st.one_of(
-                                            st.just(stream_frame.h3_frame.payload),
-                                            st.binary(min_size=0, max_size=1000)))
+            h3_frame_strategy = self._build_h3_headers_strategy(stream_frame.h3_frame)
+        elif isinstance(stream_frame.h3_frame, H3Settings):
+            h3_frame_strategy = self._build_h3_settings_strategy(stream_frame.h3_frame)
+        elif isinstance(stream_frame.h3_frame, H3PriorityUpdate):
+            h3_frame_strategy = self._build_h3_priority_update_strategy(stream_frame.h3_frame)        
         elif isinstance(stream_frame.h3_frame, QpackEncoder):
-            h3_frame_strategy = st.builds(QpackEncoder, payload= st.one_of(
-                                            st.just(stream_frame.h3_frame.payload),
-                                            st.binary(min_size=0, max_size=1000)))
+            h3_frame_strategy = self._build_h3_qpack_encoder_strategy(stream_frame.h3_frame)
         elif isinstance(stream_frame.h3_frame, QpackDecoder):
-            h3_frame_strategy = st.builds(QpackDecoder, payload= st.one_of(
-                                            st.just(stream_frame.h3_frame.payload),
-                                            st.binary(min_size=0, max_size=1000)))
+            h3_frame_strategy = self._build_h3_qpack_decoder_strategy(stream_frame.h3_frame)
         elif stream_frame.h3_frame is None:
             h3_frame_strategy = st.none() # stream doesn't have any application layer data
         else:
@@ -854,7 +911,7 @@ class Fuzzer():
             h3_frame_strategy
         ]
         
-        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
+        inter_field_strategies = self._build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
 
         built_strategies = []
@@ -870,12 +927,12 @@ class Fuzzer():
         
         return st.one_of(built_strategies)
     
-    def build_max_streams_strategy(self, max_streams_frame:QuicMaxStreams) -> st.SearchStrategy:
+    def _build_max_streams_strategy(self, max_streams_frame:QuicMaxStreams) -> st.SearchStrategy:
         """
-        maximum_streams:int = None
+        QuicMaxStreams:
+            maximum_streams:int
         """
 
-        # variable-length integer
         max_streams_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
@@ -889,7 +946,7 @@ class Fuzzer():
             max_streams_field_strategy
         ]
         
-        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
+        inter_field_strategies = self._build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
 
         built_strategies = []
@@ -902,40 +959,38 @@ class Fuzzer():
         return st.one_of(built_strategies)
 
 
-    def build_h3_settings_strategy(self, settings_frame:H3Settings) -> st.SearchStrategy:
+    # Build HTTP/3 frame strategies
+
+    def _build_h3_settings_strategy(self, settings_frame:H3Settings) -> st.SearchStrategy:
         """
-        max_table_capacity:int = None
-        max_field_section_size:int = None
-        blocked_streams:int = None
-        h3_datagram:int = None
-        webtransport:int = None
+        H3Settings:
+            max_table_capacity:int
+            max_field_section_size:int
+            blocked_streams:int
+            h3_datagram:int
+            webtransport:int
         """
 
-        # variable-length integer
         max_table_capacity_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**32+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         max_field_section_size_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**32+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         blocked_streams_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**32+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         h3_datagram_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**15+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        # variable-length integer
         webtransport_strategy = st.one_of(
             st.integers(0, 100),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
@@ -958,7 +1013,7 @@ class Fuzzer():
             webtransport_strategy
         ]
         
-        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
+        inter_field_strategies = self._build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
 
         built_strategies = []
@@ -975,13 +1030,13 @@ class Fuzzer():
         
         return st.one_of(built_strategies)
                                                       
-    def build_h3_priority_update_strategy(self, priority_update_frame:H3PriorityUpdate) -> st.SearchStrategy:
+    def _build_h3_priority_update_strategy(self, priority_update_frame:H3PriorityUpdate) -> st.SearchStrategy:
         """
-        element_id:int = None
-        field_value:str = None
+        H3PriorityUpdate:
+            element_id:int
+            field_value:str
         """
 
-        # variable-length integer
         element_id_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=2**31+1),
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
@@ -1005,7 +1060,7 @@ class Fuzzer():
             field_value_field_strategy
         ]
         
-        inter_field_strategies = self.build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
+        inter_field_strategies = self._build_inter_field_strategies(default_field_strategies, modifying_field_strategies)
 
 
         built_strategies = []
@@ -1021,8 +1076,52 @@ class Fuzzer():
 
         return st.one_of(built_strategies)
     
+    def _build_h3_data_strategy(self, data_frame:H3Data) -> st.SearchStrategy:
+        """
+        H3Data:
+            payload:bytes
+        """
+
+        payload_field_strategy = st.binary()
+
+
+        return st.builds(H3Data, 
+                        payload_field_strategy )
+
+    def _build_h3_headers_strategy(self, headers_frame:H3Headers) -> st.SearchStrategy:
+        """
+        H3Headers:
+            payload:bytes
+        """
+
+        payload_field_strategy = st.binary()
+
+        return st.builds(H3Headers, 
+                        payload_field_strategy )
     
-    def build_inter_field_strategies(self, default_field_strategies:List[st.SearchStrategy], modifying_field_strategies:List[st.SearchStrategy]) -> List[List[st.SearchStrategy]]:
+    def _build_h3_qpack_encoder_strategy(self, qpack_encoder:QpackEncoder) -> st.SearchStrategy:
+        """
+        QpackEncoder:
+            payload:bytes
+        """
+
+        payload_field_strategy = st.binary()
+
+        return st.builds(QpackEncoder, 
+                        payload_field_strategy )
+    
+    def _build_h3_qpack_decoder_strategy(self, qpack_decoder:QpackDecoder) -> st.SearchStrategy:
+        """
+        QpackDecoder:
+            payload:bytes
+        """
+
+        payload_field_strategy = st.binary()
+
+        return st.builds(QpackDecoder, 
+                        payload_field_strategy )
+
+    def _build_inter_field_strategies(self, default_field_strategies:List[st.SearchStrategy], modifying_field_strategies:List[st.SearchStrategy]) -> List[List[st.SearchStrategy]]:
        
         inter_field_strategies:List[List[st.SearchStrategy]] = []
 
@@ -1051,64 +1150,9 @@ class Fuzzer():
 
         return inter_field_strategies
     
-    def extract_fuzzed_object_str_from_strategy(self, strategy:st.SearchStrategy) -> str:
-        
-        fuzzed_object_str = ""
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            example = strategy.example()
-            if isinstance(example, QuicTransportParameters):
-                fuzzed_object_str = "Transport Params"
-            elif isinstance(example, QuicAck):
-                fuzzed_object_str = "ACK"
-            elif isinstance(example, QuicNewConnectionId):
-                fuzzed_object_str = "NCI"
-            elif isinstance(example, QuicStream):
-                h3FrameName = ""
-                if isinstance(example, H3Settings):
-                    h3FrameName = H3_FRAME_ABBREVIATIONS["SETTINGS"]
-                elif isinstance(example, H3Headers):
-                    h3FrameName = H3_FRAME_ABBREVIATIONS["HEADERS"]
-                elif isinstance(example, H3Data):
-                    h3FrameName = H3_FRAME_ABBREVIATIONS["DATA"]
-                elif isinstance(example, H3PriorityUpdate):
-                    h3FrameName = H3_FRAME_ABBREVIATIONS["PRIORITY_UPDATE"]
-                elif isinstance(example, QpackEncoder):
-                    h3FrameName = "Enc"
-                elif isinstance(example, QpackDecoder):
-                    h3FrameName = "Dec"
-                fuzzed_object_str = "Stream[{}]".format(h3FrameName)
-
-        return fuzzed_object_str
-
-    def restart_remote_server(self):
-
-        def run_remote_tmux_command(ssh, command):
-            stdin, stdout, stderr = ssh.exec_command(command)
-            return stdout.read().decode(), stderr.read().decode()
-        
-        # Setup SSH connection
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        key = paramiko.Ed25519Key.from_private_key_file(self.ssh_key_path)
-        client.connect(self.hostname, 22, self.ssh_user, pkey=key)
-        
-        # Kill running process
-        cmd ="sudo pkill -9 -f autorun.py"
-        run_remote_tmux_command(client, cmd)
-
-        time.sleep(3)
-
-        # Run the new process
-        cmd = "tmux send-keys -t server 'sudo python3 autorun.py {} {}' Enter".format(self.server_name, self.server_version)
-        run_remote_tmux_command(client, cmd)
-
-        client.close()
-
+   
 if __name__ == "__main__":
-    install()
+    #install()
 
     defaults = QuicConfiguration(is_client=True)
 
@@ -1164,13 +1208,6 @@ if __name__ == "__main__":
         help="The length of attack (in sec.) (default 60)"
     )
     parser.add_argument(
-        "-rf",
-        "--reproduce_failure",
-        type=str,
-        default=None,
-        help="Comma seperated hypothesis version and test case string to reproduce a specific case (e.g. 6.113.0,AAMBAw==) to build @reproduce_failure('6.113.0', b'AAMBAw==')"
-    )
-    parser.add_argument(
         "-rs", "--restart_server", action="store_true", help="After fuzzing for each mutation, connect to the target server and restart the QUIC server"
     )
     parser.add_argument(
@@ -1200,6 +1237,13 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Server name to use as input parameter while running autorun.py to restart QUIC server"
+    )
+    parser.add_argument(
+        "-r",
+        "--replay",
+        type=int,
+        default=2,
+        help="Number of additional replays to confirm a finding (default 2)"
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Verbose output"
@@ -1235,12 +1279,12 @@ if __name__ == "__main__":
         interval=args.interval,
         duration=args.duration,
         verbose = args.verbose,
-        reproduce_failure=args.reproduce_failure,
         restart_server=args.restart_server,
         ssh_user=args.ssh_user,
         ssh_key_path=args.ssh_key_path,
         server_name=args.server_name,
-        server_version=args.server_version)
+        server_version=args.server_version,
+        num_of_replays=args.replay)
     
     
     fuzzer.set_up_graph(args.state_machine, args.pcap)
