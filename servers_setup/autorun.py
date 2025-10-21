@@ -49,10 +49,10 @@ def run_h2o(version):
     os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
 
     
-def run_quiche(version):
-    print("[+] Running quiche %s..." % version)
+def run_cloudflare_quiche(version):
+    print("[+] Running Cloudflare's quiche %s..." % version)
     if version == '0.23.5':
-        os.chdir("quiche")
+        os.chdir("cloudflare-quiche")
         os.system("sudo ./target/release/quiche-server --listen 0.0.0.0:443 --cert ../certs/prett3.com.crt --key ../certs/prett3.com.key --root /usr/local/nginx/html/ --no-retry --name prett3.com")
 
 def run_quic_go(version):
@@ -96,7 +96,7 @@ def run_ngtcp2(version):
 def run_xquic(version):
     if version == "1.8.3":
         os.chdir("xquic")
-        os.system("sudo ./build/demo/demo_server -p 443 > /dev/null")
+        os.system("sudo ./build/demo/demo_server -p 443")
 
 def run_mvfst_proxygen(version):
     if version == "2025.04.14.00":
@@ -110,9 +110,9 @@ def run_picoquic(version):
         os.chdir("picoquic")
         os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key -x 10000000")
  
-def run_googlequiche(version):
+def run_google_quiche(version):
     if version=="7b2b126":
-        os.chdir("quiche")
+        os.chdir("google-quiche")
         os.system("sudo ./bazel-bin/quiche/quic_server --port 443 --certificate_file ../certs/prett3.com.crt --key_file ../certs/prett3.com.key  --generate_dynamic_responses")
 
 
@@ -123,7 +123,7 @@ if __name__ == '__main__':
     "- caddy\n"
     "- h2o\n"
     "- ols (lsquic + openlitespeed)\n"
-    "- quiche\n"
+    "- cloudflare-quiche\n"
     "- quic-go\n"
     "- msquic-kestrel\n"
     "- neqo\n"
@@ -173,8 +173,8 @@ if __name__ == '__main__':
         run_openlitespeed(version)
     elif server == 'h2o':
         run_h2o(version)
-    elif server == "quiche":
-        run_quiche(version)
+    elif server == "cloudflare-quiche":
+        run_cloudflare_quiche(version)
     elif server == "quic-go":
         run_quic_go(version)
     elif server == "msquic-kestrel":
@@ -194,5 +194,5 @@ if __name__ == '__main__':
     elif server == "picoquic":
         run_picoquic(version)
     elif server == "google-quiche":
-        run_googlequiche(version)
+        run_google_quiche(version)
     print("[+] Done.")

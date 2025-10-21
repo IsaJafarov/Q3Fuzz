@@ -235,17 +235,17 @@ def install_h2o(version):
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
     
     
-def install_quiche(version):
+def install_cloudflare_quiche(version):
     if version == '0.23.5':
-        os.system("sudo rm -r ./quiche")
+        os.system("sudo rm -r ./cloudflare-quiche")
 
         # install dependencies: rust and cmake
         os.system("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo sh -s -- -y") 
         os.system("sudo apt install -y build-essential cmake")
         
         # clone Quiche
-        os.system("git clone https://github.com/cloudflare/quiche.git")
-        os.chdir("quiche")
+        os.system("git clone https://github.com/cloudflare/quiche.git ./cloudflare-quiche")
+        os.chdir("cloudflare-quiche")
         os.system("git checkout tags/0.23.5")
         os.system("git submodule update --init --recursive") # retrieve submodules, such as boringssl
 
@@ -444,13 +444,14 @@ def install_ngtcp2(version):
         # run
         os.system("sudo ./examples/bsslserver 0.0.0.0 443 ../certs/prett3.com.key ../certs/prett3.com.crt -d /usr/local/nginx/html/ -q")
 
-def install_googlequiche(version):
+def install_google_quiche(version):
     if version=="7b2b126":
+        os.system("sudo rm -r ./google-quiche")
         os.system("sudo apt -y install gcc-12 g++-12 libicu-dev clang lld libstdc++-12-dev")
         os.system("wget https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-amd64.deb")
         os.system("sudo dpkg -i bazelisk-amd64.deb")
-        os.system("git clone https://github.com/google/quiche.git")
-        os.chdir("quiche")
+        os.system("git clone https://github.com/google/quiche.git ./google-quiche")
+        os.chdir("google-quiche")
         os.system("git checkout 7b2b1267559fb8c475faf8e6f2f9e6aa18909b4d") # 2025/04/30
         os.system("CC=gcc-12 CXX=g++-12 bazel build -c opt --cxxopt=-std=c++20 //...")
         os.system("sudo ./bazel-bin/quiche/quic_server --port 443 --certificate_file ../certs/prett3.com.crt --key_file ../certs/prett3.com.key  --generate_dynamic_responses")
@@ -504,7 +505,7 @@ def install_xquic(version):
         os.system("cp ../certs/prett3.com.crt ./server.crt")
         os.system("cp ../certs/prett3.com.key ./server.key")
 
-        os.system("sudo ./build/demo/demo_server -p 443 > /dev/null")
+        os.system("sudo ./build/demo/demo_server -p 443")
             
 def install_mvfst_proxygen(version):
     # Compiling proxygen, especially folly, requires a lot of computing resources. 
@@ -554,7 +555,7 @@ if __name__ == '__main__':
     "- caddy\n"
     "- h2o\n"
     "- ols (lsquic + openlitespeed)\n"
-    "- quiche\n"
+    "- cloudflare-quiche\n"
     "- quic-go\n"
     "- msquic-kestrel\n"
     "- neqo\n"
@@ -572,7 +573,7 @@ if __name__ == '__main__':
     "- 2.4.6, 2.7.6, 2.8.4, 2.10.0\t(for caddy) \n"
     "- a429117, 222b36d, 16b13ee or f1918a5\t(for h2o) \n"
     "- 1.7.15, 1.8.1, 1.8.3.1\t(for ols)\n"
-    "- 0.23.5 \t(for quiche)\n"
+    "- 0.23.5 \t(for cloudflare-quiche)\n"
     "- 0.50.1 \t (for quic-go)\n"
     "- 2.4.8 \t (for msquic-kestrel)\n"
     "- 0.13.1, 0.14.1 \t (for neqo)\n"
@@ -604,8 +605,8 @@ if __name__ == '__main__':
         install_openlitespeed(version)
     elif server == 'h2o':
         install_h2o(version)
-    elif server == "quiche":
-        install_quiche(version)
+    elif server == "cloudflare-quiche":
+        install_cloudflare_quiche(version)
     elif server == "quic-go":
         install_quic_go(version)
     elif server == "msquic-kestrel":
@@ -625,6 +626,6 @@ if __name__ == '__main__':
     elif server == "picoquic":
         install_picoquic(version)
     elif server == "google-quiche":
-        install_googlequiche(version)
+        install_google_quiche(version)
         
 
