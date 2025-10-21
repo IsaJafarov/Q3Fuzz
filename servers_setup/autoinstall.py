@@ -444,6 +444,16 @@ def install_ngtcp2(version):
         # run
         os.system("sudo ./examples/bsslserver 0.0.0.0 443 ../certs/prett3.com.key ../certs/prett3.com.crt -d /usr/local/nginx/html/ -q")
 
+def install_googlequiche(version):
+    if version=="7b2b126":
+        os.system("sudo apt -y install gcc-12 g++-12 libicu-dev clang lld libstdc++-12-dev")
+        os.system("wget https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-amd64.deb")
+        os.system("sudo dpkg -i bazelisk-amd64.deb")
+        os.system("git clone https://github.com/google/quiche.git")
+        os.chdir("quiche")
+        os.system("git checkout 7b2b1267559fb8c475faf8e6f2f9e6aa18909b4d") # 2025/04/30
+        os.system("CC=gcc-12 CXX=g++-12 bazel build -c opt --cxxopt=-std=c++20 //...")
+        os.system("sudo ./bazel-bin/quiche/quic_server --port 443 --certificate_file ../certs/prett3.com.crt --key_file ../certs/prett3.com.key  --generate_dynamic_responses")
 
 def install_xquic(version):
     if version == "1.8.3":
@@ -494,7 +504,7 @@ def install_xquic(version):
         os.system("cp ../certs/prett3.com.crt ./server.crt")
         os.system("cp ../certs/prett3.com.key ./server.key")
 
-        os.system("sudo ./build/demo/demo_server -p 443")
+        os.system("sudo ./build/demo/demo_server -p 443 > /dev/null")
             
 def install_mvfst_proxygen(version):
     # Compiling proxygen, especially folly, requires a lot of computing resources. 
@@ -554,6 +564,7 @@ if __name__ == '__main__':
     "- xquic\n"
     "- mvfst-proxygen\n"
     "- picoquic\n"
+    "- google-quiche\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -571,6 +582,7 @@ if __name__ == '__main__':
     "- 1.8.3 \t (for xquic)\n"
     "- 2025.04.14.00 \t (for mvfst-proxygen)\n"
     "- b19dcf1 \t (for picoquic)\n"
+    "- 7b2b126 \t (for google-quiche)\n"
     )
 
     args = parser.parse_args()
@@ -612,5 +624,7 @@ if __name__ == '__main__':
         install_mvfst_proxygen(version)
     elif server == "picoquic":
         install_picoquic(version)
+    elif server == "google-quiche":
+        install_googlequiche(version)
         
 

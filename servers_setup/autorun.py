@@ -96,7 +96,7 @@ def run_ngtcp2(version):
 def run_xquic(version):
     if version == "1.8.3":
         os.chdir("xquic")
-        os.system("sudo ./build/demo/demo_server -p 443")
+        os.system("sudo ./build/demo/demo_server -p 443 > /dev/null")
 
 def run_mvfst_proxygen(version):
     if version == "2025.04.14.00":
@@ -110,6 +110,11 @@ def run_picoquic(version):
         os.chdir("picoquic")
         os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key -x 10000000")
  
+def run_googlequiche(version):
+    if version=="7b2b126":
+        os.chdir("quiche")
+        os.system("sudo ./bazel-bin/quiche/quic_server --port 443 --certificate_file ../certs/prett3.com.crt --key_file ../certs/prett3.com.key  --generate_dynamic_responses")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HTTP/3 web servers runner', formatter_class=argparse.RawTextHelpFormatter)
@@ -128,6 +133,7 @@ if __name__ == '__main__':
     "- xquic\n"
     "- mvfst-proxygen\n"
     "- picoquic\n"
+    "- google-quiche\n"
     )
 
     parser.add_argument("version", help="corresponding version(s) \n\t"
@@ -145,6 +151,7 @@ if __name__ == '__main__':
     "- 1.8.3 \t (for xquic)\n"
     "- 2025.04.14.00 \t (for mvfst-proxygen)\n"
     "- b19dcf1 \t (for picoquic)\n"
+    "- 7b2b126 \t (for google-quiche)\n"
     )
 
     args = parser.parse_args()
@@ -186,5 +193,6 @@ if __name__ == '__main__':
         run_mvfst_proxygen(version)
     elif server == "picoquic":
         run_picoquic(version)
-
+    elif server == "google-quiche":
+        run_googlequiche(version)
     print("[+] Done.")
