@@ -168,15 +168,17 @@ class Fuzzer():
                     QuicPadding, QuicPing, QuicAck, QuicResetStream, QuicStopSending, 
                     QuicCrypto, QuicNewTokenFrame, QuicStream, QuicMaxData, QuicMaxStreamData, 
                     QuicMaxStreams, QuicDataBlocked, QuicStreamDataBlocked, QuicStreamsBlocked, QuicNewConnectionId, 
-                    QuicRetireConnectionId, QuicPathChallenge, QuicPathResponse, QuicConnectionClose, QuicHandshakeDone
-                    ]
+                    QuicRetireConnectionId, QuicPathChallenge, QuicPathResponse, QuicConnectionClose, QuicHandshakeDone,
+                    QuicDatagram
+                ]
                 
                 # Give a higher priority to QuicStream, because it is more complex.
                 weights = [
                     1,1,1,1,1,
                     1,1,10,1,1, 
                     1,1,1,1,1,
-                    1,1,1,1,1
+                    1,1,1,1,1,
+                    1
                 ]
 
 
@@ -188,6 +190,9 @@ class Fuzzer():
                     # Do not rediscover existing vulnerability: https://github.com/mozilla/neqo/security/advisories/GHSA-56c6-rfrf-rh4r
                     weights[6] = 0 # QuicNewTokenFrame
 
+                if self.server_name == "msquic-kestrel":
+                    weights[18] = 0 # PATH_RESPONSE
+                    
 
                 random_quic_frame_types = random.choices(available_quic_frame_types, weights=weights, k=5)
 
@@ -227,6 +232,9 @@ class Fuzzer():
                             if random_quic_frame_types[i] is QuicConnectionClose:
                                 # https://github.com/IsaJafarov/Neqo-TransportInvalidStreamId-Crash-Exploit
                                 random_quic_frame_types[i] = random.choice([x for x in available_quic_frame_types if x is not QuicConnectionClose])
+
+                
+
 
 
                 # build strategy for each frame
@@ -272,6 +280,8 @@ class Fuzzer():
                         strategies.append(self._build_connection_close_frame_strategy())
                     elif quic_frame_type is QuicHandshakeDone:
                         strategies.append(self._build_handshake_done_frame_strategy())
+                    elif quic_frame_type is QuicDatagram:
+                        strategies.append(self._build_datagram_frame_strategy())
                 
                 strategy = st.tuples(*strategies).map(list)
                 
@@ -293,7 +303,7 @@ class Fuzzer():
                     try:
                         test_func(*args, **kwargs)
                     except Exception as original_error:
-                        print(">>> Failed. Let's replay {} times.".format(self.num_of_replays) )
+                        print("> Failed. Let's replay {} times.".format(self.num_of_replays) )
                         # Test failed - verify it's consistent
                         failures = 0
                         for _ in range(self.num_of_replays):
@@ -302,14 +312,14 @@ class Fuzzer():
                                 self._restart_remote_server()
                                 time.sleep(5)
                                 test_func(*args, **kwargs)
-                                print(">>> Passed this time :(")
+                                print("> Passed this time :(")
                                 return
                             except Exception:
-                                print(">>> Failed again:)" )
+                                print("> Failed again:)" )
                                 failures += 1
                         # Only raise if it fails consistently
                         if failures == self.num_of_replays:
-                            print(">>> Failed in all attempts!".format() )
+                            print("> Failed in all attempts!".format() )
                             raise original_error
                 return wrapper
             return decorator
@@ -402,25 +412,25 @@ class Fuzzer():
             connect_response = h3client.read_from_buffer()  # Receive any response from the server
             if self.verbose:
                 print("\t\tConnection: {}. Connection Response: {}".format(h3client.connection._host_cids[0].cid.hex(), connect_response) )
-            if connect_response == "\u2298":
-                return
+            # if connect_response == "\u2298":
+            #     return
 
             # Complete the connection by sending handshake completion messages
             h3client.complete_connection()
             completion_response = h3client.read_from_buffer()
             if self.verbose:
                 print("\t\tConnection: {}. Handshake Response: {}".format(h3client.connection._host_cids[0].cid.hex(), completion_response) )
-            if completion_response == "\u2298":
-                return
+            # if completion_response == "\u2298":
+            #     return
 
             # Send Moving Messages
             for moving_msg in moving_msgs:
                 moving_msg_response = h3client.send_frames(moving_msg)
-                if moving_msg_response == "\u2298":
-                    return
+                # if moving_msg_response == "\u2298":
+                #     return
 
             # Send Test Input
-            test_input_response = h3client.send_frames( fuzzed_entity, wait_for_respose=False )
+            test_input_response = h3client.send_frames( fuzzed_entity, wait_for_respose=self.verbose )
             if self.verbose:
                 print("\t\tConnection: {}. Fuzzed Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), test_input_response))
 
@@ -536,8 +546,7 @@ class Fuzzer():
 
         if self.server_name == "h2o":
             final_size = st.one_of(
-                st.integers(min_value=0, max_value=0x3FFFFFFFFF000000-1), 
-                st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+                st.integers(min_value=0, max_value=0x3FFFFFFFFF000000-1)
             )
 
 
@@ -626,7 +635,7 @@ class Fuzzer():
         )
 
         # choose HTTP/3 frame type randomly
-        available_h3_frames_types = [H3Data, H3Headers, H3CancelPush, H3Settings, H3PushPromise, H3GoAway, H3MaxPushId, H3PriorityUpdate, QpackEncoder, QpackDecoder]
+        available_h3_frames_types = [ H3Data, H3Headers, H3CancelPush, H3Settings, H3PushPromise, H3GoAway, H3MaxPushId, H3PriorityUpdate, H3Origin,  QpackEncoder, QpackDecoder]
         random_h3_type = random.choice(available_h3_frames_types)
         
         h3_frame_strategy = st.none()
@@ -646,6 +655,8 @@ class Fuzzer():
             h3_frame_strategy = self._build_h3_max_push_id_strategy()
         elif random_h3_type is H3PriorityUpdate:
             h3_frame_strategy = self._build_h3_priority_update_strategy()
+        elif random_h3_type is H3Origin:
+            h3_frame_strategy = self._build_h3_origin_strategy()
         elif random_h3_type is QpackEncoder:
             h3_frame_strategy = self._build_h3_qpack_encoder_strategy()
         elif random_h3_type is QpackDecoder:
@@ -887,6 +898,29 @@ class Fuzzer():
 
         return st.builds(QuicHandshakeDone)
     
+    def _build_datagram_frame_strategy(self) -> st.SearchStrategy:
+        """
+        QuicDatagram:
+            h3_datagram:H3Datagram
+        
+        H3Datagram:
+            quarter_stream_id:int
+            payload:bytes
+        """
+
+        quarter_stream_id_field_strategy = st.one_of(
+            st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8),
+            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES))
+
+        payload_field_strategy = st.binary()
+
+        h3datagram_strtegy = st.builds(H3Datagram,
+                                quarter_stream_id_field_strategy,
+                                payload_field_strategy)
+        
+        return st.builds(QuicDatagram, 
+                         h3datagram_strtegy)
+    
 
     # Build HTTP/3 frame strategies
     def _build_h3_data_strategy(self) -> st.SearchStrategy:
@@ -934,8 +968,8 @@ class Fuzzer():
             max_table_capacity:int
             max_field_section_size:int
             blocked_streams:int
-            h3_datagram:int
-            webtransport:int
+            h3_datagram:bool
+            webtransport:bool
         """
 
         max_table_capacity_field_strategy = st.one_of(
@@ -953,15 +987,9 @@ class Fuzzer():
             st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
         )
 
-        h3_datagram_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=2**15+1),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
-        )
+        h3_datagram_field_strategy = st.booleans()
 
-        webtransport_strategy = st.one_of(
-            st.integers(0, 100),
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES),
-        )
+        webtransport_strategy = st.booleans()
 
         return st.builds(H3Settings, 
                           max_table_capacity_field_strategy,
@@ -1038,6 +1066,24 @@ class Fuzzer():
                           element_id_field_strategy,
                           field_value_field_strategy )
     
+    def _build_h3_origin_strategy(self) -> st.SearchStrategy:
+        """
+        H3Origin:
+            entries:List[str]
+        """
+
+        entries_field_strategy = st.lists(
+            st.one_of(
+                st.characters(),
+                st.sampled_from(["https://example.com", "http://example.com:8080", "https://sub.domain.org", "wss://chat.example.net", "https://[2001:db8::1]", "http://127.0.0.1:8000", "http://localhost"])
+            )
+        )
+
+       
+        return st.builds(H3Origin, 
+                          entries_field_strategy )
+    
+
     def _build_h3_qpack_encoder_strategy(self) -> st.SearchStrategy:
         """
         QpackEncoder:

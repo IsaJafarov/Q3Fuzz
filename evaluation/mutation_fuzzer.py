@@ -226,7 +226,7 @@ class Fuzzer():
                     try:
                         test_func(*args, **kwargs)
                     except Exception as original_error:
-                        print(">>> Failed. Let's replay {} times.".format(self.num_of_replays) )
+                        print("> Failed. Let's replay {} times.".format(self.num_of_replays) )
                         # Test failed - verify it's consistent
                         failures = 0
                         for _ in range(self.num_of_replays):
@@ -235,14 +235,14 @@ class Fuzzer():
                                 self._restart_remote_server()
                                 time.sleep(5)
                                 test_func(*args, **kwargs)
-                                print(">>> Passed this time :(")
+                                print("> Passed this time :(")
                                 return
                             except Exception:
-                                print(">>> Failed again:)" )
+                                print("> Failed again:)" )
                                 failures += 1
                         # Only raise if it fails consistently
                         if failures == self.num_of_replays:
-                            print(">>> Failed in all attempts!".format() )
+                            print("> Failed in all attempts!".format() )
                             raise original_error
                 return wrapper
             return decorator
@@ -365,17 +365,13 @@ class Fuzzer():
                 connect_response = h3client.read_from_buffer()
                 if self.verbose:
                     print("\t\tConnection: {}. Connection Response: {}".format(h3client.connection._host_cids[0].cid.hex(), connect_response) )
-                if connect_response == "\u2298":
-                    return
 
                 h3client.complete_connection()
                 completion_response = h3client.read_from_buffer()
                 if self.verbose:
                     print("\t\tConnection: {}. Handshake Response: {}".format(h3client.connection._host_cids[0].cid.hex(), completion_response) )
-                if completion_response == "\u2298":
-                    return
                 
-                following_trans_response = h3client.send_frames( following_msg, wait_for_respose=False )
+                following_trans_response = h3client.send_frames( following_msg, wait_for_respose=self.verbose )
                 if self.verbose:
                     print("\t\tConnection: {}. Following Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), following_trans_response) )
 
@@ -386,28 +382,20 @@ class Fuzzer():
                 connect_response = h3client.read_from_buffer()  # Receive any response from the server
                 if self.verbose:
                     print("\t\tConnection: {}. Connection Response: {}".format(h3client.connection._host_cids[0].cid.hex(), connect_response) )
-                if connect_response == "\u2298":
-                    return
 
                 # Complete the connection by sending handshake completion messages
                 h3client.complete_connection()
                 completion_response = h3client.read_from_buffer()
                 if self.verbose:
                     print("\t\tConnection: {}. Handshake Response: {}".format(h3client.connection._host_cids[0].cid.hex(), completion_response) )
-                if completion_response == "\u2298":
-                    return
 
                 # Send Moving Messages
                 for moving_msg in moving_msgs:
                     moving_msg_response = h3client.send_frames(moving_msg)
-                    if moving_msg_response == "\u2298":
-                        return
 
                 test_input_response = h3client.send_frames( preceding_quic_frames + [fuzzed_entity] + succeeding_quic_frames )
                 if self.verbose:
                     print("\t\tConnection: {}. Fuzzed Transition Response: {}".format(h3client.connection._host_cids[0].cid.hex(), test_input_response))
-                if test_input_response == "\u2298":
-                    return
 
                 #h3client.replay_msg(following_msg) # TODO replay_msg() doesn't work. Don't make MSGDissector H3Client's object parameter
                 following_trans_response = h3client.send_frames( following_msg, wait_for_respose=False ) 
@@ -794,7 +782,6 @@ class Fuzzer():
         QuicNewConnectionId:
             sequence_number:int
             retire_prior_to:int
-            length:int
             connection_id:bytes
             stateless_reset_token:bytes
         """
@@ -810,10 +797,10 @@ class Fuzzer():
         )
 
         # 8-bit unsigned integer
-        length_field_strategy = st.one_of(
-            st.integers(min_value=0, max_value=2**8+1), 
-            st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
-        )
+        # length_field_strategy = st.one_of(
+        #     st.integers(min_value=0, max_value=2**8+1), 
+        #     st.sampled_from(SAMPLE_VALUES_FOR_VARINT_VALUES)
+        # )
 
         # connection ID of the specified length
         connection_id_field_strategy = st.binary(min_size=0, max_size=2**8+1)
@@ -825,7 +812,7 @@ class Fuzzer():
         default_field_strategies = [
             st.just(nci_frame.sequence_number), 
             st.just(nci_frame.retire_prior_to), 
-            st.just(nci_frame.length), 
+            # st.just(nci_frame.length), 
             st.just(nci_frame.connection_id), 
             st.just(nci_frame.stateless_reset_token)
         ]
@@ -833,7 +820,7 @@ class Fuzzer():
         modifying_field_strategies = [
             sequence_number_field_strategy,
             retire_prior_to_field_strategy,
-            length_field_strategy,
+            # length_field_strategy,
             connection_id_field_strategy,
             stateless_reset_token_strategy
         ]
@@ -848,8 +835,7 @@ class Fuzzer():
                           final_strategy[0],
                           final_strategy[1],
                           final_strategy[2],
-                          final_strategy[3],
-                          final_strategy[4] )
+                          final_strategy[3])
             )
 
         return st.one_of(built_strategies)
@@ -870,8 +856,10 @@ class Fuzzer():
 
         fin_bit_field_strategy = st.booleans()
 
-        # When you fuzz msquic, set fin_bit to False in order not to discover the same vulnerability over and over 
-        # fin_bit_field_strategy = st.just(False)
+        
+        if self.server_name == "msquic-kestrel":
+            # Don't rediscover the same vulnerability that stems from fin_bit=True
+            fin_bit_field_strategy = st.just(False)
 
         offset_field_strategy = st.one_of(
             st.integers(min_value=0, max_value=LARGEST_VARINT_LEN8), 
