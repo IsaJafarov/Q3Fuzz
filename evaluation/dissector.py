@@ -29,8 +29,8 @@ class H3Settings(H3Frame):
     max_table_capacity:int = None
     max_field_section_size:int = None
     blocked_streams:int = None
-    h3_datagram:int = None
-    webtransport:int = None
+    h3_datagram:bool = None
+    webtransport:bool = None
 
 @dataclass
 class H3PushPromise(H3Frame):
@@ -49,6 +49,15 @@ class H3MaxPushId(H3Frame):
 class H3PriorityUpdate(H3Frame):
     element_id:int = None
     field_value:str = None
+
+@dataclass
+class H3Origin(H3Frame):
+    entries:List[str]
+
+@dataclass
+class H3Datagram(H3Frame):
+    quarter_stream_id:int = None
+    payload:bytes = None
 
 @dataclass
 class QpackEncoder(H3Frame):
@@ -169,6 +178,9 @@ class QuicConnectionClose(QuicFrame):
 class QuicHandshakeDone(QuicFrame):
     pass
 
+@dataclass
+class QuicDatagram(QuicFrame):
+    h3_datagram:H3Datagram = None
 
 
 

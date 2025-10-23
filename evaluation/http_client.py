@@ -85,7 +85,7 @@ class HttpClient():
                 initial_max_streams_uni=128,
                 initial_source_connection_id=self._http._quic._host_cids[0].cid,
                 max_ack_delay=25,
-                max_datagram_frame_size=self.quic_conf.max_datagram_frame_size,
+                max_datagram_frame_size=2000,#self.quic_conf.max_datagram_frame_size,
                 quantum_readiness=(
                     b"Q" * SMALLEST_MAX_DATAGRAM_SIZE
                     if self.quic_conf.quantum_readiness_test

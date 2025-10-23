@@ -25,7 +25,7 @@ class MSGCrafter():
                 continue
             self.add_dissected_frames_to_builder(quic_frame, builder)
 
-    def craft_msg_from_frames(self, quic_frames:List, builder:QuicPacketBuilder) -> None:
+    def craft_msg_from_frames(self, quic_frames:List[QuicFrame], builder:QuicPacketBuilder) -> None:
         for quic_frame in quic_frames:
             self.add_dissected_frames_to_builder(quic_frame, builder)
 
@@ -70,7 +70,9 @@ class MSGCrafter():
         elif isinstance(quic_frame, QuicConnectionClose):
             self._add_connection_close_frame(quic_frame, builder)
         elif isinstance(quic_frame, QuicHandshakeDone):
-            self._add_handshake_done_frame(quic_frame, builder)         
+            self._add_handshake_done_frame(quic_frame, builder)
+        elif isinstance(quic_frame, QuicDatagram):
+            self._add_datagram_frame(quic_frame, builder)
         else:
             raise Exception("Unexpected QUIC frame {}. Add it here.".format(quic_frame))
 
@@ -105,8 +107,8 @@ class MSGCrafter():
             max_table_capacity:int
             max_field_section_size:int
             blocked_streams:int
-            h3_datagram:int
-            webtransport:int
+            h3_datagram:bool
+            webtransport:bool
         """
         settings = {}
 
@@ -119,12 +121,11 @@ class MSGCrafter():
         if h3_frame.blocked_streams is not None:
             settings[0x07] = h3_frame.blocked_streams
 
-        # Removed Enable Datagram field (prevent CC by included LEN bit in stream type)
-        # if h3_frame.h3_datagram is not None:
-        #     settings[0x33] = h3_frame.h3_datagram
+        if h3_frame.h3_datagram is not None:
+            settings[0x33] = 1 if h3_frame.h3_datagram else 0
 
         if h3_frame.webtransport is not None:
-            settings[0x2B603742] = h3_frame.webtransport
+            settings[0x2B603742] = 1 if h3_frame.webtransport else 0
 
         # Encode the settings into SETTINGS frame payload
         settings_data = encode_settings(settings)
@@ -197,6 +198,22 @@ class MSGCrafter():
         
         return frame_data
     
+    def _generate_h3_origin_frame(self, h3_frame:H3Origin) -> bytes:
+        """
+        H3Origin:
+            entries:List[str]
+        """
+
+        data_payload = b""
+        for entry in h3_frame.entries:
+            data_payload += len(entry).to_bytes(2, byteorder='big', signed=False)
+            data_payload += entry.encode()
+        
+        frame_data = encode_frame(0xC, data_payload)
+
+        return frame_data
+
+
     def _generate_qpack_encoder(self, h3_frame:QpackEncoder, include_stream_type:bool=True) -> bytes:
         
         if include_stream_type:
@@ -357,6 +374,8 @@ class MSGCrafter():
             h3_frame_payload = self._generate_max_push_id_frame(quic_frame.h3_frame)
         elif isinstance(quic_frame.h3_frame, H3PriorityUpdate):
             h3_frame_payload = self._generate_h3_priority_update_frame(quic_frame.h3_frame)
+        elif isinstance(quic_frame.h3_frame, H3Origin):
+            h3_frame_payload = self._generate_h3_origin_frame(quic_frame.h3_frame)
         elif isinstance(quic_frame.h3_frame, QpackEncoder):
             h3_frame_payload = self._generate_qpack_encoder(quic_frame.h3_frame, quic_frame.offset==0)
         elif isinstance(quic_frame.h3_frame, QpackDecoder):
@@ -547,3 +566,17 @@ class MSGCrafter():
             QuicFrameType.HANDSHAKE_DONE,
             capacity = HANDSHAKE_DONE_FRAME_CAPACITY
         )
+
+    def _add_datagram_frame(self, quic_frame:QuicDatagram, builder:QuicPacketBuilder) -> None:
+        """
+        QuicDatagram
+            h3_datagram:H3Datagram
+        """
+
+        application_layer_payload = encode_uint_var(quic_frame.h3_datagram.quarter_stream_id) + quic_frame.h3_datagram.payload
+
+        buf = builder.start_frame(
+            QuicFrameType.DATAGRAM_WITH_LENGTH,
+        )
+        buf.push_uint_var( len(application_layer_payload) )
+        buf.push_bytes( application_layer_payload )
