@@ -15,15 +15,6 @@ class MSGCrafter():
         self.stream_offsets = dict()
         self.opened_uni_streams = set()
         
-    def copy_msg(self, h3msg:Packet, builder:QuicPacketBuilder, exclude_ack:bool = False) -> None:
-        msg_dissector = MSGDissector()
-        quic_frames = msg_dissector.dissect_msg(h3msg)
-
-        for quic_frame in quic_frames:
-
-            if isinstance(quic_frame, QuicAck):
-                continue
-            self.add_dissected_frames_to_builder(quic_frame, builder)
 
     def craft_msg_from_frames(self, quic_frames:List[QuicFrame], builder:QuicPacketBuilder) -> None:
         for quic_frame in quic_frames:

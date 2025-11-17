@@ -29,6 +29,8 @@ from handler import MSGHandler
 from crafter import MSGCrafter
 import util
 
+from dissector import MSGDissector, QuicAck
+
 class HttpClient():
     def __init__(self, quic_conf: QuicConfiguration, hostname: str) -> None:
         self.quic_conf = quic_conf
@@ -609,163 +611,6 @@ class HttpClient():
         # Send the ACK frame using existing send_quic_frames_from_builder()
         self.send_quic_frames_from_builder(builder)
 
-    # def receive_datagram(self, data:bytes, now:float) -> str:
-    #     """
-    #     Process a received QUIC datagram, decrypt and return any decrypted packet data.
-        
-    #     Args:
-    #         data: Raw data from the UDP socket.
-    #         now: Current time to use in QUIC processing.
-            
-    #     Returns:
-    #         decrypted_payload: List of decrypted QUIC or HTTP/3 layer from processed packets.
-    #     """
-    #     res_per_packet = ''
-
-    #     buf = Buffer(data=data)
-        
-    #     while not buf.eof():
-  
-    #         # print("\tQUIC layer #{}".format(i),end=" ")
-
-    #         start_off = buf.tell()
-
-    #         try:
-    #             header = pull_quic_header(buf, host_cid_length=self.quic_conf.connection_id_length)
-    #         except ValueError:
-    #             return
-    #         #print("(Type: {})".format(header.packet_type.name))
-
-    #         ''' 
-    #         This aioquic check causes a problem, when we send NEW_CONNECTIONS_ID frame in the test message 
-    #         and the server responds to that new destination ID
-
-    #         # Check destination CID matches.
-    #         destination_cid_seq: Optional[int] = None
-    #         for connection_id in self._http._quic._host_cids:
-    #             if header.destination_cid == connection_id.cid:
-    #                 destination_cid_seq = connection_id.sequence_number
-    #                 break
-    #         if destination_cid_seq is None:
-    #             print("asas")
-    #             return 
-    #         '''
-
-    #         # Handle version negotiation packet.
-    #         if header.packet_type == QuicPacketType.VERSION_NEGOTIATION:
-    #             self._http._quic._receive_version_negotiation_packet(header=header, now=now)
-    #             return
-            
-    #         # Check long header packet protocol version.
-    #         if (
-    #             header.version is not None
-    #             and header.version not in self.quic_conf.supported_versions
-    #         ):
-    #             return
-            
-    #         # Handle retry packet.
-    #         if header.packet_type == QuicPacketType.RETRY:
-    #             self.handler.handle_retry_packet(header=header,
-    #                 packet_without_tag=buf.data_slice(
-    #                     start_off, buf.tell() - RETRY_INTEGRITY_TAG_SIZE
-    #                 ))
-    #             return
-
-            
-    #         crypto_frame_required = False
-
-    #         # Determine crypto and packet space.
-    #         epoch = get_epoch(header.packet_type)
-    #         if epoch == tls.Epoch.INITIAL:
-    #             crypto = self._http._quic._cryptos_initial[header.version]
-    #         else:
-    #             crypto = self._http._quic._cryptos[epoch]
-    #         if epoch == tls.Epoch.ZERO_RTT:
-    #             space = self._http._quic._spaces[tls.Epoch.ZERO_RTT]  # Keep separate space
-    #         else:
-    #             space = self._http._quic._spaces[epoch] # Keep separate space
-
-
-    #         # decrypt packet
-    #         encrypted_off = buf.tell() - start_off
-    #         end_off = start_off + header.packet_length
-    #         buf.seek(end_off)
-
-    #         try:
-    #             plain_header, plain_payload, packet_number = crypto.decrypt_packet(
-    #                     data[start_off:end_off], encrypted_off, space.expected_packet_number)
-
-    #         except KeyUnavailableError as exc:
-    #             # If a client receives HANDSHAKE or 1-RTT packets before it has
-    #             # handshake keys, it can assume that the server's INITIAL was lost.
-    #             if (
-    #                 epoch in (tls.Epoch.HANDSHAKE, tls.Epoch.ONE_RTT)
-    #                 and not self._http._quic._crypto_retransmitted
-    #             ):
-    #                 self._http._quic._loss.reschedule_data(now=now)
-    #                 self._http._quic._crypto_retransmitted = True
-    #             continue
-    #         except CryptoError as exc:
-    #             continue
-            
-    #         #print("Received packet: \n\tPacket Number={}\n\tPlain Header={}\n\tPlain Payload={}".format(packet_number, plain_header, plain_payload))
-            
-    #         # check reserved bits
-    #         if header.packet_type == QuicPacketType.ONE_RTT:
-    #             reserved_mask = 0x18
-    #         else:
-    #             reserved_mask = 0x0C
-    #         if plain_header[0] & reserved_mask:
-    #             self._http._quic.close(
-    #                 error_code=QuicErrorCode.PROTOCOL_VIOLATION,
-    #                 frame_type=QuicFrameType.PADDING,
-    #                 reason_phrase="Reserved bits must be zero",)
-    #             return
-
-
-    #         # raise expected packet number
-    #         if packet_number > space.expected_packet_number:
-    #             space.expected_packet_number = packet_number + 1
-
-    #         # update state
-    #         if self._http._quic._peer_cid.sequence_number is None:
-    #             self._http._quic._peer_cid.cid = header.source_cid
-    #             self._http._quic._peer_cid.sequence_number = 0
-
-    #         if self._http._quic._state == QuicConnectionState.FIRSTFLIGHT:
-    #             self._http._quic._remote_initial_source_connection_id = header.source_cid
-    #             self._http._quic._set_state(QuicConnectionState.CONNECTED)
-
-    #         # update spin bit
-    #         if (header.packet_type == QuicPacketType.ONE_RTT
-    #             and packet_number > self._http._quic._spin_highest_pn):
-                
-    #             spin_bit = get_spin_bit(plain_header[0])
-    #             self._spin_bit = not spin_bit # for clients
-    #             self._spin_highest_pn = packet_number
-                
-    #         # handle payload
-    #         context = QuicReceiveContext(
-    #             epoch=epoch,
-    #             host_cid=header.destination_cid,
-    #             network_path=self.network_path,
-    #             quic_logger_frames=None, #quic_logger_frames,
-    #             time=now,
-    #             version=header.version,
-    #         )
-            
-    #         try:
-    #             res_per_packet += self.handler.process_quic_payload( context, plain_payload, crypto_frame_required=crypto_frame_required )+","
-    #         except QuicConnectionError:
-    #             pass
-
-    #         if self._http._quic._state in END_STATES or self._http._quic._close_pending:
-    #             return
-
-    #         # update idle timeout
-    #         self._http._quic._close_at = now + self._http._quic._idle_timeout()
-
-    #     return util.beautify_message_string(res_per_packet, False)
 
     def replay_msg(self, h3msg:Packet, exclude_ack:bool = False) -> str:
         """
@@ -773,15 +618,21 @@ class HttpClient():
         """
         
         # Build message by parsing h3msg
-        builder = self.get_builder(Epoch.ONE_RTT)
-        self.msg_crafter.copy_msg(h3msg, builder, exclude_ack)
+        builder = self.get_builder(Epoch.ONE_RTT)        
+        
+        quic_frames = MSGDissector().dissect_msg(h3msg)
+        if QuicAck in quic_frames:
+            quic_frames.remove(QuicAck)
+        
+        self.msg_crafter.craft_msg_from_frames(quic_frames, builder)
+        
         self.send_quic_frames_from_builder(builder)
 
         response_packets = self.read_from_buffer()
 
         return response_packets
     
-    def send_frames(self, quic_frames:List, wait_for_respose=True) -> str:
+    def send_frames(self, quic_frames:List, wait_for_response=True) -> str:
         """
         Send the QUIC and HTTP/3 frames in a packet and capture responses.
         """
@@ -792,7 +643,7 @@ class HttpClient():
         self.send_quic_frames_from_builder(builder)
 
         response_packets = "\x1B[3m not waited \x1B[0m"
-        if wait_for_respose:
+        if wait_for_response:
             response_packets = self.read_from_buffer()
 
         return response_packets
