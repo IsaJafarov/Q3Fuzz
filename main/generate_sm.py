@@ -1,36 +1,22 @@
 #! /usr/bin/env python
 import os
-import sys
-import time
-import socket
 import argparse
 import ssl
-import pyshark.packet
-import pyshark.packet.fields
 from pathlib import Path
 from rich.traceback import install
 
 # aioquic module
-import aioquic
-from aioquic.buffer import Buffer
-from aioquic.h3.connection import H3_ALPN, H3Connection, FrameType, encode_frame, encode_settings, StreamType
+from aioquic.h3.connection import H3_ALPN
 from aioquic.quic.configuration import QuicConfiguration
-from aioquic.quic.packet_builder import QuicPacketBuilder
-from aioquic.quic.packet import QuicFrameType, QuicPacketType
 from aioquic.quic.logger import QuicFileLogger
 from aioquic.quic.connection import *
-from aioquic.tls import CipherSuite, Epoch
+from aioquic.tls import CipherSuite
 
 # pyshark module
-import pyshark
-from pyshark.packet.packet import Packet
-from pyshark.packet.layers.xml_layer import XmlLayer
 
 # PRETT3 module
-from handler import MSGHandler
-from crafter import MSGCrafter
-import util
-import statemachine as stma
+from libs.util import h3msg_from_pcap
+import libs.statemachine as stma
 
 EVALUATION_DIR = Path(__file__).parent.resolve()
 
@@ -180,7 +166,7 @@ if __name__ == "__main__":
     output_dir = init(args)
     
     ### Extract initial state machine ###
-    http3_basic_messages = util.h3msg_from_pcap(args.pcap, decrypt_keylog_file, client_only=True)
+    http3_basic_messages = h3msg_from_pcap(args.pcap, decrypt_keylog_file, client_only=True)
 
     
     stma.modeller_h3(conf=configuration, 

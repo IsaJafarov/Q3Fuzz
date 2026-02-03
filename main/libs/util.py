@@ -12,7 +12,7 @@ import pyshark.packet
 import pyshark.packet.layers
 from pyshark.packet.packet import Packet
 from pyshark.packet.layers.xml_layer import XmlLayer
-from dissector import *
+from .dissector import *
 
 # IETF specification
 QUIC_LONGPACKETTYPE = ['INIT', '0-RTT', 'HANDSHAKE', 'RETRY']

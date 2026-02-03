@@ -7,3 +7,7 @@ ehthumbs.db
 Thumbs.db
 __pycache__/
 .hypothesis/
+exploit_template_generation.py
+exploit_template_mutation.py
+sse_test.py
+generate_sm.sh

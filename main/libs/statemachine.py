@@ -1,15 +1,14 @@
-import states
+from .states import *
 from transitions.extensions import GraphMachine
-from http_client import HttpClient
+from libs.http_client import HttpClient
 
-import util
+from .util import *
 import json
 import time
 import sys
 from typing import List
 from collections import OrderedDict
 import copy
-import traceback
 from urllib.parse import urlparse
 from pyshark.packet.packet import Packet
 from aioquic.quic.configuration import QuicConfiguration
@@ -30,8 +29,8 @@ class ProtoModel(object):
         # State searching information
         self.current_state = 0
         self.num_of_states = 0
-        self.state_list = states.StateList(state_list=[states.State('CONNECTED', 1)])  # basic state in level 1
-        self.candidate_state_list = states.StateList(state_list=[])
+        self.state_list = StateList(state_list=[State('CONNECTED', 1)])  # basic state in level 1
+        self.candidate_state_list = StateList(state_list=[])
 
         # Transition information
         # trigger as key (string) : [src_state (string), dest_state (string), cnt]
@@ -51,7 +50,7 @@ def generate_sm():
     sm = GraphMachine(model=pm, states=['START', 'FINISH'], initial='START', auto_transitions=False)
     return pm, sm
 
-def get_move_state_h3msgs(pm:ProtoModel, target_state:states.State) -> List[Packet]:
+def get_move_state_h3msgs(pm:ProtoModel, target_state:State) -> List[Packet]:
     # Get state moving message to reach current state
     # Return list of QUIC / HTTP3 messages
     state_moving_msgs = []
@@ -203,7 +202,7 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
     
     ### SENDING STATE MOVING MESSAGES ###
     for mov_msg in mov_msg_list:
-        # print(f"  [+] Sending state-moving message: {util.h3msg_to_str(mov_msg, exclude_opt_client_frames=True)}")
+        # print(f"  [+] Sending state-moving message: {h3msg_to_str(mov_msg, exclude_opt_client_frames=True)}")
         state_msg = h3client.replay_msg(mov_msg)  # Send HTTP/3 state-moving message
         if state_msg:
             # print(f"  [+] Received state-moving response: {state_msg}")
@@ -212,14 +211,14 @@ def send_receive_http3(pm:ProtoModel, h3client:HttpClient, mov_msg_list:List[Pac
     ### SENDING TARGET MSG ###
     if is_already_closed is False: # check for goaway in state moving (TODO)
         # print("  [+] Sending testing message...")
-        # print(f"  [+] Sending target message: {util.h3msg_to_str(h3msg_sent, exclude_opt_client_frames=True)}")
+        # print(f"  [+] Sending target message: {h3msg_to_str(h3msg_sent, exclude_opt_client_frames=True)}")
         # h3msg_sent.show()
         h3msg_rcvd = h3client.replay_msg(h3msg_sent)  # Send HTTP/3 target message
     
     h3client.close_connection()
 
     print("\033[92m  [SUMMARY]\tSent: (%s) => %s \n\t\tReceived: %s\033[0m" % (
-    util.h3msg_to_str(mov_msg_list, exclude_opt_client_frames=True), util.h3msg_to_str(h3msg_sent, exclude_opt_client_frames=True), h3msg_rcvd))
+    h3msg_to_str(mov_msg_list, exclude_opt_client_frames=True), h3msg_to_str(h3msg_sent, exclude_opt_client_frames=True), h3msg_rcvd))
 
     return h3msg_rcvd
 
@@ -235,17 +234,17 @@ def update_candidates(pm:ProtoModel, sm:GraphMachine, msg_sent:Packet, msg_rcvd:
 
     # No valid state found yet. Add candidate states in protocol model first.
     pm.num_of_states += 1
-    cand_s = states.State(name=str(pm.num_of_states), level=pm.current_level + 1, parent_state=pm.current_state,
+    cand_s = State(name=str(pm.num_of_states), level=pm.current_level + 1, parent_state=pm.current_state,
                           msg_sent=msg_sent, msg_rcvd_str=msg_rcvd)
     pm.candidate_state_list.add_state(cand_s)
     print("  [+] Candidate state %s added (%s -> %s)" % (cand_s.name, cand_s.parent_state.name, cand_s.name))
 
-def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -> bool:
+def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:State, mode:str) -> bool:
     if mode == 'p':
         # Case 1. Parent:
         # Compare its SR dict with that of its parent
         target_state = cand_s.parent_state.name + " (its parent)"
-        if util.compare_sr_pairs(target_state, cand_s.parent_state.child_sr_dict, cand_s.child_sr_dict):
+        if compare_sr_pairs(target_state, cand_s.parent_state.child_sr_dict, cand_s.child_sr_dict):
             md.src_s = cand_s.parent_state
             md.dst_s = cand_s.parent_state
             return True
@@ -259,7 +258,7 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
             if state_v.parent_state is not None and state_v.parent_state.name == cand_s.parent_state.name:  #
                 # siblings; same parent
                 target_state = state_v.name + " (its sibling)"
-                if util.compare_sr_pairs(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
+                if compare_sr_pairs(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
                     md.src_s = cand_s.parent_state
                     md.dst_s = state_v
                     return True
@@ -273,7 +272,7 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
                 continue
             if state_v.parent_state is None or state_v.parent_state.name != cand_s.parent_state.name:  # relative; different parent or ancestor
                 target_state = state_v.name + " (its relative)"
-                if util.compare_sr_pairs(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
+                if compare_sr_pairs(target_state, state_v.child_sr_dict, cand_s.child_sr_dict):
                     md.src_s = cand_s.parent_state
                     md.dst_s = state_v
                     return True
@@ -284,7 +283,7 @@ def check_dupstate(pm:ProtoModel, md:MergeData, cand_s:states.State, mode:str) -
         sys.exit()
 
 
-def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData) -> None:
+def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:State, md:MergeData) -> None:
     # Mergable
     if md.src_s is not None and md.dst_s is not None:
         # if len(sm.get_transitions(trigger=md.t_label + "\n", source=md.src_s.name, dest=md.dst_s.name)) > 0:
@@ -301,7 +300,7 @@ def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData)
         # Non-finished
         else:
             if cand_s.msg_rcvd_str:
-                ss_stream_ids = util.extract_stop_sending_stream_ids(cand_s.msg_rcvd_str)
+                ss_stream_ids = extract_stop_sending_stream_ids(cand_s.msg_rcvd_str)
                 for ss_id in ss_stream_ids:
                     cand_s.blocked_stream_ids.add(ss_id)
                     print(f"\033[31m[DEBUG] Unique state {cand_s.name}: Detected STOP_SENDING for stream {ss_id}, now blocked in this state.\033[0m")
@@ -312,7 +311,7 @@ def update_sm(pm:ProtoModel, sm:GraphMachine, cand_s:states.State, md:MergeData)
             # Explicitly add finishing transition
             sm.add_transition("CC", source=cand_s.name, dest='FINISH')
 
-def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) -> None:
+def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[State]) -> None:
     # Find candidate states in the next level from leaf states found in the current level.
     leafstate_num = 1
     for leaf_state in leaf_states:
@@ -327,7 +326,7 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
         pm.current_state = leaf_state
         skipped_messages = 0
         for msg_sent in pm.testmsgs:
-            msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
+            msg_sent_str = h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
 
             ## SKIP TEST 1 (connection establishment?)
             if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
@@ -336,7 +335,7 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
 
             ## SKIP TEST 2 (blocked stream ID?)
             # Extract stream IDs from the test message string
-            stream_ids_in_msg = util.extract_stream_ids_from_msg_str(msg_sent_str)
+            stream_ids_in_msg = extract_stream_ids_from_msg_str(msg_sent_str)
             # If any stream ID in the message is blocked for the current state, skip this test message
             if any(sid in leaf_state.blocked_stream_ids for sid in stream_ids_in_msg):
                 print(f"\033[31m[SKIP] Testmsg for state '{leaf_state.name}' contains blocked stream ID(s): {stream_ids_in_msg & leaf_state.blocked_stream_ids}\033[0m")
@@ -350,15 +349,15 @@ def expand_sm(pm:ProtoModel, sm:GraphMachine, leaf_states:List[states.State]) ->
             print("│    [LV %d | EXP | LEAF %d/%d | State '%s' | MSG %d/%d]         " %
                 (pm.current_level, leafstate_num, len(leaf_states), leaf_state.name, message_num, len(pm.testmsgs)-skipped_messages))
             print("│    - Moving MSG: %s                                            " % 
-                util.h3msg_to_str(state_moving_msgs_list, exclude_opt_client_frames=True))
+                h3msg_to_str(state_moving_msgs_list, exclude_opt_client_frames=True))
             print("│    - Test MSG  : %s                                            " % 
-                util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True))
+                h3msg_to_str(msg_sent, exclude_opt_client_frames=True))
             print("└────────────────────────────────────────────────────────────────────────────────────")
 
             msg_rcvd_str = send_receive_http3(pm, h3client, state_moving_msgs_list, msg_sent)
 
             message_num += 1
-            msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
+            msg_sent_str = h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
 
             update_candidates(pm, sm, msg_sent, msg_rcvd_str)
 
@@ -376,7 +375,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
     print("  [INFO] Test %d candidate states in level %d" % (len(cand_s_list), pm.current_level))
     for cand_s in cand_s_list:
         md = MergeData()
-        msg_sent_str = util.h3msg_to_str(cand_s.msg_sent, exclude_opt_client_frames=True)
+        msg_sent_str = h3msg_to_str(cand_s.msg_sent, exclude_opt_client_frames=True)
         msg_rcvd_str = cand_s.msg_rcvd_str
         # print("msg_rcvd_str: {}".format( msg_rcvd_str ))
         sr_msg = "%s => %s" % (msg_sent_str, msg_rcvd_str)
@@ -393,7 +392,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
             state_moving_msgs_list = get_move_state_h3msgs(pm, cand_s)
 
             for msg_sent in pm.testmsgs:
-                msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
+                msg_sent_str = h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
 
                 ## SKIP TEST 1 (connection establishment?)
                 if 'INIT' in msg_sent_str or 'HANDSHAKE' in msg_sent_str or len(msg_sent_str)==0:
@@ -401,7 +400,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
 
                 ## SKIP TEST 2 (blocked stream ID?)
                 # Extract stream IDs from the test message string
-                stream_ids_in_msg = util.extract_stream_ids_from_msg_str(msg_sent_str)
+                stream_ids_in_msg = extract_stream_ids_from_msg_str(msg_sent_str)
                 # If any stream ID in the message is blocked for the current candidate state, skip this test message
                 if any(sid in cand_s.blocked_stream_ids for sid in stream_ids_in_msg):
                     print(f"\033[31m[SKIP] Testmsg for state '{cand_s.name}' contains blocked stream ID(s): {stream_ids_in_msg & cand_s.blocked_stream_ids}\033[0m")
@@ -410,7 +409,7 @@ def minimize_sm(pm:ProtoModel, sm:GraphMachine) -> None:
                 h3client = HttpClient(pm.configuration, urlparse(pm.dst_ip).netloc)
                 msg_rcvd_str = send_receive_http3(pm, h3client, state_moving_msgs_list, msg_sent)
                 
-                msg_sent_str = util.h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
+                msg_sent_str = h3msg_to_str(msg_sent, exclude_opt_client_frames=True)
                 cand_sr_dict[msg_sent_str] = msg_rcvd_str
 
             cand_s.child_sr_dict = cand_sr_dict

@@ -1,11 +1,9 @@
 #! /usr/bin/env python
-import sys
 from aioquic.quic.connection import *
 from aioquic.h3.connection import FrameType, StreamType
 from aioquic.quic.rangeset import RangeSet
 from aioquic.buffer import Buffer
-import util
-from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS, GREASE_ABBREVIATION
+from .util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS, GREASE_ABBREVIATION
 
 @dataclass
 class Stream():

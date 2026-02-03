@@ -2,9 +2,8 @@
 from aioquic.quic.connection import *
 from aioquic.h3.connection import FrameType, StreamType, encode_settings, encode_frame
 from aioquic.buffer import encode_uint_var
-from pyshark.packet.packet import Packet
 from typing import List
-from dissector import *
+from .dissector import *
 
 PRIORITY_UPDATE_FRAME_IDS = [0xf0700, 0xf0701]
 

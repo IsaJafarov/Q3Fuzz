@@ -10,12 +10,13 @@ from pyshark.packet.packet import Packet
 from urllib.parse import urlparse
 from typing import Union
 
-import util
-from http_client import HttpClient
+from libs import *
+from libs.dissector import *
+from libs.util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
+from libs.http_client import HttpClient
+
 from aioquic.h3.connection import H3_ALPN
-from dissector import *
 from aioquic.quic.packet import QuicPreferredAddress
-from util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
 from datetime import datetime
 import time
 import concurrent.futures

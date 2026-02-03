@@ -12,15 +12,14 @@ from aioquic.quic.connection import *
 from aioquic.tls import Epoch
 
 # pyshark module
-import pyshark
 from pyshark.packet.packet import Packet
 
 # PRETT3 module
-from handler import MSGHandler
-from crafter import MSGCrafter
-import util
+from libs.handler import MSGHandler
+from libs.crafter import MSGCrafter
+from .util import beautify_message_string
 
-from dissector import MSGDissector, QuicAck
+from .dissector import MSGDissector, QuicAck
 
 class HttpClient():
     def __init__(self, quic_conf: QuicConfiguration, hostname: str) -> None:
@@ -537,7 +536,7 @@ class HttpClient():
                         self._wait_till_handshake_crypto_is_ready()
                     self.send_ack_frame(context, packet_number)
 
-        return util.beautify_message_string(res_per_packet, exclude_opt_server_frames=True)
+        return beautify_message_string(res_per_packet, exclude_opt_server_frames=True)
 
     def handle_retry_packet(self, header: QuicHeader, packet_without_tag: bytes) -> None:
         """
