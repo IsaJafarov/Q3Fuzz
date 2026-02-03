@@ -51,7 +51,7 @@ def install_nginx(version):
                        --with-ld-opt=\"-L./boringssl/build/ssl    \
                                       -L./boringssl/build/crypto\"")        
         os.system("sudo make -j")
-        os.system("sudo make install")
+        # os.system("sudo make install")
         os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
 
         os.system("sudo ./installation-root/sbin/nginx")
@@ -72,7 +72,7 @@ def install_nginx(version):
 	--with-cc-opt="-I./boringssl/include" \
 	--with-ld-opt="-L./boringssl/build/ssl -L../boringssl/build/crypto"')
         os.system("sudo make -j")
-        os.system("sudo make install")
+        # os.system("sudo make install")
         os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
         os.system("sudo ./installation-root/sbin/nginx")
 
@@ -92,7 +92,7 @@ def install_nginx(version):
 	--with-cc-opt="-I./boringssl/include" \
 	--with-ld-opt="-L./boringssl/build/ssl -L../boringssl/build/crypto"')
         os.system("sudo make -j")
-        os.system("sudo make install")
+        # os.system("sudo make install")
         os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
         os.system("sudo ./installation-root/sbin/nginx")
 
@@ -113,7 +113,7 @@ def install_nginx(version):
 	--with-ld-opt="-L./boringssl/build/ssl -L./boringssl/build/crypto"')
 
         os.system("sudo make -j2")
-        os.system("sudo make install")
+        # os.system("sudo make install")
         os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
         os.system("sudo ./installation-root/sbin/nginx")
 
@@ -177,7 +177,7 @@ def install_openlitespeed(version):
         os.system("sudo sed -i -e s+'$VH_ROOT/html/'+/usr/local/nginx/html/+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf")
         os.system("sudo sed -i -e s+VERSION+LiteSpeed\ {}+g /usr/local/lsws/conf/vhosts/Example/vhconf.conf".format(version))
 
-        os.system("sudo /usr/local/lsws/bin/lswsctrl start")
+        os.system("sudo env LSWS_HOME=/usr/local/lsws /usr/local/lsws/bin/litespeed -d") # runs in foreground
 
 def install_h2o(version):
     os.system("sudo apt install -y unzip cmake build-essential libssl-dev zlib1g-dev")
@@ -191,7 +191,7 @@ def install_h2o(version):
         os.chdir("build")
         os.system("cmake ..")
         os.system("make")
-        os.system("sudo make install")
+        # os.system("sudo make install")
         os.system("cp ../../../h2o-files/a429117/h2o.conf ../examples/h2o/h2o.conf")
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
     if version=='222b36d': # 2024/04/11
@@ -204,7 +204,7 @@ def install_h2o(version):
         os.chdir("build")
         os.system("cmake ..")
         os.system("make")
-        os.system("sudo make install")
+        # os.system("sudo make install")
         os.system("cp ../../../h2o-files/222b36d/h2o.conf ../examples/h2o/h2o.conf")
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
     if version=='16b13ee': # 2024/06/18
@@ -217,7 +217,7 @@ def install_h2o(version):
         os.chdir("build")
         os.system("cmake ..")
         os.system("make")
-        os.system("sudo make install")
+        # os.system("sudo make install")
         os.system("cp ../../../h2o-files/16b13ee/h2o.conf ../examples/h2o/h2o.conf")
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
     if version=="f1918a5": # 2025/04/29
@@ -229,7 +229,7 @@ def install_h2o(version):
         os.chdir("build")
         os.system("cmake ..")
         os.system("make")
-        os.system("sudo make install")
+        # os.system("sudo make install")
         os.system("cp ../../h2o-files/f1918a5/h2o.conf ../examples/h2o/h2o.conf")
         os.system("cp /usr/local/nginx/html/index.html ../examples/doc_root/index.html") # replace the html file
         os.system("sudo ./h2o -c ../examples/h2o/h2o.conf")
@@ -279,23 +279,24 @@ def install_msquic_kestrel(version):
         os.system("sudo add-apt-repository -y \"deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-$(lsb_release -cs)-prod $(lsb_release -cs) main\"")
         os.system("sudo apt update")
         # install the latest (2.4.8) libmsquic. Previous versions cause problems https://github.com/dotnet/runtime/issues/105788
-        os.system("sudo apt install -y libmsquic=2.4.8")
+        # newer Msquic versions should also be fine
+        os.system("sudo apt install -y --allow-downgrades libmsquic=2.4.8")
 
         # install .NET SDK. msquic needs it https://github.com/microsoft/msquic/blob/main/docs/BUILD.md
-        # https://learn.microsoft.com/en-us/dotnet/core/install/linux-ubuntu-install
-        os.system("sudo add-apt-repository ppa:dotnet/backports -y")
-        os.system("sudo apt update")
-        os.system("sudo apt install dotnet-sdk-9.0=9.0.203-1 -y")
-
-        # it is possible that, apt installs dotnet into /usr/share/dotnet/sdk/
-        # but dotnet searches for SDKs in /usr/lib/dotnet/sdk/
-        os.system("sudo ln -s /usr/share/dotnet/sdk /usr/lib/dotnet/sdk")
+        # https://learn.microsoft.com/en-us/dotnet/core/install/linux-scripted-manual#manual-install
+        # .NET 9.0.11 is already fixed
+        if not os.path.isdir("dotnet-9.0.10"):
+            os.system("mkdir dotnet-9.0.10")
+            os.system("wget https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.306/dotnet-sdk-9.0.306-linux-x64.tar.gz -P ./dotnet-9.0.10")
+            os.chdir("dotnet-9.0.10")
+            os.system("tar -zxf dotnet-sdk-9.0.306-linux-x64.tar.gz")
+            os.chdir("..")
 
         # create and run .NET project
-        os.system("dotnet new web -n msquic_kestrel")
+        os.system("./dotnet-9.0.10/dotnet new web -n msquic_kestrel")
         os.chdir("msquic_kestrel")
         os.system("cp ../msquic-kestrel-files/Program.cs ./")
-        os.system("sudo dotnet run")
+        os.system("sudo ../dotnet-9.0.10/dotnet run")
 
 def install_neqo(version):
 
@@ -430,7 +431,7 @@ def install_ngtcp2(version):
         os.system("autoreconf -i")
         os.system("./configure --prefix=$PWD/build --enable-lib-only")
         os.system("make -j$(nproc) check")
-        os.system("make install")
+        os.system("sudo make install")
         os.chdir("..")
 
         # set up ngtcp2
@@ -445,14 +446,15 @@ def install_ngtcp2(version):
         os.system("sudo ./examples/bsslserver 0.0.0.0 443 ../certs/prett3.com.key ../certs/prett3.com.crt -d /usr/local/nginx/html/ -q")
 
 def install_google_quiche(version):
-    if version=="7b2b126":
+    if version=="7b2b126": # 2025/04/30
         os.system("sudo rm -r ./google-quiche")
         os.system("sudo apt -y install gcc-12 g++-12 libicu-dev clang lld libstdc++-12-dev")
         os.system("wget https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-amd64.deb")
         os.system("sudo dpkg -i bazelisk-amd64.deb")
+        os.system("sudo rm bazelisk-amd64.deb")
         os.system("git clone https://github.com/google/quiche.git ./google-quiche")
         os.chdir("google-quiche")
-        os.system("git checkout 7b2b1267559fb8c475faf8e6f2f9e6aa18909b4d") # 2025/04/30
+        os.system("git checkout 7b2b1267559fb8c475faf8e6f2f9e6aa18909b4d")
         os.system("CC=gcc-12 CXX=g++-12 bazel build -c opt --cxxopt=-std=c++20 //...")
         os.system("sudo ./bazel-bin/quiche/quic_server --port 443 --certificate_file ../certs/prett3.com.crt --key_file ../certs/prett3.com.key  --generate_dynamic_responses")
 
@@ -546,7 +548,7 @@ def install_picoquic(version):
         os.system("./picoquic_ct") # run tests
         os.system("sudo ./picoquicdemo -p 443 -w /usr/local/nginx/html/  -c ../certs/prett3.com.pem -k ../certs/prett3.com.key -x 10000000")
 
-        
+
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='HTTP/3 web servers installation', formatter_class=argparse.RawTextHelpFormatter)

@@ -29,7 +29,7 @@ def run_nginx(version):
 
 def run_openlitespeed(version):
     print("[+] Running openlitespeed %s..." % version)
-    os.system("sudo /usr/local/lsws/bin/lswsctrl start")
+    os.system("sudo env LSWS_HOME=/usr/local/lsws /usr/local/lsws/bin/litespeed -d") # runs in foreground
 
 def run_h2o(version):
     print("[+] Running h2o %s..." % version)
@@ -65,7 +65,7 @@ def run_msquic_kestrel(version):
     print("[+] Running msquic + kestrel %s..." % version)
     if version == '2.4.8':    
         os.chdir("msquic_kestrel")
-        os.system("sudo dotnet run")
+        os.system("sudo ../dotnet-9.0.10/dotnet run")
         
 def run_neqo(version):
     print("[+] Running neqo %s..." % version)
