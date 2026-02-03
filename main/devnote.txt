@@ -1,0 +1,16 @@
+Development Note and Troubleshoot
+
+[Running]
+- Copy the keylog file in sample_traffics/ and feed it to prett3_syn.py via -l argument
+- prett3_syn.py will append new encryption keys in the keylog file to decrypt both .pcap and runtime communication
+$ sudo cp sample_traffics/secrets.keylog ./secrets.keylog
+$ sudo python3 prett3_syn.py https://prett3.com sample_traffics/ch_n_ng_n.pcapng -l secrets.keylog
+
+[Troubleshooting]
+- If none of QUIC/HTTP3 packets is dissected, edit Wireshark-Edit-Protocol-TLS to set keylogfile.
+
+[Mechanism]
+# prett3_syn.py
+- Establish the connection using QUIC frames such as Init and Handshake.
+- Then it replays foreseen QUIC/H3 packets stored in a specified pcap file.
+  (Note that it replays 1-RTT messages only in pcap, skipping Init and Handshake messages)
