@@ -25,12 +25,13 @@ def init(args) -> Path:
 
     # Remove __pycache__ directory if it exists
     pycache_dir = EVALUATION_DIR / "__pycache__"
+
     if pycache_dir.exists():
         import shutil
         shutil.rmtree(pycache_dir)
 
     # Create the result directory based on script location
-    output_dir = EVALUATION_DIR / "result"
+    output_dir = EVALUATION_DIR.parent / "result"
 
     # If possible, append a name part from the pcap file to the output directory
     try:
@@ -168,10 +169,10 @@ if __name__ == "__main__":
     ### Extract initial state machine ###
     http3_basic_messages = h3msg_from_pcap(args.pcap, decrypt_keylog_file, client_only=True)
 
-    
-    stma.modeller_h3(conf=configuration, 
-                     url=args.url, 
-                     sample_msgs=http3_basic_messages, 
-                     outdir=output_dir)
-    
+    tm = stma.TrafficModeller(name="HTTP/3 State Machine",
+                            conf=configuration, 
+                            url=args.url, 
+                            testmsgs=http3_basic_messages, 
+                            outdir=output_dir)
+    tm.modeller_h3()
     

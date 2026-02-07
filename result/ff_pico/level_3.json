@@ -1,0 +1,168 @@
+{
+  "initial": "START",
+  "transitions": [
+    {
+      "source": "START",
+      "dest": "HANDSHAKING",
+      "trigger": "INITIAL => ACK,CRY,CRY,CRY,ST(3)[SE],ST(7)[Enc],ST(11)[Dec]"
+    },
+    {
+      "source": "HANDSHAKING",
+      "dest": "CONNECTED",
+      "trigger": "HANDSHAKE => HD"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "1",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "9",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "9",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[DA+]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA],ST(0)[DA+]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "2",
+      "trigger": "ST(4)[HE] => ACK,ST(4)[HE]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "2",
+      "trigger": "ST(4)[HE] => ACK,ST(4)[HE]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "2",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => SS(2)\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "9",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "9",
+      "trigger": "ST(4)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE] => ACK,CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    }
+  ],
+  "states": [
+    {
+      "name": "START"
+    },
+    {
+      "name": "FINISH"
+    },
+    {
+      "name": "HANDSHAKING"
+    },
+    {
+      "name": "CONNECTED"
+    },
+    {
+      "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "9"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "START",
+      "name": "",
+      "class-name": "self"
+    }
+  ]
+}

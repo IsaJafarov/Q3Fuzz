@@ -12,7 +12,7 @@ from typing import Union
 
 from libs import *
 from libs.dissector import *
-from libs.util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS
+from libs.util import *
 from libs.http_client import HttpClient
 
 from aioquic.h3.connection import H3_ALPN
@@ -25,9 +25,8 @@ from rich.console import Console
 from rich.table import Table
 import warnings
 import paramiko
-from hypothesis import given, reproduce_failure, settings, Verbosity, Phase, strategies as st, HealthCheck
+from hypothesis import given, settings, Verbosity, Phase, strategies as st, HealthCheck
 from hypothesis.database import DirectoryBasedExampleDatabase
-from rich.traceback import install
 import functools
 
 
@@ -84,7 +83,7 @@ class Fuzzer():
             packet_number = t['conditions'][0].split(":")[1] if 'conditions' in t else None
             self.graph.add_edge(source, destination, trigger=trigger, packet_number=packet_number)
 
-        self.traffic_messages = util.h3msg_from_pcap(traffic_file_path, self.keylog_file, True)
+        self.traffic_messages = h3msg_from_pcap(traffic_file_path, self.keylog_file, True)
 
     def print_info(self, transitions:List[Tuple]):
         table = Table(title="Fuzzing Configuration")

@@ -1,0 +1,2408 @@
+{
+  "initial": "START",
+  "transitions": [
+    {
+      "source": "START",
+      "dest": "HANDSHAKING",
+      "trigger": "INITIAL => ACK,CRY,CRY"
+    },
+    {
+      "source": "HANDSHAKING",
+      "dest": "CONNECTED",
+      "trigger": "HANDSHAKE => HD,ACK,ST(7)[Dec],ST(3)[SE]"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "1",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "11",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "11",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "11",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "37",
+      "dest": "32",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "153",
+      "dest": "143",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "4",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "7",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "9",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "11",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "14",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "19",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "22",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "23",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "24",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "27",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "28",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "32",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "34",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "37",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "41",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "42",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "43",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "44",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "47",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "54",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "58",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "64",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "78",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "88",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "89",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "91",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "93",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "94",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "109",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "112",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "117",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "118",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "120",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "124",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "127",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "134",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "137",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "143",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "144",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "149",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "153",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "158",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "160",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "167",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "172",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "184",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "227",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "243",
+      "dest": "FINISH",
+      "trigger": "CC"
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "7",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "14",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "88",
+      "dest": "9",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "134",
+      "dest": "9",
+      "trigger": "ST(0)[HE] => ACK,ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "CONNECTED",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "1",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "4",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "23",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "28",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "14",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "23",
+      "dest": "23",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "28",
+      "dest": "28",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "32",
+      "dest": "32",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "34",
+      "dest": "78",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "42",
+      "dest": "93",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "43",
+      "dest": "43",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "54",
+      "dest": "54",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "58",
+      "dest": "118",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "109",
+      "dest": "158",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "112",
+      "dest": "112",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "134",
+      "dest": "134",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "143",
+      "dest": "9",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "153",
+      "dest": "14",
+      "trigger": "ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "4",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "9",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "14",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "CONNECTED",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "19",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "22",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "23",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "27",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "28",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "32",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "34",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "37",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "41",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "42",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "43",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "44",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "47",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "64",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "78",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "88",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "89",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "91",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "93",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "94",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "120",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "124",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "127",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "134",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "137",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "143",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "144",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "149",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "153",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "160",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "184",
+      "dest": "FINISH",
+      "trigger": "ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "1",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "22",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "23",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "27",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "28",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "32",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "34",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "41",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "47",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "54",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "58",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "64",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "78",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "88",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "89",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "91",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "109",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "112",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "117",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "118",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "120",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "124",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "127",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "134",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "137",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "143",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "144",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "158",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "160",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "167",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "172",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "184",
+      "dest": "FINISH",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => CC\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "2",
+      "dest": "2",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "22",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "27",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "37",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "22",
+      "dest": "47",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "23",
+      "dest": "23",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "24",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "37",
+      "dest": "37",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "47",
+      "dest": "7",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "54",
+      "dest": "112",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "58",
+      "dest": "117",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "109",
+      "dest": "109",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "112",
+      "dest": "112",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "117",
+      "dest": "167",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "158",
+      "dest": "158",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "160",
+      "dest": "227",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "167",
+      "dest": "167",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "172",
+      "dest": "117",
+      "trigger": "ST(0)[HE] => ACK\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "4",
+      "dest": "19",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "9",
+      "dest": "11",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "14",
+      "dest": "19",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "27",
+      "dest": "64",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "28",
+      "dest": "28",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "37",
+      "dest": "43",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "54",
+      "dest": "54",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "88",
+      "dest": "134",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "112",
+      "dest": "112",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "124",
+      "dest": "184",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "134",
+      "dest": "134",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "143",
+      "dest": "143",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "153",
+      "dest": "153",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "184",
+      "dest": "143",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "7",
+      "dest": "24",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "47",
+      "dest": "109",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "32",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "19",
+      "dest": "42",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "32",
+      "dest": "32",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "34",
+      "dest": "34",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "41",
+      "dest": "64",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "43",
+      "dest": "42",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "44",
+      "dest": "94",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "78",
+      "dest": "127",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "89",
+      "dest": "137",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "118",
+      "dest": "172",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "120",
+      "dest": "160",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "127",
+      "dest": "127",
+      "trigger": "ST(0)[HE] => \u2298\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "32",
+      "trigger": "ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "19",
+      "dest": "43",
+      "trigger": "ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "22",
+      "dest": "7",
+      "trigger": "ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "58",
+      "trigger": "ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "37",
+      "dest": "43",
+      "trigger": "ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "47",
+      "dest": "7",
+      "trigger": "ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "184",
+      "dest": "243",
+      "trigger": "ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "11",
+      "dest": "34",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "19",
+      "dest": "44",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "32",
+      "dest": "34",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "41",
+      "dest": "89",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "42",
+      "dest": "94",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "43",
+      "dest": "44",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "44",
+      "dest": "44",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "64",
+      "dest": "124",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "89",
+      "dest": "89",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "91",
+      "dest": "144",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "93",
+      "dest": "149",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "94",
+      "dest": "94",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "137",
+      "dest": "137",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "144",
+      "dest": "144",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "149",
+      "dest": "149",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => \u2298\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "19",
+      "dest": "41",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => \u2298\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "42",
+      "dest": "91",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => \u2298\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "43",
+      "dest": "41",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => \u2298\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "44",
+      "dest": "89",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => \u2298\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "93",
+      "dest": "64",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => \u2298\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "94",
+      "dest": "144",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => \u2298\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "149",
+      "dest": "137",
+      "trigger": "ST(2)[SE],ST(6)[Enc],ST(10)[Dec] => \u2298\n",
+      "conditions": [
+        "packet_number:1"
+      ]
+    },
+    {
+      "source": "22",
+      "dest": "24",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA],ACK\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "23",
+      "dest": "54",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => ACK,ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "34",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "58",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "78",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "109",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "117",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "118",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "120",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "127",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "158",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "160",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "167",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "172",
+      "dest": "FINISH",
+      "trigger": "ST(4)[HE],ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:4"
+      ]
+    },
+    {
+      "source": "24",
+      "dest": "9",
+      "trigger": "ST(10)[Dec] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "117",
+      "dest": "9",
+      "trigger": "ST(10)[Dec] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "118",
+      "dest": "9",
+      "trigger": "ST(10)[Dec] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "167",
+      "dest": "9",
+      "trigger": "ST(10)[Dec] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "27",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "42",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "64",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "91",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "93",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "94",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "124",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "137",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "143",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "144",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "149",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "153",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "184",
+      "dest": "FINISH",
+      "trigger": "ST(0)[HE] => CC\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "27",
+      "dest": "FINISH",
+      "trigger": "ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "88",
+      "dest": "FINISH",
+      "trigger": "ST(6)[Enc] => CC\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "28",
+      "dest": "9",
+      "trigger": "ST(0)[HE] => ACK,ST(11)[Enc],ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:2"
+      ]
+    },
+    {
+      "source": "41",
+      "dest": "88",
+      "trigger": "ST(6)[Enc] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "91",
+      "dest": "143",
+      "trigger": "ST(6)[Enc] => ACK,ST(11)[Enc]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "44",
+      "dest": "4",
+      "trigger": "ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "94",
+      "dest": "153",
+      "trigger": "ST(6)[Enc] => ACK,ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "54",
+      "dest": "9",
+      "trigger": "ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "58",
+      "dest": "120",
+      "trigger": "ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "112",
+      "dest": "9",
+      "trigger": "ST(10)[Dec] => ACK\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "64",
+      "dest": "9",
+      "trigger": "ST(6)[Enc] => ST(11)[Enc],ST(0)[HE,DA],ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "78",
+      "dest": "9",
+      "trigger": "ST(6)[Enc] => ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "89",
+      "dest": "134",
+      "trigger": "ST(6)[Enc] => ACK,ST(11)[Enc],ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "144",
+      "dest": "143",
+      "trigger": "ST(6)[Enc] => ACK,ST(11)[Enc],ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "93",
+      "dest": "14",
+      "trigger": "ST(6)[Enc] => ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "109",
+      "dest": "160",
+      "trigger": "ST(10)[Dec] => \u2298\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "117",
+      "dest": "54",
+      "trigger": "ST(6)[Enc] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "118",
+      "dest": "54",
+      "trigger": "ST(6)[Enc] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "120",
+      "dest": "9",
+      "trigger": "ST(6)[Enc] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "124",
+      "dest": "9",
+      "trigger": "ST(6)[Enc] => ACK,ST(11)[Enc],ST(0)[HE,DA],ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "127",
+      "dest": "9",
+      "trigger": "ST(6)[Enc] => ACK,ST(7)[Dec],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "137",
+      "dest": "9",
+      "trigger": "ST(6)[Enc] => ACK,ST(11)[Enc],ST(7)[Dec],ST(0)[HE,DA]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "149",
+      "dest": "14",
+      "trigger": "ST(6)[Enc] => ACK,ST(0)[HE,DA],ST(7)[Dec]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "158",
+      "dest": "54",
+      "trigger": "ST(6)[Enc] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA],ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "167",
+      "dest": "54",
+      "trigger": "ST(6)[Enc] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA],ACK\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "158",
+      "dest": "9",
+      "trigger": "ST(10)[Dec] => ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA],ACK\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    },
+    {
+      "source": "160",
+      "dest": "9",
+      "trigger": "ST(6)[Enc] => ACK,ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "172",
+      "dest": "54",
+      "trigger": "ST(6)[Enc] => ACK,ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:3"
+      ]
+    },
+    {
+      "source": "172",
+      "dest": "9",
+      "trigger": "ST(10)[Dec] => ACK,ST(7)[Dec],ST(11)[Enc],ST(4)[HE,DA]\n",
+      "conditions": [
+        "packet_number:5"
+      ]
+    }
+  ],
+  "states": [
+    {
+      "name": "START"
+    },
+    {
+      "name": "FINISH"
+    },
+    {
+      "name": "HANDSHAKING"
+    },
+    {
+      "name": "CONNECTED"
+    },
+    {
+      "name": "1"
+    },
+    {
+      "name": "2"
+    },
+    {
+      "name": "4"
+    },
+    {
+      "name": "7"
+    },
+    {
+      "name": "9"
+    },
+    {
+      "name": "11"
+    },
+    {
+      "name": "14"
+    },
+    {
+      "name": "19"
+    },
+    {
+      "name": "22"
+    },
+    {
+      "name": "23"
+    },
+    {
+      "name": "24"
+    },
+    {
+      "name": "27"
+    },
+    {
+      "name": "28"
+    },
+    {
+      "name": "32"
+    },
+    {
+      "name": "34"
+    },
+    {
+      "name": "37"
+    },
+    {
+      "name": "41"
+    },
+    {
+      "name": "42"
+    },
+    {
+      "name": "43"
+    },
+    {
+      "name": "44"
+    },
+    {
+      "name": "47"
+    },
+    {
+      "name": "54"
+    },
+    {
+      "name": "58"
+    },
+    {
+      "name": "64"
+    },
+    {
+      "name": "78"
+    },
+    {
+      "name": "88"
+    },
+    {
+      "name": "89"
+    },
+    {
+      "name": "91"
+    },
+    {
+      "name": "93"
+    },
+    {
+      "name": "94"
+    },
+    {
+      "name": "109"
+    },
+    {
+      "name": "112"
+    },
+    {
+      "name": "117"
+    },
+    {
+      "name": "118"
+    },
+    {
+      "name": "120"
+    },
+    {
+      "name": "124"
+    },
+    {
+      "name": "127"
+    },
+    {
+      "name": "134"
+    },
+    {
+      "name": "137"
+    },
+    {
+      "name": "143"
+    },
+    {
+      "name": "144"
+    },
+    {
+      "name": "149"
+    },
+    {
+      "name": "153"
+    },
+    {
+      "name": "158"
+    },
+    {
+      "name": "160"
+    },
+    {
+      "name": "167"
+    },
+    {
+      "name": "172"
+    },
+    {
+      "name": "184"
+    },
+    {
+      "name": "227"
+    },
+    {
+      "name": "243"
+    }
+  ],
+  "before_state_change": [],
+  "after_state_change": [],
+  "prepare_event": [],
+  "finalize_event": [],
+  "on_exception": [],
+  "on_final": [],
+  "send_event": false,
+  "auto_transitions": false,
+  "model_attribute": "state",
+  "model_override": false,
+  "ignore_invalid_triggers": null,
+  "queued": false,
+  "models": [
+    {
+      "state": "START",
+      "name": "",
+      "class-name": "self"
+    }
+  ]
+}

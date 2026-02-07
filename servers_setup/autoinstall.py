@@ -273,6 +273,9 @@ def install_quic_go(version):
 def install_msquic_kestrel(version):
     if version == '2.4.8':
         os.system("sudo rm -rf ./msquic_kestrel")
+        
+        # make sure there is not any installed dotnet related apt package.
+        # check with: dpkg -l | grep -Ei 'dotnet|aspnet|netstandard|mono'
 
         # install msquic library
         os.system("wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | sudo apt-key add -")
@@ -574,7 +577,7 @@ if __name__ == '__main__':
     "- 1.23.4, 1.25.5, 1.27.0 or 1.28.0 \t(for nginx) \n"
     "- 2.4.6, 2.7.6, 2.8.4, 2.10.0\t(for caddy) \n"
     "- a429117, 222b36d, 16b13ee or f1918a5\t(for h2o) \n"
-    "- 1.7.15, 1.8.1, 1.8.3.1\t(for ols)\n"
+    "- 1.7.15, 1.8.1 or 1.8.3.1\t(for ols)\n"
     "- 0.23.5 \t(for cloudflare-quiche)\n"
     "- 0.50.1 \t (for quic-go)\n"
     "- 2.4.8 \t (for msquic-kestrel)\n"

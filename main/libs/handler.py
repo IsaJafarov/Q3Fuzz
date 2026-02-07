@@ -3,7 +3,7 @@ from aioquic.quic.connection import *
 from aioquic.h3.connection import FrameType, StreamType
 from aioquic.quic.rangeset import RangeSet
 from aioquic.buffer import Buffer
-from .util import QUIC_FRAME_ABBREVIATIONS, H3_FRAME_ABBREVIATIONS, GREASE_ABBREVIATION
+from .util import *
 
 @dataclass
 class Stream():
@@ -160,7 +160,7 @@ class MSGHandler():
             
         self.previous_quic_payloads.append( plain )
 
-        return util.beautify_message_string(msg_per_layer, exclude_opt_server_frames=True)
+        return beautify_message_string(msg_per_layer, exclude_opt_server_frames=True)
     
 
     def process_http3_payload( self, received_stream:ReceivedStreamFrame ) -> str:
@@ -198,10 +198,10 @@ class MSGHandler():
             # Check if the stream is a QPACK Encoder/Decoder stream
             if stream.uni_stream_type == StreamType.QPACK_ENCODER:
                 msg_http3 += "Enc,"
-                return util.beautify_message_string(msg_http3, exclude_opt_server_frames=True)
+                return beautify_message_string(msg_http3, exclude_opt_server_frames=True)
             elif stream.uni_stream_type == StreamType.QPACK_DECODER:
                 msg_http3 += "Dec,"
-                return util.beautify_message_string(msg_http3, exclude_opt_server_frames=True)
+                return beautify_message_string(msg_http3, exclude_opt_server_frames=True)
             
 
 
@@ -240,7 +240,7 @@ class MSGHandler():
                 stream.unfinished_h3_frame_len_to_read = frame_len - left_data
                 #print("Frame data length to read in the next stream {}".format( stream.unfinished_h3_frame_len_to_read ))
                 
-        return util.beautify_message_string(msg_http3, exclude_opt_server_frames=True) if msg_http3 != '' else "\u2298"
+        return beautify_message_string(msg_http3, exclude_opt_server_frames=True) if msg_http3 != '' else "\u2298"
       
     def handle_padding_frame(
         self, context: QuicReceiveContext, frame_type: int, buf: Buffer

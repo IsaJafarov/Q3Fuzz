@@ -6,10 +6,6 @@ import re
 from termcolor import colored
 from collections import OrderedDict
 from typing import List, Union
-from aioquic.buffer import Buffer
-from aioquic.quic.packet import QuicFrameType, QuicPacketType
-import pyshark.packet
-import pyshark.packet.layers
 from pyshark.packet.packet import Packet
 from pyshark.packet.layers.xml_layer import XmlLayer
 from .dissector import *
@@ -278,8 +274,9 @@ def h3msg_from_pcap(file_path:str, keylog_file:str, client_only:bool=False) -> L
     
     return quic_packet_list
 
+    
 
-def h3msg_to_str(h3msg:Union[list, Packet], exclude_opt_client_frames:bool = False, exclude_opt_server_frames:bool = False) -> str:
+def h3msg_to_str(h3msg:Packet, exclude_opt_client_frames:bool = False, exclude_opt_server_frames:bool = False) -> str:
     """
     Convert a QUIC or HTTP3 message in a human-readable format.
     args:
@@ -287,59 +284,52 @@ def h3msg_to_str(h3msg:Union[list, Packet], exclude_opt_client_frames:bool = Fal
     return:
         msginfo: a string of a Q / H3 message with multiple layers and frames
     """
-    
+
+    quic_layer = h3msg.quic
     msginfo = ''
+    
+    if 'header_form' in quic_layer.field_names and quic_layer.header_form == "1":  # Long header type
+        if msginfo:
+            msginfo += ','
+        msginfo += QUIC_LONGPACKETTYPE[int(quic_layer.long_packet_type)]
+        return msginfo
 
-    if isinstance(h3msg, list): # for moving messages
-        for h3msg_sub in h3msg:
-            msginfo += h3msg_to_str(h3msg_sub) + " => "
-        if msginfo != '':
-            msginfo = msginfo.rstrip(" => ")
-    else:
-        quic_layer = h3msg.quic
-        
-        if 'header_form' in quic_layer.field_names and quic_layer.header_form == "1":  # Long header type
-            if msginfo:
-                msginfo += ','
-            msginfo += QUIC_LONGPACKETTYPE[int(quic_layer.long_packet_type)]
-            return msginfo
+    msg_dissector = MSGDissector()
+    quic_frames = msg_dissector.dissect_msg(h3msg)
 
-        msg_dissector = MSGDissector()
-        quic_frames = msg_dissector.dissect_msg(h3msg)
+    for quic_frame in quic_frames:
 
-        for quic_frame in quic_frames:
-
-            if isinstance(quic_frame, QuicAck):
-                msginfo += QUIC_FRAME_ABBREVIATIONS['ACK']
-            elif isinstance(quic_frame, QuicNewConnectionId):
-                msginfo += QUIC_FRAME_ABBREVIATIONS['NEW_CONNECTION_ID']
-            elif isinstance(quic_frame, QuicMaxStreams):
-                msginfo += QUIC_FRAME_ABBREVIATIONS['MAX_STREAMS']
-            elif isinstance(quic_frame, QuicStream):
-                h3_frame_str = ''
-                
-                if quic_frame.h3_frame is None:
-                    h3_frame_str = "\u2298"
-                elif isinstance(quic_frame.h3_frame, H3Settings):
-                    h3_frame_str = H3_FRAME_ABBREVIATIONS['SETTINGS']
-                elif isinstance(quic_frame.h3_frame, H3Headers):
-                    h3_frame_str = H3_FRAME_ABBREVIATIONS['HEADERS']
-                elif isinstance(quic_frame.h3_frame, H3Data):
-                    h3_frame_str = H3_FRAME_ABBREVIATIONS['DATA'] 
-                elif isinstance(quic_frame.h3_frame, H3PriorityUpdate):
-                    h3_frame_str = H3_FRAME_ABBREVIATIONS['PRIORITY_UPDATE']
-                elif isinstance(quic_frame.h3_frame, QpackEncoder):
-                    h3_frame_str = 'Enc'
-                elif isinstance(quic_frame.h3_frame, QpackDecoder):
-                    h3_frame_str = 'Dec'
-                else:
-                    print(quic_frame)
-                    raise Exception("Unknown HTTP/3 frame")
+        if isinstance(quic_frame, QuicAck):
+            msginfo += QUIC_FRAME_ABBREVIATIONS['ACK']
+        elif isinstance(quic_frame, QuicNewConnectionId):
+            msginfo += QUIC_FRAME_ABBREVIATIONS['NEW_CONNECTION_ID']
+        elif isinstance(quic_frame, QuicMaxStreams):
+            msginfo += QUIC_FRAME_ABBREVIATIONS['MAX_STREAMS']
+        elif isinstance(quic_frame, QuicStream):
+            h3_frame_str = ''
             
-                msginfo += "{}({})[{}]".format(QUIC_FRAME_ABBREVIATIONS['STREAM'], quic_frame.stream_id, h3_frame_str)
+            if quic_frame.h3_frame is None:
+                h3_frame_str = "\u2298"
+            elif isinstance(quic_frame.h3_frame, H3Settings):
+                h3_frame_str = H3_FRAME_ABBREVIATIONS['SETTINGS']
+            elif isinstance(quic_frame.h3_frame, H3Headers):
+                h3_frame_str = H3_FRAME_ABBREVIATIONS['HEADERS']
+            elif isinstance(quic_frame.h3_frame, H3Data):
+                h3_frame_str = H3_FRAME_ABBREVIATIONS['DATA'] 
+            elif isinstance(quic_frame.h3_frame, H3PriorityUpdate):
+                h3_frame_str = H3_FRAME_ABBREVIATIONS['PRIORITY_UPDATE']
+            elif isinstance(quic_frame.h3_frame, QpackEncoder):
+                h3_frame_str = 'Enc'
+            elif isinstance(quic_frame.h3_frame, QpackDecoder):
+                h3_frame_str = 'Dec'
             else:
-                raise Exception("Unknown QUIC frame")
-            msginfo += ","
+                print(quic_frame)
+                raise Exception("Unknown HTTP/3 frame")
+        
+            msginfo += "{}({})[{}]".format(QUIC_FRAME_ABBREVIATIONS['STREAM'], quic_frame.stream_id, h3_frame_str)
+        else:
+            raise Exception("Unknown QUIC frame")
+        msginfo += ","
 
     return beautify_message_string(msginfo, exclude_opt_client_frames=exclude_opt_client_frames, exclude_opt_server_frames=exclude_opt_server_frames) 
 
@@ -359,12 +349,12 @@ def beautify_message_string(message:str, exclude_opt_client_frames:bool = False,
         .replace(QUIC_FRAME_ABBREVIATIONS["MAX_STREAM_DATA"]+",", "")
             
         # check if there are frames other than ACK
-        if len( message.replace("ACK", "").replace(",", "") ) > 0:
+        # if len( message.replace("ACK", "").replace(",", "") ) > 0:
             # print(">>> Turned {} into {}".format(
             #     message,
             #     message.replace(QUIC_FRAME_ABBREVIATIONS["ACK"]+",", "")
             # ))
-            message = message.replace(QUIC_FRAME_ABBREVIATIONS["ACK"]+",", "")
+            # message = message.replace(QUIC_FRAME_ABBREVIATIONS["ACK"]+",", "")
     
     if exclude_opt_client_frames:
         message = message\

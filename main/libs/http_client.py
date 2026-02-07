@@ -2,9 +2,8 @@ import time
 import socket
 
 # aioquic module
-import aioquic
 from aioquic.buffer import Buffer
-from aioquic.h3.connection import H3Connection, FrameType, encode_frame, encode_settings, StreamType
+from aioquic.h3.connection import H3Connection
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.packet_builder import QuicPacketBuilder
 from aioquic.quic.packet import QuicFrameType, QuicPacketType
@@ -17,7 +16,7 @@ from pyshark.packet.packet import Packet
 # PRETT3 module
 from libs.handler import MSGHandler
 from libs.crafter import MSGCrafter
-from .util import beautify_message_string
+from .util import beautify_message_string, QUIC_FRAME_ABBREVIATIONS
 
 from .dissector import MSGDissector, QuicAck
 
@@ -35,7 +34,6 @@ class HttpClient():
         self.handler = MSGHandler(qc = self.connection)
         self.msg_crafter = MSGCrafter(http_client=self)
         self.received_packet_numbers = set()
-        self.ack_needed = True  # Flag to determine if an ACK should be sent against specific QUIC messages   TODO
         
     def get_builder(self, epoch: Epoch):
         builder = QuicPacketBuilder(
@@ -194,7 +192,7 @@ class HttpClient():
 
         self._http._quic._loss.spaces = list(self._http._quic._spaces.values())
     
-    def connect(self, transport_params:QuicTransportParameters=None) -> None:
+    def connect(self, transport_params:QuicTransportParameters=None) -> str:
         """
         How aioquic's QuicConnection does it:
         initialize() sets up tls context
@@ -222,9 +220,9 @@ class HttpClient():
         
         self.send_quic_frames_from_builder(builder)
         
-
-
-    def complete_connection(self) -> None:
+        return self.read_from_buffer()
+    
+    def complete_connection(self) -> str:
         """
         How aioquic's QuicConnection does it:
         receive_datagram() calls _payload_received()
@@ -234,8 +232,21 @@ class HttpClient():
 
         _update_traffic_key() (when called automatically) calls _push_crypto_data() to write data from HANDSHAKE's full buffer to its stream
         """
+        
+        def wait_till_crypto_is_ready():
 
-        self._wait_till_handshake_crypto_is_ready()  
+            for _ in range(50):
+                if self._http._quic._cryptos[Epoch.HANDSHAKE].send.is_valid() and \
+                    self._http._quic._cryptos[Epoch.ONE_RTT].send.is_valid():
+                    break
+                else:
+                    self.read_from_buffer()
+            else:
+                self.close_local_socket()
+                raise Exception("The Encoding crypto is not valid to send data. Is your server up?")            
+        
+
+        wait_till_crypto_is_ready()
         
         builder = self.get_builder(Epoch.HANDSHAKE)
 
@@ -244,11 +255,10 @@ class HttpClient():
         
         crypto_frame = None
         # Wait till the server finishes sending all the CRYPTO data
-        for _ in range(20):
+        for _ in range(50):
             crypto_frame = crypto_streams.sender.get_frame(1135)  # TODO: calculate max_size dynamically instead of giving static number
             if crypto_frame is not None: 
                 break
-            #time.sleep(0.1)
         else:
             self.close_local_socket()
             raise Exception("The Server did not send crypto data. Try again.")
@@ -265,110 +275,8 @@ class HttpClient():
 
         self.send_quic_frames_from_builder(builder)
 
+        return self.read_from_buffer()
 
-    def open_qpack_streams(self):
-        """
-        How aioquic does it
-        1. Crafting
-        _http._init_connection()
-            - gonna create 3 uni streams via _http._create_uni_stream()
-        
-        _http._create_uni_stream()
-            - gonna create QUIC stream by calling _quic.send_stream_data() with stream id and encoded _http.StreamType
-
-        _quic.send_stream_data()
-            - gonna create the stream by calling _quic._get_or_create_stream_for_send()
-            - appends to _quic._streams_queue list
-            - writes data to that stream.sender
-        
-        _quic._get_or_create_stream_for_send()
-            - creates QuicStream
-        
-            
-        2. Sending
-        _quic.datagrams_to_send() 
-            - passes builder to _quic._write_application()
-
-        _quic._write_application()
-            - gets the stream from _quic._streams_queue list
-            - gonna create the stream frame by passing builder to _quic._write_stream_frame
-
-        _quic._write_stream_frame()
-            - creates frame by calling stream.sender.get_frame()
-
-        stream.sender.get_frame()
-            - creates QuicStreamFrame
-        """
-
-        settings={
-            aioquic.h3.connection.Setting.QPACK_MAX_TABLE_CAPACITY: self._http._max_table_capacity,
-            aioquic.h3.connection.Setting.QPACK_BLOCKED_STREAMS: self._http._blocked_streams,
-            aioquic.h3.connection.Setting.ENABLE_CONNECT_PROTOCOL: 1,
-            aioquic.h3.connection.Setting.DUMMY: 1
-        }
-        encoded_settings_frame = encode_frame(FrameType.SETTINGS, encode_settings(settings))
-
-        # Control stream
-        stream2_frame = QuicStreamFrame(
-            data=
-             bytes( aioquic.buffer.encode_uint_var(StreamType.CONTROL) + encoded_settings_frame), #aioquic.buffer.encode_uint_var(StreamType.CONTROL),
-            offset=0,
-            fin=False
-        )
-       
-        # Encoder stream
-        stream6_frame = QuicStreamFrame(
-            data=aioquic.buffer.encode_uint_var(StreamType.QPACK_ENCODER),
-            offset=0,
-            fin=False
-        )
-
-        # Decoder stream
-        stream10_frame = QuicStreamFrame(
-            data=aioquic.buffer.encode_uint_var(StreamType.QPACK_DECODER),
-            offset=0,
-            fin=False
-        )
-
-
-        builder = self.get_builder(Epoch.ONE_RTT)
-
-
-        # Frame 1
-        buf1 = builder.start_frame(
-                QuicFrameType.STREAM_BASE | 2, 
-                capacity=4, #checked
-            )
-        buf1.push_uint_var(2) # stream id
-        #buf1.push_uint_var(0) # offset. IMPORTANT!!! _QUIC._write_stream_frame() does not set offset for these frames.
-        buf1.push_uint16( len(stream2_frame.data) | 0x4000 ) #(16399) #(len(stream2_frame.data) | 0x4000) # length
-        buf1.push_bytes(stream2_frame.data) # data
-        
-        
-        # Frame 2
-        #'''
-        buf2 = builder.start_frame(
-                QuicFrameType.STREAM_BASE | 2,
-                capacity=4, #checked
-            )
-        buf2.push_uint_var(6)
-        #buf2.push_uint_var(0) # offset
-        buf2.push_uint16( len(stream6_frame.data) | 0x4000 )  #(16385) #(len(stream6_frame.data) | 0x4000)
-        buf2.push_bytes(stream6_frame.data)
-        #'''
-
-        #'''
-        # Frame 3
-        buf3 = builder.start_frame(
-                QuicFrameType.STREAM_BASE | 2,
-                capacity=4, #checked
-            )
-        buf3.push_uint_var(10)
-        #buf3.push_uint_var(0) # offset
-        buf3.push_uint16(len(stream10_frame.data) | 0x4000) #(16385) | 0x4000)
-        buf3.push_bytes(stream10_frame.data)        
-        #'''
-        self.send_quic_frames_from_builder(builder)
 
     def send_quic_frames_from_builder(self, builder:QuicPacketBuilder) -> None:
         datagrams, packets = builder.flush()
@@ -376,7 +284,7 @@ class HttpClient():
         for data in datagrams:
             self.sock.sendto(data, (self.hostname, 443))
 
-    def read_from_buffer(self) -> str:
+    def read_from_buffer(self, respond_with_ack:bool=False) -> str:
         """
         Read QUIC/HTTP3 messages from the buffer, directly parsing decrypted payloads and saving into human-readable format.
 
@@ -390,9 +298,9 @@ class HttpClient():
                 # Receive raw data from UDP socket
                 data, addr = self.sock.recvfrom(2048)  # Adjust buffer size as needed
 
-                res_per_packet = self.receive_datagram(data, now=time.process_time())
+                res_per_packet = self.receive_datagram(data, now=time.process_time(), respond_with_ack=respond_with_ack)
 
-                if res_per_packet and res_per_packet != '':
+                if res_per_packet != '':
                     res += res_per_packet
                     res += ','
                     # res += '|'
@@ -406,7 +314,7 @@ class HttpClient():
                 res="\u2298"
             return res
 
-    def receive_datagram(self, data: bytes, now: float) -> str:
+    def receive_datagram(self, data: bytes, now: float, respond_with_ack:bool) -> str:
         """
         Process a received QUIC packet datagram and return any decrypted packet data.
         Also determines whether to send an ACK frame.
@@ -527,14 +435,17 @@ class HttpClient():
             if self._http._quic._state in END_STATES or self._http._quic._close_pending:
                 return
             
-            # Step 10: Determine if ACK should be sent based on `res_per_packet` and `self.ack_needed`
-            # QUIC ACK should be sent in response to STREAM and CRYPTO
-            if self.ack_needed and (epoch == tls.Epoch.ONE_RTT or epoch == tls.Epoch.HANDSHAKE):
-                # If "ST" or "CRY" is present, trigger ACK
-                if "ST" in res_per_packet or "CRY" in res_per_packet or "HD" in res_per_packet:
-                    if epoch==Epoch.HANDSHAKE:
-                        self._wait_till_handshake_crypto_is_ready()
-                    self.send_ack_frame(context, packet_number)
+        
+        if respond_with_ack:
+            # https://quicwg.org/base-drafts/rfc9002.html#name-conventions-and-definitions
+            response_without_non_ack_eliciting_frames = res_per_packet\
+                .replace(QUIC_FRAME_ABBREVIATIONS["ACK"], "")\
+                .replace(QUIC_FRAME_ABBREVIATIONS["PADDING"], "")\
+                .replace(QUIC_FRAME_ABBREVIATIONS["CONNECTION_CLOSE"], "")\
+                .replace(",", "")
+            if response_without_non_ack_eliciting_frames:
+                self.send_ack_frame(context, packet_number)
+
 
         return beautify_message_string(res_per_packet, exclude_opt_server_frames=True)
 
@@ -554,32 +465,6 @@ class HttpClient():
         self._http._quic._retry_source_connection_id = header.source_cid
 
         self.connect()
-        
-
-    def set_ack_enabled(self, flag: bool) -> None:
-        """
-        Switch for en-/disabling auto-ack response per HttpClient.
-        For state machine construction, the self.ack_needed is set to be True as default.
-        For fuzzing, we may choose to either 
-        - 'True' to follow the same transition as SM construciton) 
-        - 'False' to ignore auto-ack for the special use.
-        !!! This function MUST BE CALLED EVERY TIME we create HttpClient instance to DISABLE.
-        """
-        self.ack_needed = flag
-
-    def _wait_till_handshake_crypto_is_ready(self):
-
-        for _ in range(20):
-            crypto_pair = self._http._quic._cryptos[Epoch.HANDSHAKE]
-
-            if crypto_pair.send.is_valid():
-                break
-            else:
-                self.read_from_buffer()
-        else:
-            self.close_local_socket()
-            raise Exception("The Encoding crypto is not valid to send data. Is your server up?")            
-        
 
     def send_ack_frame(self, context: QuicReceiveContext, largest_acknowledged: int) -> None:
         """Constructs and sends an ACK frame in response to received QUIC packets."""
@@ -600,7 +485,7 @@ class HttpClient():
         
 
 
-    def replay_msg(self, h3msg:Packet) -> str:
+    def replay_msg(self, h3msg:Packet, respond_with_ack:bool=True) -> str:
         """
         Replay QUIC and HTTP/3 packets by copying h3msg and capture responses.
         """
@@ -616,11 +501,11 @@ class HttpClient():
         
         self.send_quic_frames_from_builder(builder)
 
-        response_packets = self.read_from_buffer()
-
+        response_packets = self.read_from_buffer(respond_with_ack=respond_with_ack)
+        
         return response_packets
     
-    def send_frames(self, quic_frames:List, wait_for_response=True) -> str:
+    def send_frames(self, quic_frames:List, wait_for_response=True, respond_with_ack:bool=True) -> str:
         """
         Send the QUIC and HTTP/3 frames in a packet and capture responses.
         """
@@ -632,7 +517,7 @@ class HttpClient():
 
         response_packets = "\x1B[3m not waited \x1B[0m"
         if wait_for_response:
-            response_packets = self.read_from_buffer()
+            response_packets = self.read_from_buffer(respond_with_ack=respond_with_ack)
 
         return response_packets
 

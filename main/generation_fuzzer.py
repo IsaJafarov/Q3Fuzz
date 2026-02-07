@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from libs.http_client import HttpClient
 from aioquic.h3.connection import H3_ALPN
 from libs.dissector import *
-from libs.util import QUIC_FRAME_ABBREVIATIONS
+from libs.util import *
 from datetime import datetime
 import time
 import concurrent.futures
@@ -78,7 +78,7 @@ class Fuzzer():
             packet_number = t['conditions'][0].split(":")[1] if 'conditions' in t else None
             self.graph.add_edge(source, destination, trigger=trigger, packet_number=packet_number)
 
-        self.traffic_messages = util.h3msg_from_pcap(traffic_file_path, self.keylog_file, True)
+        self.traffic_messages = h3msg_from_pcap(traffic_file_path, self.keylog_file, True)
 
     def print_info(self, transitions:List[Tuple]):
         table = Table(title="Fuzzing Configuration")
