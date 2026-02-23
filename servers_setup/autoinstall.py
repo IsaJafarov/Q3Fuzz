@@ -51,7 +51,7 @@ def install_nginx(version):
                        --with-ld-opt=\"-L./boringssl/build/ssl    \
                                       -L./boringssl/build/crypto\"")        
         os.system("sudo make -j")
-        # os.system("sudo make install")
+        os.system("sudo make install")
         os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
 
         os.system("sudo ./installation-root/sbin/nginx")
@@ -72,7 +72,7 @@ def install_nginx(version):
 	--with-cc-opt="-I./boringssl/include" \
 	--with-ld-opt="-L./boringssl/build/ssl -L../boringssl/build/crypto"')
         os.system("sudo make -j")
-        # os.system("sudo make install")
+        os.system("sudo make install")
         os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
         os.system("sudo ./installation-root/sbin/nginx")
 
@@ -92,7 +92,7 @@ def install_nginx(version):
 	--with-cc-opt="-I./boringssl/include" \
 	--with-ld-opt="-L./boringssl/build/ssl -L../boringssl/build/crypto"')
         os.system("sudo make -j")
-        # os.system("sudo make install")
+        os.system("sudo make install")
         os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
         os.system("sudo ./installation-root/sbin/nginx")
 
@@ -113,7 +113,7 @@ def install_nginx(version):
 	--with-ld-opt="-L./boringssl/build/ssl -L./boringssl/build/crypto"')
 
         os.system("sudo make -j2")
-        # os.system("sudo make install")
+        os.system("sudo make install")
         os.system("sudo cp ../nginx-files/nginx.conf ./installation-root/conf/nginx.conf")
         os.system("sudo ./installation-root/sbin/nginx")
 
