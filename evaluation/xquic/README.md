@@ -29,16 +29,8 @@ CC=gcc CXX=g++ CFLAGS="--coverage" LDFLAGS="--coverage" cmake -DGCOV=on -DCMAKE_
 make -j2
 ```
 
-Run
-```sh
-sudo ./build/tests/test_server -p 443 -l e
-```
 
-Generate simple traffic
-
-Put `ff_xquic_eval.keylog`, `ff_xquic_eval.pcapng` and `level_4.json` in `xquic_for_prett3`
-
-Now run the server with the shared object, so that the coverage will be recorded
+Now run the server
 
 ```sh
 cd ~/evaluation/xquic_for_q3fuzz/xquic;
