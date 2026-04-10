@@ -61,7 +61,7 @@ done
 
 # QUICFuzz
 
-Build the server just like QUICFuzz on host machine and apply the patches
+Build the server just like QUICFuzz on host machine and apply the patches.
 
 ```sh
 sudo apt install -y libevent-dev
@@ -112,7 +112,8 @@ done
 ```
 
 
-Setup docker container
+Setup the docker container on the attacking machine
+
 ```sh
 git clone https://github.com/QUICTester/QUIC-Fuzz.git
 
@@ -132,17 +133,17 @@ sudo docker start quicfuzz_xquic_1
 sudo docker exec -it quicfuzz_xquic_1 bash
 ```
 
-Set up the script that is going to forward traffic
+Set up the *replayer* script. It will replay the test inputs to the web server running on the host machine.
+
 ```sh
 #!/bin/bash
 
-CONTAINER_ID="quicfuzz_xquic_6"
+CONTAINER_ID="quicfuzz_xquic" # update
 CONTAINER_QUEUE="/tmp/xquic/xquic_out_enc_sync_snap_24h/replayable-queue"
 PROCESSED_FILE="./$CONTAINER_ID"_processed_testcases.txt
-TARGET_IP="10.20.20.130"
+TARGET_IP="10.20.20.130" # update
 TARGET_PORT="443"
 LOCAL_PORT=$((49152 + RANDOM % 16384))
-TMUX_PANEL="server"
 
 rm "$PROCESSED_FILE"
 touch "$PROCESSED_FILE"
@@ -188,15 +189,14 @@ echo "All test cases processed"
 ```
 
 
-Start fuzzing
+Start fuzzer inside the container.
 
 ```sh
 # with encryption module + Synchronisation + Snapshot
 ./run quic-fuzz/aflnet xquic_out_enc_sync_snap_24h '-a /tmp/quic-fuzz/aflnet/sabre -A /tmp/quic-fuzz/aflnet/libsnapfuzz.so -p -1 -y -m none -b 1 -P QUIC -q 3 -s 3 -E -K' 86400 5
 ```
-Make sure port 4433 is not occupied. Otherwise, you will get the following. In that case, replace 4433 with a different port number `sed -i 's/4433/4434/g' run`
 
-Run the *replayer* to send the test inputs.
+Run the *replayer* script on the attacking machine.
 ```sh
 sudo bash replay_1.sh
 ```
