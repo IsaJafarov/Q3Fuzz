@@ -116,16 +116,16 @@ sudo docker build -t quicfuzz_xquic . # on sidekick
 # docker build --network=host -t quicfuzz_xquic . # on fuzzservers
 
 # create container
-sudo docker run --network host -it --name quicfuzz_xquic_1 quicfuzz_xquic bash # network=host so that it can send messages to remote machines too
+sudo docker run --network host -it --name quicfuzz_xquic quicfuzz_xquic bash # network=host so that it can send messages to remote machines too
 
 # start container
-sudo docker start quicfuzz_xquic_1
+sudo docker start quicfuzz_xquic
 
 # spawn a shell inside docker
-sudo docker exec -it quicfuzz_xquic_1 bash
+sudo docker exec -it quicfuzz_xquic bash
 ```
 
-Set up the *replayer* script. It will replay the test inputs to the web server running on the host machine.
+Set up the *replayer* script. It will run on the attacking machine, extract test inputs from the docker container and replay them to the web server running on the host machine.
 
 ```sh
 #!/bin/bash
@@ -181,7 +181,7 @@ echo "All test cases processed"
 ```
 
 
-Start fuzzer inside the container.
+Start fuzzer inside the QUICFuzz docker container.
 
 ```sh
 # with encryption module + Synchronisation + Snapshot
@@ -190,5 +190,5 @@ Start fuzzer inside the container.
 
 Run the *replayer* script on the attacking machine.
 ```sh
-sudo bash replay_1.sh
+sudo bash replay.sh
 ```
