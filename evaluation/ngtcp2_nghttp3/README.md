@@ -35,19 +35,7 @@ autoreconf -i
 make -j2 check
 ```
 
-Run the server to generate SM
-```sh
-sudo ./examples/wsslserver 0.0.0.0 443 ../../../PRETT3/servers_setup/certs/prett3.com.key ../../../PRETT3/servers_setup/certs/prett3.com.crt --initial-pkt-num=0 -d /usr/local/nginx/html/
-```
-
-Generate traffic with firefox: `ff_n_ngtcp2_eval.pcapng` and `ff_n_ngtcp2_eval.keylog`
-
-Generate SM
-```sh
-python3 prett3_syn.py https://prett3.com ../ff_n_ngtcp2_eval.pcapng -dk ../ff_n_ngtcp2_eval.keylog
-```
-
-Run the server for fuzzing. Preferably, run in a `tmux` session
+Now run the server
 
 ```bash
 cd ~/evaluation/; \
@@ -55,12 +43,12 @@ sudo lcov --zerocounters --directory /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ng
 sudo rm coverage_log.txt; \
 while true; do \
     sudo timeout --signal=INT 300 /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/examples/wsslserver 0.0.0.0 443 /home/ubuntu/PRETT3/servers_setup/certs/prett3.com.key /home/ubuntu/PRETT3/servers_setup/certs/prett3.com.crt --initial-pkt-num=0 -d /usr/local/nginx/html/; \
-    sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/; \
+	if [ $? -eq 124 ]; then sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/; fi; \
 done
 ```
 
 
-Start fuzzer
+Start fuzzing
 ```sh
 while true; do \
 	python3 generation_fuzzer.py https://prett3.com ../sample_traffics/evaluation/ff_ngtcp2_eval.pcapng ../result/evaluation/ff_ngtcp2_eval/level_4.json -dk  ../sample_traffics/secrets.keylog -p1 -i1 -d1 -g50 -m50 -nr; \
@@ -71,6 +59,8 @@ done
 # QUICFuzz
 
 ## Setup
+
+Build the server just like QUICFuzz on host machine and apply the patches.
 
 ```sh
 sudo apt-get install -y libev-dev libbrotli-dev libtool autoconf automake
@@ -106,11 +96,11 @@ autoreconf -i
 make -j2 check
 ```
 
-Set up docker container. 
+Setup the docker container on the attacking machine.
 
-The 2nd line in Dockerfile from the end (`COPY ngtcp2_RetryClientAuth_seed ngtcp2_RetryClientAuth_seed`) causes a problem. It tries to copy `ngtcp2_RetryClientAuth_seed`, but there is no file or folder named that. We check the `run.sh` script and see that, it is not used anywhere. The `run.sh` script uses `ngtcp2_seed`, but not `ngtcp2_RetryClientAuth_seed`. Therefore, we assume that we can safely comment out that line from the Dockerfile.
+P.S. The 2nd line in Dockerfile from the end (`COPY ngtcp2_RetryClientAuth_seed ngtcp2_RetryClientAuth_seed`) causes a problem. It tries to copy `ngtcp2_RetryClientAuth_seed`, but there is no file or folder named that. We check the `run.sh` script and see that, it is not used anywhere. The `run.sh` script uses `ngtcp2_seed`, but not `ngtcp2_RetryClientAuth_seed`. Therefore, we assume that we can safely comment out that line from the Dockerfile.
 
-I also added `RUN git submodule update --init --recursive` line to Dockerfile. Otherwise, nghttp3 would not build due to some version mismatch.
+P.S. We also added `RUN git submodule update --init --recursive` line to Dockerfile. Otherwise, nghttp3 would not build due to some version mismatch.
 
 ```sh
 git clone https://github.com/QUICTester/QUIC-Fuzz.git
@@ -121,34 +111,27 @@ cd QUIC-Fuzz/dockerFiles/ngtcp2/
 sudo docker build -t quicfuzz_ngtcp2 . # if you face connection issues, try adding --network=host
 
 # create containers. Add "network=host" so that it can send messages to remote machines too
-sudo docker run --network host -it --name quicfuzz_ngtcp2_1 quicfuzz_ngtcp2 bash
+sudo docker run --network host -it --name quicfuzz_ngtcp2 quicfuzz_ngtcp2 bash
 
 # start container
-sudo docker start quicfuzz_ngtcp2_1
+sudo docker start quicfuzz_ngtcp2
 
 # spawn a shell inside docker
-tmux new -s quicfuzz_ngtcp2_1 # optional
-sudo docker exec -it quicfuzz_ngtcp2_1 bash
+sudo docker exec -it quicfuzz_ngtcp2 bash
 ```
 
 
-Update **replayX.sh** scripts.
-For the first 5 instances, we did `replayable-queue` and `$CONTAINER_QUEUE/*+cov`.
-For the last 5 instances, we did `replayable-new-ipsm-paths` and `$CONTAINER_QUEUE/*new`
+Set up the replayer script. It will run on the attacking machine, extract test inputs from the docker container and replay them to the web server running on the host machine.
+
 ```sh
 #!/bin/bash
 
-CONTAINER_ID="quicfuzz_ngtcp2_5"
+CONTAINER_ID="quicfuzz_ngtcp2" # update
 CONTAINER_QUEUE="/tmp/ngtcp2/ngtcp2_out_enc_sync_snap_24h/replayable-queue"
-SERVER_BINARY="/home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/examples/wsslserver"
-CERT_FILE="/home/ubuntu/evaluation/QUIC-Fuzz/dockerFiles/ngtcp2/server-cert.pem"
-KEY_FILE="/home/ubuntu/evaluation/QUIC-Fuzz/dockerFiles/ngtcp2/server-key.pem"
-SO_FILE="/home/ubuntu/evaluation/covdump_5sec.so"
 PROCESSED_FILE="./$CONTAINER_ID"_processed_testcases.txt
-TARGET_IP="10.20.20.204"
+TARGET_IP="10.20.20.130" # update
 TARGET_PORT="443"
 LOCAL_PORT=$((49152 + RANDOM % 16384))
-TMUX_PANEL="server"
 
 rm "$PROCESSED_FILE"
 touch "$PROCESSED_FILE"
@@ -162,13 +145,11 @@ docker exec "$CONTAINER_ID" bash -c "socat -d -d UDP4-RECVFROM:$LOCAL_PORT,reuse
 while true; do
 
 # Get list of +cov files from container
-files=$(docker exec "$CONTAINER_ID" bash -c "ls $CONTAINER_QUEUE/*+new 2>/dev/null" | sort)
+files=$(docker exec "$CONTAINER_ID" bash -c "ls $CONTAINER_QUEUE/*+cov 2>/dev/null" | sort)
 
-total=$(echo "$files" | wc -l)
-count=0
 
 	for file in $files; do
-	    count=$((count + 1))
+	    
 	    filename=$(basename "$file")
 	    
 	    # Skip if already processed
@@ -176,56 +157,47 @@ count=0
 	        continue
 	    fi
 	    
-	    echo "[$count/$total] Processing: $filename"
-	    
-	    # Restart server on host
-	    echo "  Restarting server..."
-	    ssh -i /home/isa/.ssh/id_rsa ubuntu@"$TARGET_IP" "tmux send-keys -t $TMUX_PANEL C-c 2>/dev/null"
-	    sleep 0.5
-	    ssh -i /home/isa/.ssh/id_rsa ubuntu@"$TARGET_IP" "tmux send-keys -t $TMUX_PANEL 'sudo env LD_PRELOAD=$SO_FILE $SERVER_BINARY 0.0.0.0 443 $KEY_FILE $CERT_FILE --initial-pkt-num=0' C-m 2>/dev/null"
-	    sleep 1
+	    echo "  Processing: $filename"
 	    
 	    # Replay from inside container using aflnet-replay
 	    echo "  Replaying..."
 	    docker exec "$CONTAINER_ID" /tmp/quic-fuzz/aflnet/aflnet-replay "$file" QUIC $LOCAL_PORT
-	    sleep 5
+	    sleep 0.5
 	    
 	    # Mark as processed
 	    echo "$filename" >> "$PROCESSED_FILE"
 	    
 	    echo "  Done"
+	    sleep 0.5
 	done;
-	sleep 0.5
+	
 done
 
-echo "All test cases processed: $count"
+echo "All test cases processed"
 ```
 
-## Run
+Run the patched server on host
 
-Start the server. Preferably, run the server in a `tmux` session
 ```sh
 cd ~/evaluation/; \
 sudo lcov --zerocounters --directory /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/ --rc lcov_branch_coverage=1; \
 sudo rm coverage_log.txt; \
 while true; do \
-    sudo timeout --signal=INT 300 /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/examples/wsslserver 0.0.0.0 443 /home/ubuntu/PRETT3/servers_setup/certs/prett3.com.key /home/ubuntu/PRETT3/servers_setup/certs/prett3.com.crt --initial-pkt-num=0 -d /usr/local/nginx/html/; \
-    sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/; \
+    sudo timeout --signal=INT 300 /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/examples/wsslserver 0.0.0.0 443 /home/ubuntu/Q3Fuzz/servers_setup/certs/prett3.com.key /home/ubuntu/Q3Fuzz/servers_setup/certs/prett3.com.crt --initial-pkt-num=0 -d /usr/local/nginx/html/; \
+    if [ $? -eq 124 ]; then sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/; fi; \
 done
 ```
 
-Start the **replayX.sh** script
+Start fuzzer inside the QUICFuzz docker container.
 ```sh
-sudo bash replayX.sh
-```
-
-Start the fuzzer inside the container
-```sh
-tmux new -s quicfuzz_ngtcp2_1
-
-sudo docker exec -it quicfuzz_ngtcp2_1 bash
-
 ./run quic-fuzz/aflnet ngtcp2_out_enc_sync_snap_24h '-a /tmp/quic-fuzz/aflnet/sabre -A /tmp/quic-fuzz/aflnet/libsnapfuzz.so -p 0 -y -b 1 -m none -P QUIC -q 3 -s 3 -E -K' 86400 5
 ```
+
+Run the *replayer* script on the attacking machine.
+```sh
+sudo bash replay.sh
+```
+
+
 
 
