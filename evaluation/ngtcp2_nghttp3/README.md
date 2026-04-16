@@ -126,12 +126,13 @@ Set up the replayer script. It will run on the attacking machine, extract test i
 ```sh
 #!/bin/bash
 
-CONTAINER_ID="quicfuzz_ngtcp2" # update
+CONTAINER_ID="quicfuzz_ngtcp2"
 CONTAINER_QUEUE="/tmp/ngtcp2/ngtcp2_out_enc_sync_snap_24h/replayable-queue"
 PROCESSED_FILE="./$CONTAINER_ID"_processed_testcases.txt
-TARGET_IP="10.20.20.130" # update
+TARGET_IP="10.20.20.217" # update
 TARGET_PORT="443"
 LOCAL_PORT=$((49152 + RANDOM % 16384))
+SERVER_RUN_CMD="tmux send-keys -t server 'sudo timeout --signal=INT 2 /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/examples/wsslserver 0.0.0.0 $TARGET_PORT /home/ubuntu/evaluation/QUIC-Fuzz/dockerFiles/ngtcp2/server-key.pem /home/ubuntu/evaluation/QUIC-Fuzz/dockerFiles/ngtcp2/server-cert.pem --initial-pkt-num=0 -d /usr/local/nginx/html/' C-m 2>/dev/null"
 
 rm "$PROCESSED_FILE"
 touch "$PROCESSED_FILE"
@@ -139,58 +140,51 @@ touch "$PROCESSED_FILE"
 echo "Processing test cases from container..."
 
 # when you replay messages to port 443 inside docker, docker should forward it to host 443
-docker exec "$CONTAINER_ID" bash -c "apt install -y socat"
+docker exec "$CONTAINER_ID" bash -c "which socat || apt install -y socat"
 docker exec "$CONTAINER_ID" bash -c "socat -d -d UDP4-RECVFROM:$LOCAL_PORT,reuseaddr,fork UDP4-SENDTO:$TARGET_IP:$TARGET_PORT &"
 
 while true; do
 
-# Get list of +cov files from container
-files=$(docker exec "$CONTAINER_ID" bash -c "ls $CONTAINER_QUEUE/*+cov 2>/dev/null" | sort)
-
+    # Get list of +cov files from container
+    files=$(docker exec "$CONTAINER_ID" bash -c "ls $CONTAINER_QUEUE/*+cov 2>/dev/null" | sort)
 
 	for file in $files; do
-	    
+
 	    filename=$(basename "$file")
-	    
+
 	    # Skip if already processed
 	    if grep -Fxq "$filename" "$PROCESSED_FILE"; then
 	        continue
 	    fi
-	    
+
 	    echo "  Processing: $filename"
-	    
+
+	    echo "  Running server..."
+		ssh -i /home/isa/.ssh/id_rsa ubuntu@"$TARGET_IP" $SERVER_RUN_CMD
+		sleep 1;
+
 	    # Replay from inside container using aflnet-replay
 	    echo "  Replaying..."
 	    docker exec "$CONTAINER_ID" /tmp/quic-fuzz/aflnet/aflnet-replay "$file" QUIC $LOCAL_PORT
-	    sleep 0.5
-	    
+	    sleep 2;
+
 	    # Mark as processed
 	    echo "$filename" >> "$PROCESSED_FILE"
-	    
+
 	    echo "  Done"
-	    sleep 0.5
 	done;
-	
+
 done
 
 echo "All test cases processed"
 ```
 
-Run the patched server on host
-
-```sh
-cd ~/evaluation/; \
-sudo lcov --zerocounters --directory /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/ --rc lcov_branch_coverage=1; \
-sudo rm coverage_log.txt; \
-while true; do \
-    sudo timeout --signal=INT 300 /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/examples/wsslserver 0.0.0.0 443 /home/ubuntu/evaluation/QUIC-Fuzz/dockerFiles/ngtcp2/server-key.pem /home/ubuntu/evaluation/QUIC-Fuzz/dockerFiles/ngtcp2/server-cert.pem --initial-pkt-num=0 -d /usr/local/nginx/html/; \
-    if [ $? -eq 124 ]; then sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/; fi; \
-done
-```
 
 Start fuzzer inside the QUICFuzz docker container.
 ```sh
-./run quic-fuzz/aflnet ngtcp2_out_enc_sync_snap_24h '-a /tmp/quic-fuzz/aflnet/sabre -A /tmp/quic-fuzz/aflnet/libsnapfuzz.so -p 0 -y -b 1 -m none -P QUIC -q 3 -s 3 -E -K' 86400 5
+sudo lcov --zerocounters --directory /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/ --rc lcov_branch_coverage=1; \
+sudo rm coverage_log.txt; \
+while true; do sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/; sleep 300; done
 ```
 
 Run the *replayer* script on the attacking machine.
