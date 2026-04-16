@@ -183,7 +183,7 @@ cd ~/evaluation/; \
 sudo lcov --zerocounters --directory /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/ --rc lcov_branch_coverage=1; \
 sudo rm coverage_log.txt; \
 while true; do \
-    sudo timeout --signal=INT 300 /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/examples/wsslserver 0.0.0.0 443 /home/ubuntu/Q3Fuzz/servers_setup/certs/prett3.com.key /home/ubuntu/Q3Fuzz/servers_setup/certs/prett3.com.crt --initial-pkt-num=0 -d /usr/local/nginx/html/; \
+    sudo timeout --signal=INT 300 /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/examples/wsslserver 0.0.0.0 443 /home/ubuntu/evaluation/QUIC-Fuzz/dockerFiles/ngtcp2/server-key.pem /home/ubuntu/evaluation/QUIC-Fuzz/dockerFiles/ngtcp2/server-cert.pem --initial-pkt-num=0 -d /usr/local/nginx/html/; \
     if [ $? -eq 124 ]; then sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/; fi; \
 done
 ```
