@@ -38,14 +38,23 @@ make -j2 check
 Now run the server
 
 ```bash
-cd ~/evaluation/; \
-sudo lcov --zerocounters --directory /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/ --rc lcov_branch_coverage=1; \
-sudo rm coverage_log.txt; \
+cd ~/evaluation/;
+sudo lcov --zerocounters --directory /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/ --rc lcov_branch_coverage=1;
+sudo rm coverage_log.txt;
+INTERVAL=300
+NEXT=$(( $(date +%s) + INTERVAL ))
+
 while true; do \
-    sudo timeout --signal=INT 300 /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/examples/wsslserver 0.0.0.0 443 /home/ubuntu/PRETT3/servers_setup/certs/prett3.com.key /home/ubuntu/PRETT3/servers_setup/certs/prett3.com.crt --initial-pkt-num=0 -d /usr/local/nginx/html/; \
-	if [ $? -eq 124 ]; then sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/; fi; \
+    sudo timeout --signal=INT $(( NEXT - $(date +%s) )) /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/examples/wsslserver 0.0.0.0 443 /home/ubuntu/PRETT3/servers_setup/certs/prett3.com.key /home/ubuntu/PRETT3/servers_setup/certs/prett3.com.crt --initial-pkt-num=0 -d /usr/local/nginx/html/;
+	NOW=$(date +%s)
+	if [ $NOW -ge $NEXT ]; then
+        sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_q3fuzz/ngtcp2/
+        NEXT=$(( NOW + INTERVAL ))
+    fi
+    # if server crashed before deadline, loop restarts with remaining time
 done
 ```
+
 
 
 Start fuzzing
@@ -180,11 +189,16 @@ echo "All test cases processed"
 ```
 
 
-Start fuzzer inside the QUICFuzz docker container.
+Start measering coverage every 5 minutes on the host machine
 ```sh
 sudo lcov --zerocounters --directory /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/ --rc lcov_branch_coverage=1; \
 sudo rm coverage_log.txt; \
 while true; do sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/ngtcp_for_quicfuzz/ngtcp2/; sleep 300; done
+```
+
+Start fuzzer inside the QUICFuzz docker container.
+```sh
+/run quic-fuzz/aflnet ngtcp2_out_enc_sync_snap_24h '-a /tmp/quic-fuzz/aflnet/sabre -A /tmp/quic-fuzz/aflnet/libsnapfuzz.so -p 0 -y -b 1 -m none -P QUIC -q 3 -s 3 -E -K' 86400 5
 ```
 
 Run the *replayer* script on the attacking machine.

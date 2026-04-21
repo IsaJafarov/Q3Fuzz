@@ -36,11 +36,21 @@ Now run the server
 cd ~/evaluation/xquic_for_q3fuzz/xquic;
 sudo lcov --zerocounters --directory /home/ubuntu/evaluation/xquic_for_q3fuzz/xquic/ --rc lcov_branch_coverage=1;
 sudo rm /home/ubuntu/evaluation/coverage_log.txt;
+INTERVAL=300
+NEXT=$(( $(date +%s) + INTERVAL ))
+
 while true; do \
-    sudo timeout --signal=TERM 300 /home/ubuntu/evaluation/xquic_for_q3fuzz/xquic/build/demo/demo_server -p 443 -l e -L /dev/null; \
-    if [ $? -eq 124 ]; then sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/xquic_for_q3fuzz/xquic/; fi; \
+    sudo timeout --signal=TERM $(( NEXT - $(date +%s) )) /home/ubuntu/evaluation/xquic_for_q3fuzz/xquic/build/demo/demo_server -p 443 -l e -L /dev/null;
+	NOW=$(date +%s)
+	if [ $NOW -ge $NEXT ]; then
+        sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/xquic_for_q3fuzz/xquic/
+        NEXT=$(( NOW + INTERVAL ))
+    fi
+    # if server crashed before deadline, loop restarts with remaining time
 done
 ```
+
+
 
 Start fuzzing
 ```sh
@@ -92,17 +102,6 @@ cp ../../QUIC-Fuzz/dockerFiles/xquic/xquic.crt ./server.crt
 cp ../../QUIC-Fuzz/dockerFiles/xquic/xquic.key ./server.key
 ```
 
-Run the patched server on host
-```sh
-cd ~/evaluation/xquic_for_quicfuzz/xquic;
-sudo lcov --zerocounters --directory /home/ubuntu/evaluation/xquic_for_quicfuzz/xquic/ --rc lcov_branch_coverage=1;
-sudo rm /home/ubuntu/evaluation/coverage_log.txt;
-while true; do \
-    sudo timeout --signal=TERM 300 /home/ubuntu/evaluation/xquic_for_quicfuzz/xquic/build/demo/demo_server -p 443 -l e -L /dev/null; \
-    if [ $? -eq 124 ]; then sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/xquic_for_quicfuzz/xquic/; fi; \
-done
-```
-
 
 Setup the docker container on the attacking machine
 
@@ -130,54 +129,66 @@ Set up the *replayer* script. It will run on the attacking machine, extract test
 ```sh
 #!/bin/bash
 
-CONTAINER_ID="quicfuzz_xquic" # update
+CONTAINER_ID="quicfuzz_xquic"
 CONTAINER_QUEUE="/tmp/xquic/xquic_out_enc_sync_snap_24h/replayable-queue"
 PROCESSED_FILE="./$CONTAINER_ID"_processed_testcases.txt
-TARGET_IP="10.20.20.130" # update
+TARGET_IP="10.20.20.217"
 TARGET_PORT="443"
 LOCAL_PORT=$((49152 + RANDOM % 16384))
+# The binary has be executed from the xquic directory. Otherwise, it crashes.
+SERVER_RUN_CMD="tmux send-keys -t server 'cd /home/ubuntu/evaluation/xquic_for_quicfuzz/xquic; sudo timeout --signal=TERM 2 ./build/demo/demo_server -p $TARGET_PORT -l e -L /dev/null' C-m 2>/dev/null"
 
-rm "$PROCESSED_FILE"
-touch "$PROCESSED_FILE"
+rm "$PROCESSED_FILE"; touch "$PROCESSED_FILE"
 
 echo "Processing test cases from container..."
 
 # when you replay messages to port 443 inside docker, docker should forward it to host 443
-docker exec "$CONTAINER_ID" bash -c "apt install -y socat"
+docker exec "$CONTAINER_ID" bash -c "which socat || apt install -y socat"
 docker exec "$CONTAINER_ID" bash -c "socat -d -d UDP4-RECVFROM:$LOCAL_PORT,reuseaddr,fork UDP4-SENDTO:$TARGET_IP:$TARGET_PORT &"
 
 while true; do
 
-# Get list of +cov files from container
-files=$(docker exec "$CONTAINER_ID" bash -c "ls $CONTAINER_QUEUE/*+cov 2>/dev/null" | sort)
-
+    # Get list of +cov files from container
+    files=$(docker exec "$CONTAINER_ID" bash -c "ls $CONTAINER_QUEUE/*+cov 2>/dev/null" | sort)
 
 	for file in $files; do
-	    
+
 	    filename=$(basename "$file")
-	    
+
 	    # Skip if already processed
 	    if grep -Fxq "$filename" "$PROCESSED_FILE"; then
 	        continue
 	    fi
-	    
+
 	    echo "  Processing: $filename"
-	    
+
+	    echo "  Running server..."
+		ssh -i /home/isa/.ssh/id_rsa ubuntu@"$TARGET_IP" $SERVER_RUN_CMD
+		sleep 1;
+
 	    # Replay from inside container using aflnet-replay
 	    echo "  Replaying..."
 	    docker exec "$CONTAINER_ID" /tmp/quic-fuzz/aflnet/aflnet-replay "$file" QUIC $LOCAL_PORT
-	    sleep 0.5
-	    
+	    sleep 2;
+
 	    # Mark as processed
 	    echo "$filename" >> "$PROCESSED_FILE"
-	    
+
 	    echo "  Done"
-	    sleep 0.5
 	done;
-	
+
 done
 
 echo "All test cases processed"
+
+```
+
+
+Start measering coverage every 5 minutes on the host machine
+```sh
+sudo lcov --zerocounters --directory /home/ubuntu/evaluation/xquic_for_quicfuzz/xquic/ --rc lcov_branch_coverage=1; \
+sudo rm /home/ubuntu/evaluation/coverage_log.txt; \
+while true; do sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/xquic_for_quicfuzz/xquic/; sleep 300; done
 ```
 
 

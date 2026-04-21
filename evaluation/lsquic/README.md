@@ -33,14 +33,28 @@ make clean all -j2
 Now run the server
 
 ```bash
-cd ~/evaluation/; \
-sudo lcov --zerocounters --directory /home/ubuntu/evaluation/lsquic_for_q3fuzz/lsquic/ --rc lcov_branch_coverage=1; \
-sudo rm coverage_log.txt; \
+cd ~/evaluation/;
+sudo lcov --zerocounters --directory /home/ubuntu/evaluation/lsquic_for_q3fuzz/lsquic/ --rc lcov_branch_coverage=1;
+sudo rm coverage_log.txt;
+INTERVAL=300
+NEXT=$(( $(date +%s) + INTERVAL ))
+
 while true; do \
-    sudo timeout --signal=USR1 300 /home/ubuntu/evaluation/lsquic_for_q3fuzz/lsquic/bin/http_server -s 0.0.0.0:443 -c prett3.com,/home/ubuntu/Q3Fuzz/servers_setup/certs/prett3.com.pem,/home/ubuntu/Q3Fuzz/servers_setup/certs/prett3.com.key -r /usr/local/nginx/html/; \
-    if [ $? -eq 124 ]; then sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/lsquic_for_q3fuzz/lsquic/; fi; \
+
+    sudo timeout --signal=USR1 $(( NEXT - $(date +%s) )) /home/ubuntu/evaluation/lsquic_for_q3fuzz/lsquic/bin/http_server -s 0.0.0.0:443 -c prett3.com,/home/ubuntu/Q3Fuzz/servers_setup/certs/prett3.com.pem,/home/ubuntu/Q3Fuzz/servers_setup/certs/prett3.com.key -r /usr/local/nginx/html/; \
+
+	NOW=$(date +%s)
+	if [ $NOW -ge $NEXT ]; then
+        sudo bash /home/ubuntu/evaluation/covrecord.sh /home/ubuntu/evaluation/lsquic_for_q3fuzz/lsquic/
+        NEXT=$(( NOW + INTERVAL ))
+    fi
+    # if server crashed before deadline, loop restarts with remaining time
 done
 ```
+
+
+
+
 
 Start fuzzing
 ```sh
