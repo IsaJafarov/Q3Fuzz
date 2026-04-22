@@ -65,7 +65,8 @@ class TrafficModeller(object):
             
             if not sample_msg_str:
                 continue
-            
+            # multiple messages might correspond to the same string representation.
+            # therefore, we add subscript to distinguish them
             if sample_msg_str not in self.client_msg_str_dict.values():
                 self.client_msg_str_dict[sample_msg.frame_info.number] = sample_msg_str
             elif sample_msg_str + "\u2082" not in self.client_msg_str_dict.values():
@@ -77,8 +78,9 @@ class TrafficModeller(object):
             elif sample_msg_str + "\u2085" not in self.client_msg_str_dict.values():
                 self.client_msg_str_dict[sample_msg.frame_info.number] = sample_msg_str + "\u2085"
 
+        print("\n\tExtracted client messages: ")
         for k,v in self.client_msg_str_dict.items():
-            print("{}: {}".format(k,v))
+            print("\t{}: {}".format(k,v))
         
     def client_msg_to_str(self, h3msg:Union[list,Packet]):
         
