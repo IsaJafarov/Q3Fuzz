@@ -8,26 +8,6 @@ The work is published at the IEEE DSN 2026 conference.
 
 
 
-|  # |  Vendor |    CWE    |                                    Vulnerability Impact                                    |       Zero-day       | # Attack Vectors |
-|:--:|:-------:|:---------:|:------------------------------------------------------------------------------------------:|:--------------------:|:----------------:|
-| 1  | Proxygen | CWE-119   | Server crash: `Segmentation fault`                                                           |          Yes         |        3+        | 
-| 2  | Xquic   | CWE-119   | Server crash: `Segmentation fault`                                                           |          Yes         |         1        |
-| 3  | Quicly  | CWE-617   | Server crash: `Assertion 'quicly_num_streams(conn) == 0' failed`                             | Yes (CVE-2025-61684) |        3+        |
-| 4  | Quicly  | CWE-617   | Server crash: `Assertion 'v <= 4611686018427387903' failed`                                  | Yes (CVE-2025-61684) |         2        |
-| 5  | Quicly  | CWE-617   | Server crash: `Assertion 'iter->p->acked == quicly_sentmap__type_packet' failed`             | Yes (CVE-2025-61684) |        3+        |
-| 6  | Quicly  | CWE-617   | Server crash: `Assertion '!"invalid CID sequence number"' failed`                            |          Yes         |         1        |
-| 7  | Neqo    | CWE-617   | Server crash: `internal error: entered unreachable code`                                     |          No          |         2        |
-| 8  | Quiche  | CWE-248   | Server crash: `called Result::unwrap() on an Err value: Done`                            |          Yes         |         1        |
-| 9  | Neqo    | CWE-248   | Server crash: `called Result::unwrap() on an Err value: InvalidStreamId`                 |          Yes         |         1        |
-| 10 | Neqo    | CWE-248   | Server crash: `called Result::unwrap() on an Err value: TransportError(InvalidStreamId)` |          Yes         |        3+        |
-| 11 | Neqo    | CWE-248   | Server crash: `called Result::unwrap() on an Err value: Transport(InvalidStreamId)`      |          Yes         |        3+        |
-| 12 | Neqo    | CWE-190   | Server crash: `Varint value too large`                                                       |          No          |         2        |
-| 13 | Kestrel |  CWE-400  | Low-rate DoS due to high CPU usage                                                         |          Yes (CVE-2026-25667))         |         1        |
-| 14 | Quiche  | CWE-400   | Low-rate DoS due to high CPU and memory usage                                              |          Yes         |         1        |
-| 15 | Xquic   | CWE-400   | Low-rate DoS due to high disk and memory usage                                                        |          Yes         |         1        |
-| 16 | Aioquic |  CWE-401  | Low-rate DoS due to memory leak                                                            |          Yes         |         1        |
-| 17 | Neqo    | CWE-401   | Out-of-Memory: Kernel kills server process                                                 |          Yes         |         1        |
-
 # Prerequisites
 
 Install the dependencies
@@ -111,3 +91,39 @@ $ python3 generation_fuzzer.py -dk ./sample_traffics/secrets.keylog https://pret
 ```
 
 The fuzzer generates `50` messages and applies `30` mutations to each message to fuzz each state.
+
+
+# Results
+
+
+|  # |  Vendor |    CWE    |                                    Vulnerability Impact                                    |       Zero-day       | # Attack Vectors |
+|:--:|:-------:|:---------:|:------------------------------------------------------------------------------------------:|:--------------------:|:----------------:|
+| 1  | Proxygen | CWE-119   | Server crash: `Segmentation fault`                                                           |          Yes         |        3+        | 
+| 2  | Xquic   | CWE-119   | Server crash: `Segmentation fault`                                                           |          Yes         |         1        |
+| 3  | Quicly  | CWE-617   | Server crash: `Assertion 'quicly_num_streams(conn) == 0' failed`                             | Yes (CVE-2025-61684) |        3+        |
+| 4  | Quicly  | CWE-617   | Server crash: `Assertion 'v <= 4611686018427387903' failed`                                  | Yes (CVE-2025-61684) |         2        |
+| 5  | Quicly  | CWE-617   | Server crash: `Assertion 'iter->p->acked == quicly_sentmap__type_packet' failed`             | Yes (CVE-2025-61684) |        3+        |
+| 6  | Quicly  | CWE-617   | Server crash: `Assertion '!"invalid CID sequence number"' failed`                            |          Yes         |         1        |
+| 7  | Neqo    | CWE-617   | Server crash: `internal error: entered unreachable code`                                     |          No          |         2        |
+| 8  | Quiche  | CWE-248   | Server crash: `called Result::unwrap() on an Err value: Done`                            |          Yes         |         1        |
+| 9  | Neqo    | CWE-248   | Server crash: `called Result::unwrap() on an Err value: InvalidStreamId`                 |          Yes         |         1        |
+| 10 | Neqo    | CWE-248   | Server crash: `called Result::unwrap() on an Err value: TransportError(InvalidStreamId)` |          Yes         |        3+        |
+| 11 | Neqo    | CWE-248   | Server crash: `called Result::unwrap() on an Err value: Transport(InvalidStreamId)`      |          Yes         |        3+        |
+| 12 | Neqo    | CWE-190   | Server crash: `Varint value too large`                                                       |          No          |         2        |
+| 13 | Kestrel |  CWE-400  | Low-rate DoS due to high CPU usage                                                         |          Yes (CVE-2026-25667))         |         1        |
+| 14 | Quiche  | CWE-400   | Low-rate DoS due to high CPU and memory usage                                              |          Yes         |         1        |
+| 15 | Xquic   | CWE-400   | Low-rate DoS due to high disk and memory usage                                                        |          Yes         |         1        |
+| 16 | Aioquic |  CWE-401  | Low-rate DoS due to memory leak                                                            |          Yes         |         1        |
+| 17 | Neqo    | CWE-401   | Out-of-Memory: Kernel kills server process                                                 |          Yes         |         1        |
+
+
+
+
+
+
+
+
+
+
+
+
