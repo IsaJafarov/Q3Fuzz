@@ -1,11 +1,16 @@
 # Q3Fuzz
 
-Q3Fuzz is a novel black-box framework to model two network protocols (QUIC and HTTP/3) together and conduct multi-layered stateful fuzzing. It constructs the model based on observed network traces by treating the underlying layer and its encapsulated payload as co-occurring
-events. It then uses the model to direct both mutation-based and generation-based fuzzing. 
+Q3Fuzz is a novel black-box framework to model two network protocols (QUIC and HTTP/3) together and conduct multi-layered stateful fuzzing. 
+It constructs the model based on observed network traces by treating the underlying layer and its encapsulated payload as co-occurring events. 
+It then uses the model to direct both mutation-based and generation-based fuzzing. 
 
+---
 
-The work is published at the IEEE DSN 2026 conference.
+## Publication
 
+This project will be presented at the [56th Annual IEEE/IFIP International Conference on Dependable Systems and Networks (DSN 2026)](https://dsn.org/), Charlotte, USA, on June 23rd, 2026.
+
+The full paper will be available at IEEE Xplore and can also be accessed [here](#) *(Link to be updated soon)*.
 
 
 # Prerequisites
